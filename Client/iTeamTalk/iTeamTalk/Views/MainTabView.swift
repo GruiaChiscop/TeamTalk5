@@ -46,6 +46,15 @@ struct MainTabView: View {
             }
             .tag(1)
 
+            // Files tab
+            NavigationStack {
+                ChannelFilesView(model: model.channelFilesModel)
+            }
+            .tabItem {
+                Label("Files", systemImage: "folder")
+            }
+            .tag(2)
+
             // Preferences tab
             NavigationStack {
                 PreferencesView(model: model.preferencesModel)
@@ -53,7 +62,7 @@ struct MainTabView: View {
             .tabItem {
                 Label("Preferences", image: "setup")
             }
-            .tag(2)
+            .tag(3)
         }
         .onAppear {
             model.setup()

@@ -59,7 +59,9 @@ enum Sounds : Int {
          transmit_ON = 11,
          transmit_OFF = 12,
          logged_IN = 13,
-         logged_OUT = 14
+         logged_OUT = 14,
+    file_UPDATE=15,
+    file_COMPLETE=16
 }
 
 var player : AVAudioPlayer?
@@ -72,72 +74,82 @@ func getSoundFile(_ s: Sounds) -> String? {
     case .tx_ON:
         if settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil ||
            settings.bool(forKey: PREF_SNDEVENT_VOICETX) {
-            return "on"
+            return "on.mp3"
         }
     case .tx_OFF:
         if settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_VOICETX) {
-                return "off"
+                return "off.mp3"
         }
     case .chan_MSG:
         if settings.object(forKey: PREF_SNDEVENT_CHANMSG) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_CHANMSG) {
-                return "channel_message"
+                return "channel_message.mp3"
         }
     case .user_MSG:
         if settings.object(forKey: PREF_SNDEVENT_USERMSG) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_USERMSG) {
-                return "user_message"
+                return "user_message.mp3"
         }
     case .broadcast_MSG:
         if settings.object(forKey: PREF_SNDEVENT_BCASTMSG) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_BCASTMSG) {
-            return "broadcast_message"
+            return "broadcast_message.mp3"
         }
     case .srv_LOST:
         if settings.object(forKey: PREF_SNDEVENT_SERVERLOST) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_SERVERLOST) {
-                return "serverlost"
+                return "serverlost.mp3"
         }
     case .joined_CHAN:
         if settings.object(forKey: PREF_SNDEVENT_JOINEDCHAN) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_JOINEDCHAN) {
-                return "newuser"
+                return "newuser.mp3"
         }
     case .left_CHAN:
         if settings.object(forKey: PREF_SNDEVENT_LEFTCHAN) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_LEFTCHAN) {
-                return "removeuser"
+                return "removeuser.mp3"
         }
     case .voxtriggered_ON :
         if settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER) {
-            return "voiceact_on"
+            return "voiceact_on.mp3"
         }
     case .voxtriggered_OFF :
         if settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER) {
-            return "voiceact_off"
+            return "voiceact_off.mp3"
         }
     case .transmit_ON :
         if settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY) {
-            return "txqueue_start"
+            return "txqueue_start.mp3"
         }
     case .transmit_OFF :
         if settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil ||
             settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY) {
-            return "txqueue_stop"
+            return "txqueue_stop.mp3"
         }
     case .logged_IN :
         if settings.object(forKey: PREF_SNDEVENT_LOGGEDIN) != nil &&
             settings.bool(forKey: PREF_SNDEVENT_LOGGEDIN) {
-            return "logged_on"
+            return "logged_on.mp3"
         }
     case .logged_OUT :
         if settings.object(forKey: PREF_SNDEVENT_LOGGEDOUT) != nil &&
             settings.bool(forKey: PREF_SNDEVENT_LOGGEDOUT) {
-            return "logged_off"
+            return "logged_off.mp3"
+        }
+    case .file_COMPLETE :
+        if settings.object(forKey: PREF_SNDEVENT_FILECOMPLETE) != nil &&
+            settings.bool(forKey: PREF_SNDEVENT_FILECOMPLETE) {
+            return "filetx_complete.wav"
+        }
+    case .file_UPDATE :
+        if settings.object(forKey: PREF_SNDEVENT_FILEUPDATE) != nil &&
+            settings.bool(forKey: PREF_SNDEVENT_FILEUPDATE) {
+            return "fileupdate.wav"
         }
     }
 
@@ -289,7 +301,7 @@ func playSound(_ s: Sounds) {
         return
     }
     
-    if let resPath = Bundle.main.path(forResource: filename, ofType: "mp3") {
+    if let resPath = Bundle.main.path(forResource: filename, ofType: "") {
         
         let url = URL(fileURLWithPath: resPath)
         
