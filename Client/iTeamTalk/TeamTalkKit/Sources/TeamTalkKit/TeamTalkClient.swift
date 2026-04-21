@@ -71,6 +71,16 @@ public final class TeamTalkClient {
             TT_DBG_SetSoundInputTone(nil, 0, 0)
             TT_DoLogin(nil, "", "", "")
             TT_RestartSoundSystem()
+            TT_DoSendFile(nil, 0, "")
+            TT_DoRecvFile(nil, 0, 0, "")
+            TT_DoDeleteFile(nil, 0, 0)
+            var count: Int32 = 0
+            TT_GetChannelFiles(nil, 0, nil, &count)
+            var remoteFile = RemoteFile()
+            TT_GetChannelFile(nil, 0, 0, &remoteFile)
+            var fileTransfer = FileTransfer()
+            TT_GetFileTransferInfo(nil, 0, &fileTransfer)
+            TT_CancelFileTransfer(nil, 0)
         }
     }
 
@@ -181,6 +191,44 @@ public final class TeamTalkClient {
         return body(&user)
     }
 
+    public func channelFiles(in channelID: Int32) -> [RemoteFile] {
+        guard let instance else {
+            return []
+        }
+
+        var count: Int32 = 0
+        guard TT_GetChannelFiles(instance, channelID, nil, &count) != 0, count > 0 else {
+            return []
+        }
+
+        var files = Array(repeating: RemoteFile(), count: Int(count))
+        var fileCount = count
+        let didRead = files.withUnsafeMutableBufferPointer { buffer in
+            TT_GetChannelFiles(instance, channelID, buffer.baseAddress, &fileCount) != 0
+        }
+        guard didRead else {
+            return []
+        }
+
+        let returnedCount = max(0, min(Int(fileCount), files.count))
+        if returnedCount < files.count {
+            files.removeLast(files.count - returnedCount)
+        }
+        return files
+    }
+
+    public func channelFile(channelID: Int32, fileID: Int32) -> RemoteFile? {
+        guard let instance else {
+            return nil
+        }
+
+        var file = RemoteFile()
+        guard TT_GetChannelFile(instance, channelID, fileID, &file) != 0 else {
+            return nil
+        }
+        return file
+    }
+
     @discardableResult
     public func join(channel: inout Channel) -> Int32 {
         TT_DoJoinChannel(instance, &channel)
@@ -237,6 +285,54 @@ public final class TeamTalkClient {
             var textMessage = textMessage
             return sent && sendTextMessage(&textMessage) > 0
         }
+    }
+
+    @discardableResult
+    public func uploadFile(at localURL: URL, toChannelID channelID: Int32) -> Int32 {
+        guard let instance else {
+            return -1
+        }
+
+        return TT_DoSendFile(instance, channelID, localURL.path)
+    }
+
+    @discardableResult
+    public func downloadFile(channelID: Int32, fileID: Int32, to localURL: URL) -> Int32 {
+        guard let instance else {
+            return -1
+        }
+
+        return TT_DoRecvFile(instance, channelID, fileID, localURL.path)
+    }
+
+    @discardableResult
+    public func deleteFile(channelID: Int32, fileID: Int32) -> Int32 {
+        guard let instance else {
+            return -1
+        }
+
+        return TT_DoDeleteFile(instance, channelID, fileID)
+    }
+
+    public func fileTransferInfo(id transferID: Int32) -> FileTransfer? {
+        guard let instance else {
+            return nil
+        }
+
+        var transfer = FileTransfer()
+        guard TT_GetFileTransferInfo(instance, transferID, &transfer) != 0 else {
+            return nil
+        }
+        return transfer
+    }
+
+    @discardableResult
+    public func cancelFileTransfer(id transferID: Int32) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_CancelFileTransfer(instance, transferID) != 0
     }
 
     @discardableResult
