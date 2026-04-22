@@ -5,11 +5,35 @@ public protocol TeamTalkMessageObserver: AnyObject {
     func handleTeamTalkMessage(_ message: TTMessage)
 }
 
+public protocol TeamTalkEventObserver: AnyObject {
+    func handleTeamTalkEvent(_ event: TeamTalkEvent)
+}
+
 final class TeamTalkMessageHandler {
     weak var value: TeamTalkMessageObserver?
 
     init(value: TeamTalkMessageObserver) {
         self.value = value
+    }
+}
+
+final class TeamTalkEventHandler {
+    weak var value: TeamTalkEventObserver?
+
+    init(value: TeamTalkEventObserver) {
+        self.value = value
+    }
+}
+
+private final class TeamTalkAsyncEventObserver: TeamTalkEventObserver {
+    private let handler: (TeamTalkEvent) -> Void
+
+    init(handler: @escaping (TeamTalkEvent) -> Void) {
+        self.handler = handler
+    }
+
+    func handleTeamTalkEvent(_ event: TeamTalkEvent) {
+        handler(event)
     }
 }
 
@@ -56,6 +80,7 @@ public final class TeamTalkClient {
 
     private var instance: UnsafeMutableRawPointer?
     private var observers = [TeamTalkMessageHandler]()
+    private var eventObservers = [TeamTalkEventHandler]()
 
     private init() {}
 
@@ -116,6 +141,14 @@ public final class TeamTalkClient {
         TT_GetMyUserRights(instance)
     }
 
+    public var myTypes: TeamTalkUserTypes {
+        TeamTalkUserTypes(cValue: TT_GetMyUserType(instance))
+    }
+
+    public var myUserData: Int32 {
+        TT_GetMyUserData(instance)
+    }
+
     public var rootChannelID: Int32 {
         TT_GetRootChannelID(instance)
     }
@@ -149,6 +182,7 @@ public final class TeamTalkClient {
         TT_CloseTeamTalk(instance)
         self.instance = nil
         observers.removeAll()
+        eventObservers.removeAll()
     }
 
     @discardableResult
@@ -169,8 +203,16 @@ public final class TeamTalkClient {
         TT_GetChannelIDFromPath(instance, path)
     }
 
+    public func channelIdentifier(fromPath path: String) -> TeamTalkChannelID {
+        TeamTalkChannelID(channelID(fromPath: path))
+    }
+
     public func isChannelOperator(userID: Int32? = nil, channelID: Int32) -> Bool {
         TT_IsChannelOperator(instance, userID ?? myUserID, channelID) != 0
+    }
+
+    public func isChannelOperator(userID: TeamTalkUserID? = nil, channelID: TeamTalkChannelID) -> Bool {
+        isChannelOperator(userID: userID?.cValue, channelID: channelID.cValue)
     }
 
     public func withServerProperties<T>(_ body: (inout ServerProperties) -> T) -> T {
@@ -185,10 +227,156 @@ public final class TeamTalkClient {
         return body(&channel)
     }
 
+    public func withChannel<T>(id channelID: TeamTalkChannelID, _ body: (inout Channel) -> T) -> T {
+        withChannel(id: channelID.cValue, body)
+    }
+
     public func withUser<T>(id userID: Int32, _ body: (inout User) -> T) -> T {
         var user = User()
         TT_GetUser(instance, userID, &user)
         return body(&user)
+    }
+
+    public func withUser<T>(id userID: TeamTalkUserID, _ body: (inout User) -> T) -> T {
+        withUser(id: userID.cValue, body)
+    }
+
+    public func serverProperties() -> TeamTalkServerProperties? {
+        guard let instance else {
+            return nil
+        }
+
+        var properties = ServerProperties()
+        guard TT_GetServerProperties(instance, &properties) != 0 else {
+            return nil
+        }
+        return TeamTalkServerProperties(properties)
+    }
+
+    public func currentUserAccount() -> TeamTalkUserAccount? {
+        guard let instance else {
+            return nil
+        }
+
+        var account = UserAccount()
+        guard TT_GetMyUserAccount(instance, &account) != 0 else {
+            return nil
+        }
+        return TeamTalkUserAccount(account)
+    }
+
+    public func serverUsers() -> [TeamTalkUser] {
+        guard let instance else {
+            return []
+        }
+
+        var count: Int32 = 0
+        guard TT_GetServerUsers(instance, nil, &count) != 0, count > 0 else {
+            return []
+        }
+
+        var users = Array(repeating: User(), count: Int(count))
+        var userCount = count
+        let didRead = users.withUnsafeMutableBufferPointer { buffer in
+            TT_GetServerUsers(instance, buffer.baseAddress, &userCount) != 0
+        }
+        guard didRead else {
+            return []
+        }
+
+        return users.prefix(Int(max(0, min(userCount, count)))).map(TeamTalkUser.init)
+    }
+
+    public func channels() -> [TeamTalkChannel] {
+        guard let instance else {
+            return []
+        }
+
+        var count: Int32 = 0
+        guard TT_GetServerChannels(instance, nil, &count) != 0, count > 0 else {
+            return []
+        }
+
+        var channels = Array(repeating: Channel(), count: Int(count))
+        var channelCount = count
+        let didRead = channels.withUnsafeMutableBufferPointer { buffer in
+            TT_GetServerChannels(instance, buffer.baseAddress, &channelCount) != 0
+        }
+        guard didRead else {
+            return []
+        }
+
+        return channels.prefix(Int(max(0, min(channelCount, count)))).map(TeamTalkChannel.init)
+    }
+
+    public func users(inChannelID channelID: Int32) -> [TeamTalkUser] {
+        guard let instance else {
+            return []
+        }
+
+        var count: Int32 = 0
+        guard TT_GetChannelUsers(instance, channelID, nil, &count) != 0, count > 0 else {
+            return []
+        }
+
+        var users = Array(repeating: User(), count: Int(count))
+        var userCount = count
+        let didRead = users.withUnsafeMutableBufferPointer { buffer in
+            TT_GetChannelUsers(instance, channelID, buffer.baseAddress, &userCount) != 0
+        }
+        guard didRead else {
+            return []
+        }
+
+        return users.prefix(Int(max(0, min(userCount, count)))).map(TeamTalkUser.init)
+    }
+
+    public func users(inChannelID channelID: TeamTalkChannelID) -> [TeamTalkUser] {
+        users(inChannelID: channelID.cValue)
+    }
+
+    public func channel(id channelID: Int32) -> TeamTalkChannel? {
+        guard let instance else {
+            return nil
+        }
+
+        var channel = Channel()
+        guard TT_GetChannel(instance, channelID, &channel) != 0 else {
+            return nil
+        }
+        return TeamTalkChannel(channel)
+    }
+
+    public func channel(id channelID: TeamTalkChannelID) -> TeamTalkChannel? {
+        channel(id: channelID.cValue)
+    }
+
+    public func user(id userID: Int32) -> TeamTalkUser? {
+        guard let instance else {
+            return nil
+        }
+
+        var user = User()
+        guard TT_GetUser(instance, userID, &user) != 0 else {
+            return nil
+        }
+        return TeamTalkUser(user)
+    }
+
+    public func user(id userID: TeamTalkUserID) -> TeamTalkUser? {
+        user(id: userID.cValue)
+    }
+
+    public func user(username: String) -> TeamTalkUser? {
+        guard let instance else {
+            return nil
+        }
+
+        var user = User()
+        guard TT_GetUserByUsername(instance, username, &user) != 0 else {
+            return nil
+        }
+        return TeamTalkUser(user)
     }
 
     public func channelFiles(in channelID: Int32) -> [RemoteFile] {
@@ -217,6 +405,10 @@ public final class TeamTalkClient {
         return files
     }
 
+    public func channelFiles(in channelID: TeamTalkChannelID) -> [RemoteFile] {
+        channelFiles(in: channelID.cValue)
+    }
+
     public func channelFile(channelID: Int32, fileID: Int32) -> RemoteFile? {
         guard let instance else {
             return nil
@@ -227,6 +419,340 @@ public final class TeamTalkClient {
             return nil
         }
         return file
+    }
+
+    public func channelFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> RemoteFile? {
+        channelFile(channelID: channelID.cValue, fileID: fileID.cValue)
+    }
+
+    public func remoteFiles(in channelID: Int32) -> [TeamTalkRemoteFile] {
+        channelFiles(in: channelID).map(TeamTalkRemoteFile.init)
+    }
+
+    public func remoteFiles(in channelID: TeamTalkChannelID) -> [TeamTalkRemoteFile] {
+        remoteFiles(in: channelID.cValue)
+    }
+
+    public func remoteFile(channelID: Int32, fileID: Int32) -> TeamTalkRemoteFile? {
+        channelFile(channelID: channelID, fileID: fileID).map(TeamTalkRemoteFile.init)
+    }
+
+    public func remoteFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> TeamTalkRemoteFile? {
+        remoteFile(channelID: channelID.cValue, fileID: fileID.cValue)
+    }
+
+    @discardableResult
+    public func ping() -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoPing(instance))
+    }
+
+    @discardableResult
+    public func logIn(nickname: String, username: String, password: String, clientName: String = "") -> TeamTalkCommandID {
+        TeamTalkCommandID(login(nickname: nickname, username: username, password: password, clientName: clientName))
+    }
+
+    @discardableResult
+    public func logOut() -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoLogout(instance))
+    }
+
+    @discardableResult
+    public func join(_ channel: TeamTalkChannel) -> TeamTalkCommandID {
+        var channel = channel.cValue
+        return TeamTalkCommandID(TT_DoJoinChannel(instance, &channel))
+    }
+
+    @discardableResult
+    public func join(_ configuration: TeamTalkChannelConfiguration) -> TeamTalkCommandID {
+        var channel = configuration.cValue
+        return TeamTalkCommandID(TT_DoJoinChannel(instance, &channel))
+    }
+
+    @discardableResult
+    public func joinChannel(withID channelID: Int32, password: String = "") -> TeamTalkCommandID {
+        TeamTalkCommandID(joinChannel(id: channelID, password: password))
+    }
+
+    @discardableResult
+    public func joinChannel(withID channelID: TeamTalkChannelID, password: String = "") -> TeamTalkCommandID {
+        joinChannel(withID: channelID.cValue, password: password)
+    }
+
+    @discardableResult
+    public func leaveChannel() -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoLeaveChannel(instance))
+    }
+
+    @discardableResult
+    public func createChannel(_ configuration: TeamTalkChannelConfiguration) -> TeamTalkCommandID {
+        var channel = configuration.cValue
+        return TeamTalkCommandID(TT_DoMakeChannel(instance, &channel))
+    }
+
+    @discardableResult
+    public func updateChannel(_ channel: TeamTalkChannel) -> TeamTalkCommandID {
+        var channel = channel.cValue
+        return TeamTalkCommandID(TT_DoUpdateChannel(instance, &channel))
+    }
+
+    @discardableResult
+    public func updateChannel(_ configuration: TeamTalkChannelConfiguration) -> TeamTalkCommandID {
+        var channel = configuration.cValue
+        return TeamTalkCommandID(TT_DoUpdateChannel(instance, &channel))
+    }
+
+    @discardableResult
+    public func removeChannel(withID channelID: Int32) -> TeamTalkCommandID {
+        TeamTalkCommandID(removeChannel(id: channelID))
+    }
+
+    @discardableResult
+    public func removeChannel(withID channelID: TeamTalkChannelID) -> TeamTalkCommandID {
+        removeChannel(withID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func setNickname(_ nickname: String) -> TeamTalkCommandID {
+        TeamTalkCommandID(changeNickname(nickname))
+    }
+
+    @discardableResult
+    public func setStatus(mode: TeamTalkStatusMode, message: String = "") -> TeamTalkCommandID {
+        TeamTalkCommandID(changeStatus(mode: mode.rawValue, message: message))
+    }
+
+    @discardableResult
+    public func sendTextMessage(_ message: TeamTalkOutgoingTextMessage) -> [TeamTalkCommandID] {
+        TeamTalkTextMessageFactory.messages(from: message.cValue, content: message.content).map { textMessage in
+            var textMessage = textMessage
+            return TeamTalkCommandID(TT_DoTextMessage(instance, &textMessage))
+        }
+    }
+
+    @discardableResult
+    public func setChannelOperator(userID: Int32, channelID: Int32, enabled: Bool) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoChannelOp(instance, userID, channelID, enabled ? 1 : 0))
+    }
+
+    @discardableResult
+    public func setChannelOperator(userID: TeamTalkUserID, channelID: TeamTalkChannelID, enabled: Bool) -> TeamTalkCommandID {
+        setChannelOperator(userID: userID.cValue, channelID: channelID.cValue, enabled: enabled)
+    }
+
+    @discardableResult
+    public func setChannelOperator(userID: Int32, channelID: Int32, operatorPassword: String, enabled: Bool) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoChannelOpEx(instance, userID, channelID, operatorPassword, enabled ? 1 : 0))
+    }
+
+    @discardableResult
+    public func setChannelOperator(
+        userID: TeamTalkUserID,
+        channelID: TeamTalkChannelID,
+        operatorPassword: String,
+        enabled: Bool
+    ) -> TeamTalkCommandID {
+        setChannelOperator(
+            userID: userID.cValue,
+            channelID: channelID.cValue,
+            operatorPassword: operatorPassword,
+            enabled: enabled
+        )
+    }
+
+    @discardableResult
+    public func kickUser(withID userID: Int32, fromChannelID channelID: Int32 = 0) -> TeamTalkCommandID {
+        TeamTalkCommandID(kickUser(id: userID, fromChannelID: channelID))
+    }
+
+    @discardableResult
+    public func kickUser(withID userID: TeamTalkUserID, fromChannelID channelID: TeamTalkChannelID = .none) -> TeamTalkCommandID {
+        kickUser(withID: userID.cValue, fromChannelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func banUser(withID userID: Int32, fromChannelID channelID: Int32 = 0) -> TeamTalkCommandID {
+        TeamTalkCommandID(banUser(id: userID, fromChannelID: channelID))
+    }
+
+    @discardableResult
+    public func banUser(withID userID: TeamTalkUserID, fromChannelID channelID: TeamTalkChannelID = .none) -> TeamTalkCommandID {
+        banUser(withID: userID.cValue, fromChannelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func banUser(withID userID: Int32, types: TeamTalkBanTypes) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoBanUserEx(instance, userID, types.cValue))
+    }
+
+    @discardableResult
+    public func banUser(withID userID: TeamTalkUserID, types: TeamTalkBanTypes) -> TeamTalkCommandID {
+        banUser(withID: userID.cValue, types: types)
+    }
+
+    @discardableResult
+    public func ban(_ configuration: TeamTalkBanConfiguration) -> TeamTalkCommandID {
+        var bannedUser = configuration.cValue
+        return TeamTalkCommandID(TT_DoBan(instance, &bannedUser))
+    }
+
+    @discardableResult
+    public func banIPAddress(_ ipAddress: String, channelID: Int32 = 0) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoBanIPAddress(instance, ipAddress, channelID))
+    }
+
+    @discardableResult
+    public func banIPAddress(_ ipAddress: String, channelID: TeamTalkChannelID = .none) -> TeamTalkCommandID {
+        banIPAddress(ipAddress, channelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func unbanIPAddress(_ ipAddress: String, channelID: Int32 = 0) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoUnBanUser(instance, ipAddress, channelID))
+    }
+
+    @discardableResult
+    public func unbanIPAddress(_ ipAddress: String, channelID: TeamTalkChannelID = .none) -> TeamTalkCommandID {
+        unbanIPAddress(ipAddress, channelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func unban(_ configuration: TeamTalkBanConfiguration) -> TeamTalkCommandID {
+        var bannedUser = configuration.cValue
+        return TeamTalkCommandID(TT_DoUnBanUserEx(instance, &bannedUser))
+    }
+
+    @discardableResult
+    public func listBans(channelID: Int32 = 0, startingAt index: Int32 = 0, count: Int32 = 100) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoListBans(instance, channelID, index, count))
+    }
+
+    @discardableResult
+    public func listBans(channelID: TeamTalkChannelID = .none, startingAt index: Int32 = 0, count: Int32 = 100) -> TeamTalkCommandID {
+        listBans(channelID: channelID.cValue, startingAt: index, count: count)
+    }
+
+    @discardableResult
+    public func moveUser(withID userID: Int32, toChannelID channelID: Int32) -> TeamTalkCommandID {
+        TeamTalkCommandID(moveUser(id: userID, toChannelID: channelID))
+    }
+
+    @discardableResult
+    public func moveUser(withID userID: TeamTalkUserID, toChannelID channelID: TeamTalkChannelID) -> TeamTalkCommandID {
+        moveUser(withID: userID.cValue, toChannelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func uploadFileCommand(at localURL: URL, toChannelID channelID: Int32) -> TeamTalkCommandID {
+        TeamTalkCommandID(uploadFile(at: localURL, toChannelID: channelID))
+    }
+
+    @discardableResult
+    public func uploadFileCommand(at localURL: URL, toChannelID channelID: TeamTalkChannelID) -> TeamTalkCommandID {
+        uploadFileCommand(at: localURL, toChannelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func uploadFile(at localURL: URL, to channel: TeamTalkChannel) -> TeamTalkCommandID {
+        uploadFileCommand(at: localURL, toChannelID: channel.id)
+    }
+
+    @discardableResult
+    public func downloadFileCommand(channelID: Int32, fileID: Int32, to localURL: URL) -> TeamTalkCommandID {
+        TeamTalkCommandID(downloadFile(channelID: channelID, fileID: fileID, to: localURL))
+    }
+
+    @discardableResult
+    public func downloadFileCommand(channelID: TeamTalkChannelID, fileID: TeamTalkFileID, to localURL: URL) -> TeamTalkCommandID {
+        downloadFileCommand(channelID: channelID.cValue, fileID: fileID.cValue, to: localURL)
+    }
+
+    @discardableResult
+    public func downloadFile(_ file: TeamTalkRemoteFile, to localURL: URL) -> TeamTalkCommandID {
+        downloadFileCommand(channelID: file.channelID, fileID: file.id, to: localURL)
+    }
+
+    @discardableResult
+    public func deleteFileCommand(channelID: Int32, fileID: Int32) -> TeamTalkCommandID {
+        TeamTalkCommandID(deleteFile(channelID: channelID, fileID: fileID))
+    }
+
+    @discardableResult
+    public func deleteFileCommand(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> TeamTalkCommandID {
+        deleteFileCommand(channelID: channelID.cValue, fileID: fileID.cValue)
+    }
+
+    @discardableResult
+    public func deleteFile(_ file: TeamTalkRemoteFile) -> TeamTalkCommandID {
+        deleteFileCommand(channelID: file.channelID, fileID: file.id)
+    }
+
+    @discardableResult
+    public func subscribeCommand(userID: Int32, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoSubscribe(instance, userID, subscriptions.cValue))
+    }
+
+    @discardableResult
+    public func subscribeCommand(userID: TeamTalkUserID, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
+        subscribeCommand(userID: userID.cValue, subscriptions: subscriptions)
+    }
+
+    @discardableResult
+    public func unsubscribeCommand(userID: Int32, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoUnsubscribe(instance, userID, subscriptions.cValue))
+    }
+
+    @discardableResult
+    public func unsubscribeCommand(userID: TeamTalkUserID, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
+        unsubscribeCommand(userID: userID.cValue, subscriptions: subscriptions)
+    }
+
+    @discardableResult
+    public func updateServer(_ configuration: TeamTalkServerPropertiesConfiguration) -> TeamTalkCommandID {
+        var properties = configuration.cValue
+        return TeamTalkCommandID(TT_DoUpdateServer(instance, &properties))
+    }
+
+    @discardableResult
+    public func updateServer(_ properties: TeamTalkServerProperties) -> TeamTalkCommandID {
+        var properties = properties.cValue
+        return TeamTalkCommandID(TT_DoUpdateServer(instance, &properties))
+    }
+
+    @discardableResult
+    public func listUserAccounts(startingAt index: Int32 = 0, count: Int32 = 100) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoListUserAccounts(instance, index, count))
+    }
+
+    @discardableResult
+    public func createUserAccount(_ configuration: TeamTalkUserAccountConfiguration) -> TeamTalkCommandID {
+        var account = configuration.cValue
+        return TeamTalkCommandID(TT_DoNewUserAccount(instance, &account))
+    }
+
+    @discardableResult
+    public func createUserAccount(_ account: TeamTalkUserAccount) -> TeamTalkCommandID {
+        var account = account.cValue
+        return TeamTalkCommandID(TT_DoNewUserAccount(instance, &account))
+    }
+
+    @discardableResult
+    public func deleteUserAccount(username: String) -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoDeleteUserAccount(instance, username))
+    }
+
+    @discardableResult
+    public func saveServerConfiguration() -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoSaveConfig(instance))
+    }
+
+    @discardableResult
+    public func queryServerStatistics() -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoQueryServerStats(instance))
+    }
+
+    @discardableResult
+    public func quitServer() -> TeamTalkCommandID {
+        TeamTalkCommandID(TT_DoQuit(instance))
     }
 
     @discardableResult
@@ -240,6 +766,11 @@ public final class TeamTalkClient {
     }
 
     @discardableResult
+    public func joinChannel(id channelID: TeamTalkChannelID, password: String = "") -> Int32 {
+        joinChannel(id: channelID.cValue, password: password)
+    }
+
+    @discardableResult
     public func update(channel: inout Channel) -> Int32 {
         TT_DoUpdateChannel(instance, &channel)
     }
@@ -247,6 +778,11 @@ public final class TeamTalkClient {
     @discardableResult
     public func removeChannel(id channelID: Int32) -> Int32 {
         TT_DoRemoveChannel(instance, channelID)
+    }
+
+    @discardableResult
+    public func removeChannel(id channelID: TeamTalkChannelID) -> Int32 {
+        removeChannel(id: channelID.cValue)
     }
 
     @discardableResult
@@ -265,13 +801,28 @@ public final class TeamTalkClient {
     }
 
     @discardableResult
+    public func kickUser(id userID: TeamTalkUserID, fromChannelID channelID: TeamTalkChannelID) -> Int32 {
+        kickUser(id: userID.cValue, fromChannelID: channelID.cValue)
+    }
+
+    @discardableResult
     public func banUser(id userID: Int32, fromChannelID channelID: Int32) -> Int32 {
         TT_DoBanUser(instance, userID, channelID)
     }
 
     @discardableResult
+    public func banUser(id userID: TeamTalkUserID, fromChannelID channelID: TeamTalkChannelID) -> Int32 {
+        banUser(id: userID.cValue, fromChannelID: channelID.cValue)
+    }
+
+    @discardableResult
     public func moveUser(id userID: Int32, toChannelID channelID: Int32) -> Int32 {
         TT_DoMoveUser(instance, userID, channelID)
+    }
+
+    @discardableResult
+    public func moveUser(id userID: TeamTalkUserID, toChannelID channelID: TeamTalkChannelID) -> Int32 {
+        moveUser(id: userID.cValue, toChannelID: channelID.cValue)
     }
 
     @discardableResult
@@ -297,6 +848,11 @@ public final class TeamTalkClient {
     }
 
     @discardableResult
+    public func uploadFile(at localURL: URL, toChannelID channelID: TeamTalkChannelID) -> Int32 {
+        uploadFile(at: localURL, toChannelID: channelID.cValue)
+    }
+
+    @discardableResult
     public func downloadFile(channelID: Int32, fileID: Int32, to localURL: URL) -> Int32 {
         guard let instance else {
             return -1
@@ -306,12 +862,22 @@ public final class TeamTalkClient {
     }
 
     @discardableResult
+    public func downloadFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID, to localURL: URL) -> Int32 {
+        downloadFile(channelID: channelID.cValue, fileID: fileID.cValue, to: localURL)
+    }
+
+    @discardableResult
     public func deleteFile(channelID: Int32, fileID: Int32) -> Int32 {
         guard let instance else {
             return -1
         }
 
         return TT_DoDeleteFile(instance, channelID, fileID)
+    }
+
+    @discardableResult
+    public func deleteFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> Int32 {
+        deleteFile(channelID: channelID.cValue, fileID: fileID.cValue)
     }
 
     public func fileTransferInfo(id transferID: Int32) -> FileTransfer? {
@@ -326,6 +892,18 @@ public final class TeamTalkClient {
         return transfer
     }
 
+    public func fileTransferInfo(id transferID: TeamTalkTransferID) -> FileTransfer? {
+        fileTransferInfo(id: transferID.cValue)
+    }
+
+    public func fileTransfer(id transferID: Int32) -> TeamTalkFileTransfer? {
+        fileTransferInfo(id: transferID).map(TeamTalkFileTransfer.init)
+    }
+
+    public func fileTransfer(id transferID: TeamTalkTransferID) -> TeamTalkFileTransfer? {
+        fileTransfer(id: transferID.cValue)
+    }
+
     @discardableResult
     public func cancelFileTransfer(id transferID: Int32) -> Bool {
         guard let instance else {
@@ -333,6 +911,11 @@ public final class TeamTalkClient {
         }
 
         return TT_CancelFileTransfer(instance, transferID) != 0
+    }
+
+    @discardableResult
+    public func cancelFileTransfer(id transferID: TeamTalkTransferID) -> Bool {
+        cancelFileTransfer(id: transferID.cValue)
     }
 
     @discardableResult
@@ -392,12 +975,42 @@ public final class TeamTalkClient {
         observers.append(TeamTalkMessageHandler(value: observer))
     }
 
+    public func addEventObserver(_ observer: TeamTalkEventObserver) {
+        if eventObservers.contains(where: { $0.value === observer }) {
+            return
+        }
+
+        eventObservers.append(TeamTalkEventHandler(value: observer))
+    }
+
     public func removeObserver(_ observer: TeamTalkMessageObserver) {
         observers.removeAll { $0.value === observer || $0.value == nil }
     }
 
+    public func removeEventObserver(_ observer: TeamTalkEventObserver) {
+        eventObservers.removeAll { $0.value === observer || $0.value == nil }
+    }
+
     public func removeAllObservers() {
         observers.removeAll()
+    }
+
+    public func removeAllEventObservers() {
+        eventObservers.removeAll()
+    }
+
+    public var events: AsyncStream<TeamTalkEvent> {
+        AsyncStream { continuation in
+            let observer = TeamTalkAsyncEventObserver { event in
+                continuation.yield(event)
+            }
+
+            addEventObserver(observer)
+
+            continuation.onTermination = { [weak self, observer] _ in
+                self?.removeEventObserver(observer)
+            }
+        }
     }
 
     public func pollMessages() {
@@ -406,9 +1019,16 @@ public final class TeamTalkClient {
 
         while TT_GetMessage(instance, &message, &waitMSec) != 0 {
             observers.removeAll { $0.value == nil }
+            eventObservers.removeAll { $0.value == nil }
+
+            let event = TeamTalkEvent(message)
 
             for observer in observers {
                 observer.value?.handleTeamTalkMessage(message)
+            }
+
+            for observer in eventObservers {
+                observer.value?.handleTeamTalkEvent(event)
             }
         }
     }

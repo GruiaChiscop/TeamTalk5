@@ -5,6 +5,7 @@ import PackageDescription
 let package = Package(
     name: "TeamTalkKit",
     platforms: [
+        .macOS(.v10_15),
         .iOS(.v16)
     ],
     products: [
@@ -18,6 +19,12 @@ let package = Package(
             publicHeadersPath: "include"),
         .target(
             name: "TeamTalkKit",
-            dependencies: ["TeamTalkC"])
+            dependencies: ["TeamTalkC"]),
+        .testTarget(
+            name: "TeamTalkKitTests",
+            dependencies: ["TeamTalkKit", "TeamTalkC"],
+            linkerSettings: [
+                .unsafeFlags(["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"], .when(platforms: [.macOS]))
+            ])
     ]
 )
