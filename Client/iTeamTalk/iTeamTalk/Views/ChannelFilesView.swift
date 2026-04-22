@@ -27,6 +27,7 @@ import UniformTypeIdentifiers
 struct ChannelFilesView: View {
     @ObservedObject var model: ChannelFilesModel
     @State private var showingFileImporter = false
+    @State private var showingDownloadFolderImporter = false
 
     var body: some View {
         List {
@@ -49,7 +50,7 @@ struct ChannelFilesView: View {
                         ChannelFileRowView(
                             file: file,
                             canDownload: model.canDownloadFiles,
-                            download: { model.download(file) },
+                            download: { requestDownload(file) },
                             delete: { model.requestDelete(file) }
                         )
                     }
@@ -105,6 +106,13 @@ struct ChannelFilesView: View {
                 model.errorMessage = error.localizedDescription
             }
         }
+        .fileImporter(
+            isPresented: $showingDownloadFolderImporter,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            model.downloadPendingFile(to: result)
+        }
         .confirmationDialog("Delete File",
             isPresented: Binding(
                 get: { model.filePendingDeletion != nil },
@@ -133,6 +141,13 @@ struct ChannelFilesView: View {
         }
         .onAppear {
             model.refresh()
+        }
+    }
+
+    private func requestDownload(_ file: ChannelFileRow) {
+        model.requestDownload(file)
+        if model.filePendingDownload != nil {
+            showingDownloadFolderImporter = true
         }
     }
 }
@@ -198,7 +213,7 @@ private struct FileTransferRowView: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(transfer.remoteFileName)
+                    Text(transfer.displayName)
                         .font(.body)
                     Text(transfer.directionText)
                         .font(.footnote)

@@ -9,8 +9,7 @@
  * Denmark
  * Email: contact@bearware.dk
  * Phone: +45 20 20 54 59
- * Web: http:
- www.bearware.dk
+ * Web: http://www.bearware.dk
  *
  * This source code is part of the TeamTalk SDK owned by
  * BearWare.dk. Use of this file, or its compiled unit, requires a
@@ -24,6 +23,7 @@
 
 import Foundation
 import TeamTalkKit
+import UIKit
 
 struct ChannelFileRow: Identifiable, Hashable {
     let file: RemoteFile
@@ -89,6 +89,16 @@ struct FileTransferRow: Identifiable {
         return URL(fileURLWithPath: localFilePath)
     }
 
+    var displayName: String {
+        if !remoteFileName.isEmpty {
+            return remoteFileName
+        }
+        if let localURL {
+            return localURL.lastPathComponent
+        }
+        return String(localized: "File", comment: "files")
+    }
+
     var progress: Double {
         guard transfer.nFileSize > 0 else { return 0 }
         return min(1, max(0, Double(transfer.nTransferred) / Double(transfer.nFileSize)))
@@ -135,11 +145,18 @@ final class ChannelFilesModel: ObservableObject {
     @Published var downloadedFiles = [DownloadedFileRow]()
     @Published var channelTitle = String(localized: "Files", comment: "files")
     @Published var errorMessage: String?
+    @Published var filePendingDownload: ChannelFileRow?
     @Published var filePendingDeletion: ChannelFileRow?
 
     private var channelID: Int32 = 0
     private var activeCommands = [Int32: ChannelFilesCommand]()
+    private var announcedDownloadProgress = [Int32: Set<Int>]()
+    private var downloadSecurityScopes = [String: URL]()
     private let fileManager = FileManager.default
+
+    deinit {
+        releaseAllDownloadSecurityScopes()
+    }
 
     var canUploadFiles: Bool {
         channelID > 0 &&
@@ -192,25 +209,63 @@ final class ChannelFilesModel: ObservableObject {
         }
     }
 
-    func download(_ file: ChannelFileRow) {
+    func requestDownload(_ file: ChannelFileRow) {
         guard canDownloadFiles else {
             errorMessage = String(localized: "You do not have permission to download files.", comment: "files")
             return
         }
 
+        filePendingDownload = file
+    }
+
+    func downloadPendingFile(to result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let directoryURL = urls.first, let file = filePendingDownload else {
+                filePendingDownload = nil
+                return
+            }
+            filePendingDownload = nil
+            download(file, to: directoryURL)
+
+        case .failure(let error):
+            filePendingDownload = nil
+            if !isUserCancelled(error) {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func download(_ file: ChannelFileRow, to directoryURL: URL) {
+        guard canDownloadFiles else {
+            errorMessage = String(localized: "You do not have permission to download files.", comment: "files")
+            return
+        }
+
+        let didAccess = directoryURL.startAccessingSecurityScopedResource()
+
         do {
-            let localURL = try uniqueFileURL(in: downloadsDirectory(), filename: file.name)
+            let localURL = try uniqueFileURL(in: directoryURL, filename: file.name)
             let cmdid = TeamTalkClient.shared.downloadFile(
                 channelID: file.channelID,
                 fileID: file.fileID,
                 to: localURL
             )
             guard cmdid > 0 else {
+                if didAccess {
+                    directoryURL.stopAccessingSecurityScopedResource()
+                }
                 errorMessage = String(format: String(localized: "Failed to download file %@", comment: "files"), file.name)
                 return
             }
+            if didAccess {
+                downloadSecurityScopes[localURL.path] = directoryURL
+            }
             activeCommands[cmdid] = .download(localURL)
         } catch {
+            if didAccess {
+                directoryURL.stopAccessingSecurityScopedResource()
+            }
             errorMessage = error.localizedDescription
         }
     }
@@ -232,8 +287,10 @@ final class ChannelFilesModel: ObservableObject {
     func cancelTransfer(_ transfer: FileTransferRow) {
         if TeamTalkClient.shared.cancelFileTransfer(id: transfer.id) {
             removeTransfer(id: transfer.id)
+            announcedDownloadProgress.removeValue(forKey: transfer.id)
             if transfer.isDownload, let localURL = transfer.localURL {
                 try? fileManager.removeItem(at: localURL)
+                releaseDownloadSecurityScope(for: localURL)
             }
         }
     }
@@ -277,17 +334,6 @@ final class ChannelFilesModel: ObservableObject {
         return directory
     }
 
-    private func downloadsDirectory() throws -> URL {
-        let directory = try fileManager.url(
-            for: .documentDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ).appendingPathComponent("TeamTalk Downloads", isDirectory: true)
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        return directory
-    }
-
     private func uniqueFileURL(in directory: URL, filename: String) throws -> URL {
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
 
@@ -318,10 +364,13 @@ final class ChannelFilesModel: ObservableObject {
             } else {
                 transfers.append(row)
             }
+            announceDownloadProgressIfNeeded(for: row)
         case FILETRANSFER_FINISHED:
             removeTransfer(id: row.id)
             if row.isDownload, let localURL = row.localURL {
                 downloadedFiles.insert(DownloadedFileRow(url: localURL), at: 0)
+                announceDownloadComplete(for: row)
+                announcedDownloadProgress.removeValue(forKey: row.id)
             } else {
                 cleanupUploadCopy(for: row)
                 refresh()
@@ -339,8 +388,10 @@ final class ChannelFilesModel: ObservableObject {
     }
 
     private func cleanupTransferFile(for transfer: FileTransferRow) {
+        announcedDownloadProgress.removeValue(forKey: transfer.id)
         if transfer.isDownload, let localURL = transfer.localURL {
             try? fileManager.removeItem(at: localURL)
+            releaseDownloadSecurityScope(for: localURL)
         } else {
             cleanupUploadCopy(for: transfer)
         }
@@ -357,12 +408,72 @@ final class ChannelFilesModel: ObservableObject {
         transfers.removeAll { $0.id == id }
     }
 
+    private func cleanupActiveTransfers() {
+        transfers.forEach { cleanupTransferFile(for: $0) }
+        transfers = []
+    }
+
+    private func announceDownloadProgressIfNeeded(for transfer: FileTransferRow) {
+        guard transfer.isDownload else { return }
+        guard transfer.transfer.nFileSize > 0 else { return }
+
+        let percent = Int(transfer.progress * 100)
+        let thresholds = [25, 50, 75]
+        let announced = announcedDownloadProgress[transfer.id, default: []]
+        guard let threshold = thresholds.last(where: { percent >= $0 && !announced.contains($0) }) else {
+            return
+        }
+
+        for crossedThreshold in thresholds where crossedThreshold <= threshold {
+            announcedDownloadProgress[transfer.id, default: []].insert(crossedThreshold)
+        }
+        announceVoiceOver(
+            String(format: String(localized: "%@, %d%% downloaded", comment: "files"),
+                transfer.displayName,
+                threshold
+            )
+        )
+    }
+
+    private func announceDownloadComplete(for transfer: FileTransferRow) {
+        guard transfer.isDownload else { return }
+        announceVoiceOver(
+            String(format: String(localized: "Download complete: %@", comment: "files"),
+                transfer.displayName
+            )
+        )
+    }
+
+    private func announceVoiceOver(_ announcement: String) {
+        guard UIAccessibility.isVoiceOverRunning else { return }
+        guard UIApplication.shared.applicationState == .active else { return }
+        UIAccessibility.post(notification: .announcement, argument: announcement)
+    }
+
+    private func releaseDownloadSecurityScope(for localURL: URL) {
+        guard let directoryURL = downloadSecurityScopes.removeValue(forKey: localURL.path) else { return }
+        directoryURL.stopAccessingSecurityScopedResource()
+    }
+
+    private func releaseAllDownloadSecurityScopes() {
+        downloadSecurityScopes.values.forEach {
+            $0.stopAccessingSecurityScopedResource()
+        }
+        downloadSecurityScopes.removeAll()
+    }
+
+    private func isUserCancelled(_ error: Error) -> Bool {
+        let error = error as NSError
+        return error.domain == NSCocoaErrorDomain && error.code == NSUserCancelledError
+    }
+
     private func commandFailed(_ command: ChannelFilesCommand) {
         switch command {
         case .upload(let url):
             try? fileManager.removeItem(at: url)
         case .download(let url):
             try? fileManager.removeItem(at: url)
+            releaseDownloadSecurityScope(for: url)
         case .delete:
             break
         }
@@ -375,8 +486,13 @@ extension ChannelFilesModel: TeamTalkEvent {
         case CLIENTEVENT_CON_LOST:
             channelID = 0
             files = []
-            transfers = []
+            cleanupActiveTransfers()
+            downloadedFiles = []
+            filePendingDownload = nil
+            filePendingDeletion = nil
             activeCommands.removeAll()
+            announcedDownloadProgress.removeAll()
+            releaseAllDownloadSecurityScopes()
             updateChannelTitle()
 
         case CLIENTEVENT_CMD_PROCESSING:
@@ -401,7 +517,9 @@ extension ChannelFilesModel: TeamTalkEvent {
             if user.nUserID == TeamTalkClient.shared.myUserID {
                 channelID = 0
                 files = []
-                transfers = []
+                cleanupActiveTransfers()
+                filePendingDownload = nil
+                filePendingDeletion = nil
                 updateChannelTitle()
             }
 
