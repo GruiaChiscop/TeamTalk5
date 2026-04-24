@@ -37,6 +37,32 @@ private final class TeamTalkAsyncEventObserver: TeamTalkEventObserver {
     }
 }
 
+private func withOptionalVideoCodecPointer<Result>(
+    _ videoCodec: VideoCodec?,
+    _ body: (UnsafePointer<VideoCodec>?) -> Result
+) -> Result {
+    guard var videoCodec else {
+        return body(nil)
+    }
+
+    return withUnsafePointer(to: &videoCodec) { pointer in
+        body(pointer)
+    }
+}
+
+private func withOptionalAudioFormatPointer<Result>(
+    _ audioFormat: AudioFormat?,
+    _ body: (UnsafePointer<AudioFormat>?) -> Result
+) -> Result {
+    guard var audioFormat else {
+        return body(nil)
+    }
+
+    return withUnsafePointer(to: &audioFormat) { pointer in
+        body(pointer)
+    }
+}
+
 public struct TeamTalkClientFlags: OptionSet {
     public let rawValue: UInt32
 
@@ -71,10 +97,6 @@ public struct TeamTalkEncryptionConfiguration {
     }
 }
 
-public enum TeamTalkSoundDeviceID {
-    public static let voiceProcessingIO = TT_SOUNDDEVICE_ID_VOICEPREPROCESSINGIO
-    public static let remoteIO = TT_SOUNDDEVICE_ID_REMOTEIO
-}
 public final class TeamTalkClient {
     public static let shared = TeamTalkClient()
 
@@ -91,6 +113,56 @@ public final class TeamTalkClient {
             TT_CloseSoundLoopbackTest(nil)
             TT_CloseSoundInputDevice(nil)
             TT_GetSoundDevices(nil, nil)
+            var defaultInputDeviceID: Int32 = 0
+            var defaultOutputDeviceID: Int32 = 0
+            TT_GetDefaultSoundDevices(&defaultInputDeviceID, &defaultOutputDeviceID)
+            TT_GetDefaultSoundDevicesEx(SOUNDSYSTEM_NONE, &defaultInputDeviceID, &defaultOutputDeviceID)
+            TT_InitSoundInputSharedDevice(0, 0, 0)
+            TT_InitSoundOutputSharedDevice(0, 0, 0)
+            TT_InitSoundDuplexDevices(nil, 0, 0)
+            TT_CloseSoundDuplexDevices(nil)
+            var soundDeviceEffects = SoundDeviceEffects()
+            TT_GetSoundDeviceEffects(nil, &soundDeviceEffects)
+            TT_SetSoundDeviceEffects(nil, &soundDeviceEffects)
+            TT_StartStreamingMediaFileToChannel(nil, "", nil)
+            var mediaPlayback = MediaFilePlayback()
+            TT_StartStreamingMediaFileToChannelEx(nil, "", &mediaPlayback, nil)
+            TT_UpdateStreamingMediaFileToChannel(nil, &mediaPlayback, nil)
+            TT_StopStreamingMediaFileToChannel(nil)
+            let playbackSessionID = TT_InitLocalPlayback(nil, "", &mediaPlayback)
+            TT_UpdateLocalPlayback(nil, playbackSessionID, &mediaPlayback)
+            TT_StopLocalPlayback(nil, playbackSessionID)
+            var mediaFileInfo = MediaFileInfo()
+            TT_GetMediaFileInfo("", &mediaFileInfo)
+            var desktopWindow = DesktopWindow()
+            TT_SendDesktopWindow(nil, &desktopWindow, BMP_NONE)
+            TT_CloseDesktopWindow(nil)
+            TT_SendDesktopCursorPosition(nil, 0, 0)
+            var desktopInput = DesktopInput()
+            TT_SendDesktopInput(nil, 0, &desktopInput, 1)
+            let acquiredDesktopWindow = TT_AcquireUserDesktopWindow(nil, 0)
+            let acquiredDesktopWindowEx = TT_AcquireUserDesktopWindowEx(nil, 0, BMP_NONE)
+            TT_ReleaseUserDesktopWindow(nil, acquiredDesktopWindow)
+            TT_ReleaseUserDesktopWindow(nil, acquiredDesktopWindowEx)
+            var videoCaptureDeviceCount: Int32 = 0
+            TT_GetVideoCaptureDevices(nil, &videoCaptureDeviceCount)
+            var videoFormat = VideoFormat()
+            TT_InitVideoCaptureDevice(nil, "", &videoFormat)
+            TT_CloseVideoCaptureDevice(nil)
+            TT_SetUserMediaStorageDir(nil, 0, "", "", AFF_NONE)
+            TT_SetUserMediaStorageDirEx(nil, 0, "", "", AFF_NONE, 0)
+            var audioCodec = AudioCodec()
+            TT_StartRecordingMuxedAudioFile(nil, &audioCodec, "", AFF_NONE)
+            TT_StartRecordingMuxedAudioFileEx(nil, 0, "", AFF_NONE)
+            TT_StartRecordingMuxedStreams(nil, STREAMTYPE_NONE.rawValue, &audioCodec, "", AFF_NONE)
+            TT_StopRecordingMuxedAudioFile(nil)
+            TT_StopRecordingMuxedAudioFileEx(nil, 0)
+            var audioFormat = AudioFormat()
+            TT_EnableAudioBlockEventEx(nil, 0, STREAMTYPE_NONE.rawValue, &audioFormat, 0)
+            var audioBlock = AudioBlock()
+            TT_InsertAudioBlock(nil, &audioBlock)
+            let acquiredAudioBlock = TT_AcquireUserAudioBlock(nil, STREAMTYPE_NONE.rawValue, 0)
+            TT_ReleaseUserAudioBlock(nil, acquiredAudioBlock)
             TT_DoLeaveChannel(nil)
             TT_GetRootChannelID(nil)
             TT_DBG_SetSoundInputTone(nil, 0, 0)
@@ -170,6 +242,151 @@ public final class TeamTalkClient {
 
     public var version: String {
         String(cString: TT_GetVersion())
+    }
+
+    public func soundDevicesInfo() -> [SoundDevice] {
+        var count: Int32 = 0
+        guard TT_GetSoundDevices(nil, &count) != 0, count > 0 else {
+            return []
+        }
+
+        var devices = Array(repeating: SoundDevice(), count: Int(count))
+        var deviceCount = count
+        let didRead = devices.withUnsafeMutableBufferPointer { buffer in
+            TT_GetSoundDevices(buffer.baseAddress, &deviceCount) != 0
+        }
+        guard didRead else {
+            return []
+        }
+
+        let returnedCount = max(0, min(Int(deviceCount), devices.count))
+        if returnedCount < devices.count {
+            devices.removeLast(devices.count - returnedCount)
+        }
+        return devices
+    }
+
+    public func soundDevices() -> [TeamTalkSoundDevice] {
+        soundDevicesInfo().map(TeamTalkSoundDevice.init)
+    }
+
+    public func defaultSoundDevices() -> (input: TeamTalkSoundDeviceID, output: TeamTalkSoundDeviceID)? {
+        var inputDeviceID: Int32 = 0
+        var outputDeviceID: Int32 = 0
+        guard TT_GetDefaultSoundDevices(&inputDeviceID, &outputDeviceID) != 0 else {
+            return nil
+        }
+        return (TeamTalkSoundDeviceID(inputDeviceID), TeamTalkSoundDeviceID(outputDeviceID))
+    }
+
+    public func defaultSoundDevices(for soundSystem: TeamTalkSoundSystem) -> (input: TeamTalkSoundDeviceID, output: TeamTalkSoundDeviceID)? {
+        var inputDeviceID: Int32 = 0
+        var outputDeviceID: Int32 = 0
+        guard TT_GetDefaultSoundDevicesEx(soundSystem.cValue, &inputDeviceID, &outputDeviceID) != 0 else {
+            return nil
+        }
+        return (TeamTalkSoundDeviceID(inputDeviceID), TeamTalkSoundDeviceID(outputDeviceID))
+    }
+
+    @discardableResult
+    public func restartSoundSystem() -> Bool {
+        TT_RestartSoundSystem() != 0
+    }
+
+    public func soundDeviceEffectsInfo() -> SoundDeviceEffects? {
+        guard let instance else {
+            return nil
+        }
+
+        var effects = SoundDeviceEffects()
+        guard TT_GetSoundDeviceEffects(instance, &effects) != 0 else {
+            return nil
+        }
+        return effects
+    }
+
+    public func soundDeviceEffects() -> TeamTalkSoundDeviceEffects? {
+        soundDeviceEffectsInfo().map(TeamTalkSoundDeviceEffects.init)
+    }
+
+    @discardableResult
+    public func setSoundDeviceEffects(_ effects: inout SoundDeviceEffects) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_SetSoundDeviceEffects(instance, &effects) != 0
+    }
+
+    @discardableResult
+    public func setSoundDeviceEffects(_ configuration: TeamTalkSoundDeviceEffectsConfiguration) -> Bool {
+        var effects = configuration.cValue
+        return setSoundDeviceEffects(&effects)
+    }
+
+    @discardableResult
+    public func setSoundDeviceEffects(_ effects: TeamTalkSoundDeviceEffects) -> Bool {
+        var rawEffects = effects.cValue
+        return setSoundDeviceEffects(&rawEffects)
+    }
+
+    @discardableResult
+    public func initSoundInputSharedDevice(sampleRate: Int32, channels: Int32, frameSize: Int32) -> Bool {
+        TT_InitSoundInputSharedDevice(sampleRate, channels, frameSize) != 0
+    }
+
+    @discardableResult
+    public func initSoundInputSharedDevice(_ configuration: TeamTalkSharedSoundDeviceConfiguration) -> Bool {
+        initSoundInputSharedDevice(
+            sampleRate: configuration.sampleRate,
+            channels: configuration.channels,
+            frameSize: configuration.frameSize
+        )
+    }
+
+    @discardableResult
+    public func initSoundOutputSharedDevice(sampleRate: Int32, channels: Int32, frameSize: Int32) -> Bool {
+        TT_InitSoundOutputSharedDevice(sampleRate, channels, frameSize) != 0
+    }
+
+    @discardableResult
+    public func initSoundOutputSharedDevice(_ configuration: TeamTalkSharedSoundDeviceConfiguration) -> Bool {
+        initSoundOutputSharedDevice(
+            sampleRate: configuration.sampleRate,
+            channels: configuration.channels,
+            frameSize: configuration.frameSize
+        )
+    }
+
+    @discardableResult
+    public func initSoundDuplexDevices(inputDeviceID: Int32, outputDeviceID: Int32) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_InitSoundDuplexDevices(instance, inputDeviceID, outputDeviceID) != 0
+    }
+
+    @discardableResult
+    public func initSoundDuplexDevices(inputDeviceID: TeamTalkSoundDeviceID, outputDeviceID: TeamTalkSoundDeviceID) -> Bool {
+        initSoundDuplexDevices(inputDeviceID: inputDeviceID.cValue, outputDeviceID: outputDeviceID.cValue)
+    }
+
+    @discardableResult
+    public func initSoundDuplexDevices(_ configuration: TeamTalkSoundDuplexConfiguration) -> Bool {
+        initSoundDuplexDevices(
+            inputDeviceID: configuration.inputDeviceRawID,
+            outputDeviceID: configuration.outputDeviceRawID
+        )
+    }
+
+    @discardableResult
+    public func closeSoundDuplexDevices() -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_CloseSoundDuplexDevices(instance) != 0
     }
 
     public func start(licenseName: String, licenseKey: String) {
@@ -1003,6 +1220,682 @@ public final class TeamTalkClient {
     }
 
     @discardableResult
+    public func sendDesktopWindow(
+        _ desktopWindow: DesktopWindow,
+        convertTo bitmapFormat: TeamTalkBitmapFormat = .none
+    ) -> Int32 {
+        guard let instance else {
+            return -1
+        }
+
+        var desktopWindow = desktopWindow
+        return TT_SendDesktopWindow(instance, &desktopWindow, bitmapFormat.cValue)
+    }
+
+    @discardableResult
+    public func sendDesktopWindow(
+        _ desktopWindow: TeamTalkDesktopWindow,
+        convertTo bitmapFormat: TeamTalkBitmapFormat = .none
+    ) -> Int32 {
+        guard let instance else {
+            return -1
+        }
+
+        return desktopWindow.withUnsafeCValue { rawValue in
+            var rawValue = rawValue
+            return TT_SendDesktopWindow(instance, &rawValue, bitmapFormat.cValue)
+        }
+    }
+
+    @discardableResult
+    public func closeDesktopWindow() -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_CloseDesktopWindow(instance) != 0
+    }
+
+    @discardableResult
+    public func sendDesktopCursorPosition(x: UInt16, y: UInt16) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_SendDesktopCursorPosition(instance, x, y) != 0
+    }
+
+    @discardableResult
+    public func sendDesktopInput(userID: Int32, inputs: [DesktopInput]) -> Bool {
+        guard let instance, !inputs.isEmpty, inputs.count <= Int(TT_DESKTOPINPUT_MAX) else {
+            return false
+        }
+
+        return inputs.withUnsafeBufferPointer { buffer in
+            guard let baseAddress = buffer.baseAddress else {
+                return false
+            }
+            return TT_SendDesktopInput(instance, userID, baseAddress, Int32(buffer.count)) != 0
+        }
+    }
+
+    @discardableResult
+    public func sendDesktopInput(userID: TeamTalkUserID, inputs: [DesktopInput]) -> Bool {
+        sendDesktopInput(userID: userID.cValue, inputs: inputs)
+    }
+
+    @discardableResult
+    public func sendDesktopInput(userID: Int32, inputs: [TeamTalkDesktopInput]) -> Bool {
+        sendDesktopInput(userID: userID, inputs: inputs.map(\.cValue))
+    }
+
+    @discardableResult
+    public func sendDesktopInput(userID: TeamTalkUserID, inputs: [TeamTalkDesktopInput]) -> Bool {
+        sendDesktopInput(userID: userID.cValue, inputs: inputs)
+    }
+
+    public func withAcquiredDesktopWindow<Result>(
+        userID: Int32,
+        _ body: (DesktopWindow) throws -> Result
+    ) rethrows -> Result? {
+        guard let instance, let desktopWindow = TT_AcquireUserDesktopWindow(instance, userID) else {
+            return nil
+        }
+
+        defer {
+            _ = TT_ReleaseUserDesktopWindow(instance, desktopWindow)
+        }
+        return try body(desktopWindow.pointee)
+    }
+
+    public func withAcquiredDesktopWindow<Result>(
+        userID: TeamTalkUserID,
+        _ body: (DesktopWindow) throws -> Result
+    ) rethrows -> Result? {
+        try withAcquiredDesktopWindow(userID: userID.cValue, body)
+    }
+
+    public func withAcquiredDesktopWindow<Result>(
+        userID: Int32,
+        convertTo bitmapFormat: TeamTalkBitmapFormat,
+        _ body: (DesktopWindow) throws -> Result
+    ) rethrows -> Result? {
+        guard let instance, let desktopWindow = TT_AcquireUserDesktopWindowEx(instance, userID, bitmapFormat.cValue) else {
+            return nil
+        }
+
+        defer {
+            _ = TT_ReleaseUserDesktopWindow(instance, desktopWindow)
+        }
+        return try body(desktopWindow.pointee)
+    }
+
+    public func withAcquiredDesktopWindow<Result>(
+        userID: TeamTalkUserID,
+        convertTo bitmapFormat: TeamTalkBitmapFormat,
+        _ body: (DesktopWindow) throws -> Result
+    ) rethrows -> Result? {
+        try withAcquiredDesktopWindow(userID: userID.cValue, convertTo: bitmapFormat, body)
+    }
+
+    public func acquireDesktopWindow(userID: Int32) -> TeamTalkDesktopWindow? {
+        withAcquiredDesktopWindow(userID: userID) { TeamTalkDesktopWindow($0) }
+    }
+
+    public func acquireDesktopWindow(userID: TeamTalkUserID) -> TeamTalkDesktopWindow? {
+        acquireDesktopWindow(userID: userID.cValue)
+    }
+
+    public func acquireDesktopWindow(
+        userID: Int32,
+        convertTo bitmapFormat: TeamTalkBitmapFormat
+    ) -> TeamTalkDesktopWindow? {
+        withAcquiredDesktopWindow(userID: userID, convertTo: bitmapFormat) { TeamTalkDesktopWindow($0) }
+    }
+
+    public func acquireDesktopWindow(
+        userID: TeamTalkUserID,
+        convertTo bitmapFormat: TeamTalkBitmapFormat
+    ) -> TeamTalkDesktopWindow? {
+        acquireDesktopWindow(userID: userID.cValue, convertTo: bitmapFormat)
+    }
+
+    public func videoCaptureDevicesInfo() -> [VideoCaptureDevice] {
+        var count: Int32 = 0
+        guard TT_GetVideoCaptureDevices(nil, &count) != 0, count > 0 else {
+            return []
+        }
+
+        var devices = Array(repeating: VideoCaptureDevice(), count: Int(count))
+        var deviceCount = count
+        let didRead = devices.withUnsafeMutableBufferPointer { buffer in
+            TT_GetVideoCaptureDevices(buffer.baseAddress, &deviceCount) != 0
+        }
+        guard didRead else {
+            return []
+        }
+
+        let returnedCount = max(0, min(Int(deviceCount), devices.count))
+        if returnedCount < devices.count {
+            devices.removeLast(devices.count - returnedCount)
+        }
+        return devices
+    }
+
+    public func videoCaptureDevices() -> [TeamTalkVideoCaptureDevice] {
+        videoCaptureDevicesInfo().map(TeamTalkVideoCaptureDevice.init)
+    }
+
+    @discardableResult
+    public func initVideoCaptureDevice(deviceID: String, format: VideoFormat) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        var format = format
+        return TT_InitVideoCaptureDevice(instance, deviceID, &format) != 0
+    }
+
+    @discardableResult
+    public func initVideoCaptureDevice(deviceID: String, format: TeamTalkVideoFormat) -> Bool {
+        initVideoCaptureDevice(deviceID: deviceID, format: format.cValue)
+    }
+
+    @discardableResult
+    public func initVideoCaptureDevice(_ device: TeamTalkVideoCaptureDevice, format: VideoFormat) -> Bool {
+        initVideoCaptureDevice(deviceID: device.deviceIdentifier, format: format)
+    }
+
+    @discardableResult
+    public func initVideoCaptureDevice(_ device: TeamTalkVideoCaptureDevice, format: TeamTalkVideoFormat) -> Bool {
+        initVideoCaptureDevice(deviceID: device.deviceIdentifier, format: format)
+    }
+
+    @discardableResult
+    public func closeVideoCaptureDevice() -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_CloseVideoCaptureDevice(instance) != 0
+    }
+
+    @discardableResult
+    public func setUserMediaStorage(
+        userID: Int32,
+        directoryURL: URL?,
+        fileNamePattern: String = "",
+        audioFileFormat: TeamTalkAudioFileFormat,
+        stopRecordingExtraDelayMilliseconds: Int32? = nil
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        let directoryPath = directoryURL?.path ?? ""
+        if let stopRecordingExtraDelayMilliseconds {
+            return TT_SetUserMediaStorageDirEx(
+                instance,
+                userID,
+                directoryPath,
+                fileNamePattern,
+                audioFileFormat.cValue,
+                stopRecordingExtraDelayMilliseconds
+            ) != 0
+        }
+
+        return TT_SetUserMediaStorageDir(
+            instance,
+            userID,
+            directoryPath,
+            fileNamePattern,
+            audioFileFormat.cValue
+        ) != 0
+    }
+
+    @discardableResult
+    public func setUserMediaStorage(
+        userID: TeamTalkUserID,
+        directoryURL: URL?,
+        fileNamePattern: String = "",
+        audioFileFormat: TeamTalkAudioFileFormat,
+        stopRecordingExtraDelayMilliseconds: Int32? = nil
+    ) -> Bool {
+        setUserMediaStorage(
+            userID: userID.cValue,
+            directoryURL: directoryURL,
+            fileNamePattern: fileNamePattern,
+            audioFileFormat: audioFileFormat,
+            stopRecordingExtraDelayMilliseconds: stopRecordingExtraDelayMilliseconds
+        )
+    }
+
+    @discardableResult
+    public func setUserMediaStorage(
+        userID: Int32,
+        configuration: TeamTalkUserMediaStorageConfiguration
+    ) -> Bool {
+        setUserMediaStorage(
+            userID: userID,
+            directoryURL: configuration.directoryURL,
+            fileNamePattern: configuration.fileNamePattern,
+            audioFileFormat: configuration.audioFileFormat,
+            stopRecordingExtraDelayMilliseconds: configuration.stopRecordingExtraDelayMilliseconds
+        )
+    }
+
+    @discardableResult
+    public func setUserMediaStorage(
+        userID: TeamTalkUserID,
+        configuration: TeamTalkUserMediaStorageConfiguration
+    ) -> Bool {
+        setUserMediaStorage(userID: userID.cValue, configuration: configuration)
+    }
+
+    @discardableResult
+    public func disableUserMediaStorage(userID: Int32) -> Bool {
+        setUserMediaStorage(userID: userID, directoryURL: nil, audioFileFormat: .none)
+    }
+
+    @discardableResult
+    public func disableUserMediaStorage(userID: TeamTalkUserID) -> Bool {
+        disableUserMediaStorage(userID: userID.cValue)
+    }
+
+    @discardableResult
+    public func startRecordingMuxedAudioFile(
+        codec: AudioCodec,
+        to fileURL: URL,
+        audioFileFormat: TeamTalkAudioFileFormat
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        var codec = codec
+        return TT_StartRecordingMuxedAudioFile(instance, &codec, fileURL.path, audioFileFormat.cValue) != 0
+    }
+
+    @discardableResult
+    public func startRecordingMuxedAudioFile(
+        channelID: Int32,
+        to fileURL: URL,
+        audioFileFormat: TeamTalkAudioFileFormat
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_StartRecordingMuxedAudioFileEx(instance, channelID, fileURL.path, audioFileFormat.cValue) != 0
+    }
+
+    @discardableResult
+    public func startRecordingMuxedAudioFile(
+        channelID: TeamTalkChannelID,
+        to fileURL: URL,
+        audioFileFormat: TeamTalkAudioFileFormat
+    ) -> Bool {
+        startRecordingMuxedAudioFile(channelID: channelID.cValue, to: fileURL, audioFileFormat: audioFileFormat)
+    }
+
+    @discardableResult
+    public func startRecordingMuxedStreams(
+        _ streamTypes: TeamTalkStreamTypes,
+        codec: AudioCodec,
+        to fileURL: URL,
+        audioFileFormat: TeamTalkAudioFileFormat
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        var codec = codec
+        return TT_StartRecordingMuxedStreams(
+            instance,
+            streamTypes.cMask,
+            &codec,
+            fileURL.path,
+            audioFileFormat.cValue
+        ) != 0
+    }
+
+    @discardableResult
+    public func stopRecordingMuxedAudioFile() -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_StopRecordingMuxedAudioFile(instance) != 0
+    }
+
+    @discardableResult
+    public func stopRecordingMuxedAudioFile(channelID: Int32) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_StopRecordingMuxedAudioFileEx(instance, channelID) != 0
+    }
+
+    @discardableResult
+    public func stopRecordingMuxedAudioFile(channelID: TeamTalkChannelID) -> Bool {
+        stopRecordingMuxedAudioFile(channelID: channelID.cValue)
+    }
+
+    @discardableResult
+    public func enableAudioBlockEvent(
+        sourceID: Int32,
+        streamTypes: TeamTalkStreamTypes,
+        audioFormat: AudioFormat? = nil,
+        enabled: Bool
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return withOptionalAudioFormatPointer(audioFormat) { formatPointer in
+            TT_EnableAudioBlockEventEx(
+                instance,
+                sourceID,
+                streamTypes.cMask,
+                formatPointer,
+                enabled ? 1 : 0
+            ) != 0
+        }
+    }
+
+    @discardableResult
+    public func enableAudioBlockEvent(
+        sourceID: TeamTalkAudioBlockSourceID,
+        streamTypes: TeamTalkStreamTypes,
+        audioFormat: AudioFormat? = nil,
+        enabled: Bool
+    ) -> Bool {
+        enableAudioBlockEvent(
+            sourceID: sourceID.cValue,
+            streamTypes: streamTypes,
+            audioFormat: audioFormat,
+            enabled: enabled
+        )
+    }
+
+    @discardableResult
+    public func enableAudioBlockEvent(
+        sourceID: Int32,
+        streamTypes: TeamTalkStreamTypes,
+        audioFormat: TeamTalkAudioFormatConfiguration,
+        enabled: Bool
+    ) -> Bool {
+        enableAudioBlockEvent(
+            sourceID: sourceID,
+            streamTypes: streamTypes,
+            audioFormat: audioFormat.cValue,
+            enabled: enabled
+        )
+    }
+
+    @discardableResult
+    public func enableAudioBlockEvent(
+        sourceID: TeamTalkAudioBlockSourceID,
+        streamTypes: TeamTalkStreamTypes,
+        audioFormat: TeamTalkAudioFormatConfiguration,
+        enabled: Bool
+    ) -> Bool {
+        enableAudioBlockEvent(
+            sourceID: sourceID.cValue,
+            streamTypes: streamTypes,
+            audioFormat: audioFormat,
+            enabled: enabled
+        )
+    }
+
+    @discardableResult
+    public func disableAudioBlockEvent(
+        sourceID: Int32,
+        streamTypes: TeamTalkStreamTypes
+    ) -> Bool {
+        enableAudioBlockEvent(sourceID: sourceID, streamTypes: streamTypes, enabled: false)
+    }
+
+    @discardableResult
+    public func disableAudioBlockEvent(
+        sourceID: TeamTalkAudioBlockSourceID,
+        streamTypes: TeamTalkStreamTypes
+    ) -> Bool {
+        disableAudioBlockEvent(sourceID: sourceID.cValue, streamTypes: streamTypes)
+    }
+
+    public func withAcquiredAudioBlock<Result>(
+        sourceID: Int32,
+        streamTypes: TeamTalkStreamTypes,
+        _ body: (AudioBlock) throws -> Result
+    ) rethrows -> Result? {
+        guard let instance, let audioBlock = TT_AcquireUserAudioBlock(instance, streamTypes.cMask, sourceID) else {
+            return nil
+        }
+
+        defer {
+            _ = TT_ReleaseUserAudioBlock(instance, audioBlock)
+        }
+        return try body(audioBlock.pointee)
+    }
+
+    public func withAcquiredAudioBlock<Result>(
+        sourceID: TeamTalkAudioBlockSourceID,
+        streamTypes: TeamTalkStreamTypes,
+        _ body: (AudioBlock) throws -> Result
+    ) rethrows -> Result? {
+        try withAcquiredAudioBlock(sourceID: sourceID.cValue, streamTypes: streamTypes, body)
+    }
+
+    public func acquireAudioBlock(
+        sourceID: Int32,
+        streamTypes: TeamTalkStreamTypes
+    ) -> TeamTalkAudioBlock? {
+        withAcquiredAudioBlock(sourceID: sourceID, streamTypes: streamTypes) { TeamTalkAudioBlock($0) }
+    }
+
+    public func acquireAudioBlock(
+        sourceID: TeamTalkAudioBlockSourceID,
+        streamTypes: TeamTalkStreamTypes
+    ) -> TeamTalkAudioBlock? {
+        acquireAudioBlock(sourceID: sourceID.cValue, streamTypes: streamTypes)
+    }
+
+    @discardableResult
+    public func insertAudioBlock(_ audioBlock: AudioBlock?) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        if var audioBlock {
+            return TT_InsertAudioBlock(instance, &audioBlock) != 0
+        }
+        return TT_InsertAudioBlock(instance, nil) != 0
+    }
+
+    @discardableResult
+    public func insertAudioBlock(_ audioBlock: TeamTalkAudioBlock?) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        guard let audioBlock else {
+            return TT_InsertAudioBlock(instance, nil) != 0
+        }
+
+        return audioBlock.withUnsafeCValue { rawValue in
+            var rawValue = rawValue
+            return TT_InsertAudioBlock(instance, &rawValue) != 0
+        }
+    }
+
+    public func mediaFileInfo(at localURL: URL) -> MediaFileInfo? {
+        var mediaFileInfo = MediaFileInfo()
+        guard TT_GetMediaFileInfo(localURL.path, &mediaFileInfo) != 0 else {
+            return nil
+        }
+        return mediaFileInfo
+    }
+
+    public func mediaFile(at localURL: URL) -> TeamTalkMediaFileInfo? {
+        mediaFileInfo(at: localURL).map(TeamTalkMediaFileInfo.init)
+    }
+
+    @discardableResult
+    public func startStreamingMediaFileToChannel(from localURL: URL, videoCodec: VideoCodec? = nil) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return withOptionalVideoCodecPointer(videoCodec) { codecPointer in
+            TT_StartStreamingMediaFileToChannel(instance, localURL.path, codecPointer) != 0
+        }
+    }
+
+    @discardableResult
+    public func startStreamingMediaFileToChannel(
+        from localURL: URL,
+        playback: MediaFilePlayback,
+        videoCodec: VideoCodec? = nil
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        var playback = playback
+        return withOptionalVideoCodecPointer(videoCodec) { codecPointer in
+            TT_StartStreamingMediaFileToChannelEx(instance, localURL.path, &playback, codecPointer) != 0
+        }
+    }
+
+    @discardableResult
+    public func startStreamingMediaFileToChannel(
+        from localURL: URL,
+        playback: TeamTalkMediaFilePlaybackConfiguration,
+        videoCodec: VideoCodec? = nil
+    ) -> Bool {
+        startStreamingMediaFileToChannel(from: localURL, playback: playback.cValue, videoCodec: videoCodec)
+    }
+
+    @discardableResult
+    public func startStreamingMediaFileToChannel(
+        from localURL: URL,
+        playback: TeamTalkMediaFilePlayback,
+        videoCodec: VideoCodec? = nil
+    ) -> Bool {
+        startStreamingMediaFileToChannel(from: localURL, playback: playback.cValue, videoCodec: videoCodec)
+    }
+
+    @discardableResult
+    public func updateStreamingMediaFileToChannel(
+        playback: MediaFilePlayback,
+        videoCodec: VideoCodec? = nil
+    ) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        var playback = playback
+        return withOptionalVideoCodecPointer(videoCodec) { codecPointer in
+            TT_UpdateStreamingMediaFileToChannel(instance, &playback, codecPointer) != 0
+        }
+    }
+
+    @discardableResult
+    public func updateStreamingMediaFileToChannel(
+        playback: TeamTalkMediaFilePlaybackConfiguration,
+        videoCodec: VideoCodec? = nil
+    ) -> Bool {
+        updateStreamingMediaFileToChannel(playback: playback.cValue, videoCodec: videoCodec)
+    }
+
+    @discardableResult
+    public func updateStreamingMediaFileToChannel(
+        playback: TeamTalkMediaFilePlayback,
+        videoCodec: VideoCodec? = nil
+    ) -> Bool {
+        updateStreamingMediaFileToChannel(playback: playback.cValue, videoCodec: videoCodec)
+    }
+
+    @discardableResult
+    public func stopStreamingMediaFileToChannel() -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_StopStreamingMediaFileToChannel(instance) != 0
+    }
+
+    @discardableResult
+    public func initLocalPlayback(from localURL: URL, playback: MediaFilePlayback) -> Int32 {
+        guard let instance else {
+            return -1
+        }
+
+        var playback = playback
+        return TT_InitLocalPlayback(instance, localURL.path, &playback)
+    }
+
+    public func initLocalPlayback(
+        from localURL: URL,
+        playback: TeamTalkMediaFilePlaybackConfiguration
+    ) -> TeamTalkPlaybackSessionID? {
+        let sessionID = initLocalPlayback(from: localURL, playback: playback.cValue)
+        guard sessionID > 0 else {
+            return nil
+        }
+        return TeamTalkPlaybackSessionID(sessionID)
+    }
+
+    public func initLocalPlayback(
+        from localURL: URL,
+        playback: TeamTalkMediaFilePlayback
+    ) -> TeamTalkPlaybackSessionID? {
+        initLocalPlayback(from: localURL, playback: TeamTalkMediaFilePlaybackConfiguration(playback))
+    }
+
+    @discardableResult
+    public func updateLocalPlayback(sessionID: Int32, playback: MediaFilePlayback) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        var playback = playback
+        return TT_UpdateLocalPlayback(instance, sessionID, &playback) != 0
+    }
+
+    @discardableResult
+    public func updateLocalPlayback(
+        sessionID: TeamTalkPlaybackSessionID,
+        playback: TeamTalkMediaFilePlaybackConfiguration
+    ) -> Bool {
+        updateLocalPlayback(sessionID: sessionID.cValue, playback: playback.cValue)
+    }
+
+    @discardableResult
+    public func updateLocalPlayback(
+        sessionID: TeamTalkPlaybackSessionID,
+        playback: TeamTalkMediaFilePlayback
+    ) -> Bool {
+        updateLocalPlayback(sessionID: sessionID, playback: TeamTalkMediaFilePlaybackConfiguration(playback))
+    }
+
+    @discardableResult
+    public func stopLocalPlayback(sessionID: Int32) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_StopLocalPlayback(instance, sessionID) != 0
+    }
+
+    @discardableResult
+    public func stopLocalPlayback(sessionID: TeamTalkPlaybackSessionID) -> Bool {
+        stopLocalPlayback(sessionID: sessionID.cValue)
+    }
+
+    @discardableResult
     public func setEncryptionContext(_ encryption: inout EncryptionContext) -> Bool {
         TT_SetEncryptionContext(instance, &encryption) != 0
     }
@@ -1161,8 +2054,18 @@ public final class TeamTalkClient {
     }
 
     @discardableResult
+    public func initSoundInputDevice(id soundDeviceID: TeamTalkSoundDeviceID) -> Bool {
+        initSoundInputDevice(id: soundDeviceID.cValue)
+    }
+
+    @discardableResult
     public func initSoundOutputDevice(id soundDeviceID: Int32) -> Bool {
         TT_InitSoundOutputDevice(instance, soundDeviceID) != 0
+    }
+
+    @discardableResult
+    public func initSoundOutputDevice(id soundDeviceID: TeamTalkSoundDeviceID) -> Bool {
+        initSoundOutputDevice(id: soundDeviceID.cValue)
     }
 
     @discardableResult

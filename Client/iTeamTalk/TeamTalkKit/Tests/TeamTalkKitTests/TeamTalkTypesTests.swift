@@ -30,6 +30,78 @@ final class TeamTalkTypesTests: XCTestCase {
         XCTAssertTrue(TeamTalkTransferID(8).isValid)
         XCTAssertFalse(TeamTalkTransferID.none.isValid)
         XCTAssertEqual(TeamTalkTransferID.invalid.description, "-1")
+
+        XCTAssertEqual(TeamTalkPlaybackSessionID(9).cValue, 9)
+        XCTAssertTrue(TeamTalkPlaybackSessionID(9).isValid)
+        XCTAssertFalse(TeamTalkPlaybackSessionID.none.isValid)
+        XCTAssertEqual(TeamTalkPlaybackSessionID.invalid.description, "-1")
+
+        XCTAssertEqual(TeamTalkAudioBlockSourceID.localUser.cValue, TT_LOCAL_USERID)
+        XCTAssertEqual(TeamTalkAudioBlockSourceID.localTransmission.cValue, TT_LOCAL_TX_USERID)
+        XCTAssertEqual(TeamTalkAudioBlockSourceID.muxed.cValue, TT_MUXED_USERID)
+        XCTAssertTrue(TeamTalkAudioBlockSourceID.localUser.isSpecialSource)
+        XCTAssertTrue(TeamTalkAudioBlockSourceID.localTransmission.isSpecialSource)
+        XCTAssertTrue(TeamTalkAudioBlockSourceID.muxed.isSpecialSource)
+        XCTAssertFalse(TeamTalkAudioBlockSourceID(userID: TeamTalkUserID(10)).isSpecialSource)
+        XCTAssertEqual(TeamTalkAudioBlockSourceID(userID: TeamTalkUserID(10)).description, "10")
+        XCTAssertEqual(
+            TeamTalkAudioBlockSourceID(playbackSessionID: TeamTalkPlaybackSessionID(11)).cValue,
+            11
+        )
+    }
+
+    func testSoundSystemWrapperPreservesCValues() {
+        assertSoundSystemMappings([
+            (.none, SOUNDSYSTEM_NONE),
+            (.winMM, SOUNDSYSTEM_WINMM),
+            (.directSound, SOUNDSYSTEM_DSOUND),
+            (.alsa, SOUNDSYSTEM_ALSA),
+            (.coreAudio, SOUNDSYSTEM_COREAUDIO),
+            (.wasapi, SOUNDSYSTEM_WASAPI),
+            (.openSLESAndroid, SOUNDSYSTEM_OPENSLES_ANDROID),
+            (.audioUnit, SOUNDSYSTEM_AUDIOUNIT),
+            (.pulseAudio, SOUNDSYSTEM_PULSEAUDIO)
+        ])
+
+        XCTAssertEqual(TeamTalkSoundSystem.audioUnitIOS, .audioUnit)
+        XCTAssertEqual(TeamTalkSoundSystem(cValue: SOUNDSYSTEM_AUDIOUNIT), .audioUnit)
+    }
+
+    func testSoundDeviceFeaturesMapToCBitmask() {
+        let features: TeamTalkSoundDeviceFeatures = [.echoCancellation, .denoise]
+        let expected = SOUNDDEVICEFEATURE_AEC.rawValue | SOUNDDEVICEFEATURE_DENOISE.rawValue
+
+        XCTAssertTrue(features.contains(.echoCancellation))
+        XCTAssertTrue(features.contains(.denoise))
+        XCTAssertEqual(features.cValue, expected)
+
+        let mappings: [(TeamTalkSoundDeviceFeatures, UInt32)] = [
+            (.none, SOUNDDEVICEFEATURE_NONE.rawValue),
+            (.echoCancellation, SOUNDDEVICEFEATURE_AEC.rawValue),
+            (.automaticGainControl, SOUNDDEVICEFEATURE_AGC.rawValue),
+            (.denoise, SOUNDDEVICEFEATURE_DENOISE.rawValue),
+            (.threeDPosition, SOUNDDEVICEFEATURE_3DPOSITION.rawValue),
+            (.duplexMode, SOUNDDEVICEFEATURE_DUPLEXMODE.rawValue),
+            (.defaultCommunicationDevice, SOUNDDEVICEFEATURE_DEFAULTCOMDEVICE.rawValue)
+        ]
+        assertUInt32Mappings(mappings)
+    }
+
+    func testSoundDeviceIDWrapperPreservesRawValuesAndHelpers() {
+        XCTAssertEqual(TeamTalkSoundDeviceID(42).cValue, 42)
+        XCTAssertEqual(TeamTalkSoundDeviceID(42).description, "42")
+
+        XCTAssertEqual(TeamTalkSoundDeviceID.remoteIO.rawValue, TT_SOUNDDEVICE_ID_REMOTEIO)
+        XCTAssertEqual(TeamTalkSoundDeviceID.voiceProcessingIO.rawValue, TT_SOUNDDEVICE_ID_VOICEPREPROCESSINGIO)
+        XCTAssertEqual(TeamTalkSoundDeviceID.openSLESDefault.rawValue, TT_SOUNDDEVICE_ID_OPENSLES_DEFAULT)
+        XCTAssertEqual(TeamTalkSoundDeviceID.openSLESVoiceCommunication.rawValue, TT_SOUNDDEVICE_ID_OPENSLES_VOICECOM)
+        XCTAssertEqual(TeamTalkSoundDeviceID.teamTalkVirtual.rawValue, TT_SOUNDDEVICE_ID_TEAMTALK_VIRTUAL)
+
+        XCTAssertFalse(TeamTalkSoundDeviceID.remoteIO.isShared)
+        XCTAssertFalse(TeamTalkSoundDeviceID.openSLESVoiceCommunication.isShared)
+        XCTAssertTrue(TeamTalkSoundDeviceID.voiceProcessingIO.isShared)
+        XCTAssertEqual(TeamTalkSoundDeviceID.voiceProcessingIO.physicalDeviceID, TeamTalkSoundDeviceID(1))
+        XCTAssertEqual(TeamTalkSoundDeviceID.teamTalkVirtual.physicalDeviceID, .teamTalkVirtual)
     }
 
     func testErrorCodeCategoriesAndRawValues() {
@@ -342,6 +414,64 @@ final class TeamTalkTypesTests: XCTestCase {
             (.active, FILETRANSFER_ACTIVE),
             (.finished, FILETRANSFER_FINISHED)
         ])
+
+        assertBitmapFormatMappings([
+            (.none, BMP_NONE),
+            (.rgb8Palette, BMP_RGB8_PALETTE),
+            (.rgb16_555, BMP_RGB16_555),
+            (.rgb24, BMP_RGB24),
+            (.rgb32, BMP_RGB32)
+        ])
+
+        assertDesktopProtocolMappings([
+            (.zlib1, DESKTOPPROTOCOL_ZLIB_1)
+        ])
+
+        assertUInt32Mappings([
+            (.none, DESKTOPKEYSTATE_NONE.rawValue),
+            (.down, DESKTOPKEYSTATE_DOWN.rawValue),
+            (.up, DESKTOPKEYSTATE_UP.rawValue)
+        ] as [(TeamTalkDesktopKeyState, UInt32)])
+
+        assertMediaFileStatusMappings([
+            (.closed, MFS_CLOSED),
+            (.error, MFS_ERROR),
+            (.started, MFS_STARTED),
+            (.finished, MFS_FINISHED),
+            (.aborted, MFS_ABORTED),
+            (.paused, MFS_PAUSED),
+            (.playing, MFS_PLAYING)
+        ])
+
+        assertAudioFileFormatMappings([
+            (.none, AFF_NONE),
+            (.channelCodec, AFF_CHANNELCODEC_FORMAT),
+            (.wave, AFF_WAVE_FORMAT),
+            (.mp3_16kbit, AFF_MP3_16KBIT_FORMAT),
+            (.mp3_32kbit, AFF_MP3_32KBIT_FORMAT),
+            (.mp3_64kbit, AFF_MP3_64KBIT_FORMAT),
+            (.mp3_128kbit, AFF_MP3_128KBIT_FORMAT),
+            (.mp3_256kbit, AFF_MP3_256KBIT_FORMAT),
+            (.mp3_320kbit, AFF_MP3_320KBIT_FORMAT)
+        ])
+
+        assertVideoPixelFormatMappings([
+            (.none, FOURCC_NONE),
+            (.i420, FOURCC_I420),
+            (.yuy2, FOURCC_YUY2),
+            (.rgb32, FOURCC_RGB32)
+        ])
+
+        let combinedDesktopKeyState: TeamTalkDesktopKeyState = [.down, .up]
+        XCTAssertEqual(TeamTalkDesktopProtocol.zlib, .zlib1)
+        XCTAssertEqual(combinedDesktopKeyState.cValue, DESKTOPKEYSTATE_DOWN.rawValue | DESKTOPKEYSTATE_UP.rawValue)
+        XCTAssertTrue(TeamTalkDesktopKeyCode.ignore.isIgnored)
+        XCTAssertFalse(TeamTalkDesktopKeyCode.ignore.isMouseButton)
+        XCTAssertEqual(TeamTalkDesktopKeyCode.leftMouseButton.rawValue, UInt32(TT_DESKTOPINPUT_KEYCODE_LMOUSEBTN))
+        XCTAssertEqual(TeamTalkDesktopKeyCode.rightMouseButton.rawValue, UInt32(TT_DESKTOPINPUT_KEYCODE_RMOUSEBTN))
+        XCTAssertEqual(TeamTalkDesktopKeyCode.middleMouseButton.rawValue, UInt32(TT_DESKTOPINPUT_KEYCODE_MMOUSEBTN))
+        XCTAssertTrue(TeamTalkDesktopKeyCode.leftMouseButton.isMouseButton)
+        XCTAssertEqual(TeamTalkDesktopKeyCode(42).description, "42")
     }
 
     func testClientEventWrapperPreservesCValues() {
@@ -485,6 +615,16 @@ final class TeamTalkTypesTests: XCTestCase {
         }
     }
 
+    private func assertSoundSystemMappings(
+        _ mappings: [(TeamTalkSoundSystem, SoundSystem)],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for (actual, expected) in mappings {
+            XCTAssertEqual(actual.cValue, expected, file: file, line: line)
+        }
+    }
+
     private func assertCodecMappings(
         _ mappings: [(TeamTalkCodec, Codec)],
         file: StaticString = #filePath,
@@ -517,6 +657,56 @@ final class TeamTalkTypesTests: XCTestCase {
 
     private func assertFileTransferStatusMappings(
         _ mappings: [(TeamTalkFileTransferStatus, FileTransferStatus)],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for (actual, expected) in mappings {
+            XCTAssertEqual(actual.cValue, expected, file: file, line: line)
+        }
+    }
+
+    private func assertBitmapFormatMappings(
+        _ mappings: [(TeamTalkBitmapFormat, BitmapFormat)],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for (actual, expected) in mappings {
+            XCTAssertEqual(actual.cValue, expected, file: file, line: line)
+        }
+    }
+
+    private func assertDesktopProtocolMappings(
+        _ mappings: [(TeamTalkDesktopProtocol, DesktopProtocol)],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for (actual, expected) in mappings {
+            XCTAssertEqual(actual.cValue, expected, file: file, line: line)
+        }
+    }
+
+    private func assertMediaFileStatusMappings(
+        _ mappings: [(TeamTalkMediaFileStatus, MediaFileStatus)],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for (actual, expected) in mappings {
+            XCTAssertEqual(actual.cValue, expected, file: file, line: line)
+        }
+    }
+
+    private func assertAudioFileFormatMappings(
+        _ mappings: [(TeamTalkAudioFileFormat, AudioFileFormat)],
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        for (actual, expected) in mappings {
+            XCTAssertEqual(actual.cValue, expected, file: file, line: line)
+        }
+    }
+
+    private func assertVideoPixelFormatMappings(
+        _ mappings: [(TeamTalkVideoPixelFormat, FourCC)],
         file: StaticString = #filePath,
         line: UInt = #line
     ) {

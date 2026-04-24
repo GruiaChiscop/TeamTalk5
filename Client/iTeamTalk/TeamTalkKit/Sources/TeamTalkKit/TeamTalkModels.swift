@@ -243,6 +243,730 @@ public struct TeamTalkUserAccountConfiguration {
     }
 }
 
+public struct TeamTalkSoundDevice: Identifiable {
+    public let rawValue: SoundDevice
+
+    public init(_ rawValue: SoundDevice) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: SoundDevice {
+        rawValue
+    }
+
+    public var id: Int32 {
+        rawValue.id
+    }
+
+    public var soundDeviceID: TeamTalkSoundDeviceID {
+        rawValue.soundDeviceID
+    }
+
+    public var physicalDeviceID: TeamTalkSoundDeviceID {
+        rawValue.physicalDeviceID
+    }
+
+    public var name: String {
+        rawValue.name
+    }
+
+    public var deviceIdentifier: String {
+        rawValue.deviceIdentifier
+    }
+
+    public var soundSystem: TeamTalkSoundSystem {
+        rawValue.soundSystem
+    }
+
+    public var waveDeviceID: Int32 {
+        rawValue.waveDeviceID
+    }
+
+    public var maxInputChannels: Int32 {
+        rawValue.maxInputChannels
+    }
+
+    public var maxOutputChannels: Int32 {
+        rawValue.maxOutputChannels
+    }
+
+    public var inputSampleRates: [Int32] {
+        rawValue.supportedInputSampleRates
+    }
+
+    public var outputSampleRates: [Int32] {
+        rawValue.supportedOutputSampleRates
+    }
+
+    public var defaultSampleRate: Int32 {
+        rawValue.defaultSampleRate
+    }
+
+    public var features: TeamTalkSoundDeviceFeatures {
+        rawValue.features
+    }
+
+    public var isShared: Bool {
+        rawValue.isShared
+    }
+
+    public var supportsEchoCancellation: Bool {
+        rawValue.supportsEchoCancellation
+    }
+
+    public var supportsAutomaticGainControl: Bool {
+        rawValue.supportsAutomaticGainControl
+    }
+
+    public var supportsDenoise: Bool {
+        rawValue.supportsDenoise
+    }
+
+    public var supportsDuplexMode: Bool {
+        rawValue.supportsDuplexMode
+    }
+
+    public var isDefaultCommunicationDevice: Bool {
+        rawValue.isDefaultCommunicationDevice
+    }
+}
+
+public struct TeamTalkSoundDeviceEffects {
+    public let rawValue: SoundDeviceEffects
+
+    public init(_ rawValue: SoundDeviceEffects) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: SoundDeviceEffects {
+        rawValue
+    }
+
+    public var automaticGainControlEnabled: Bool {
+        rawValue.automaticGainControlEnabled
+    }
+
+    public var denoiseEnabled: Bool {
+        rawValue.denoiseEnabled
+    }
+
+    public var echoCancellationEnabled: Bool {
+        rawValue.echoCancellationEnabled
+    }
+
+    public var enabledEffects: TeamTalkSoundDeviceFeatures {
+        rawValue.enabledEffects
+    }
+
+    public func hasEffect(_ effect: TeamTalkSoundDeviceFeatures) -> Bool {
+        rawValue.hasEffect(effect)
+    }
+}
+
+public struct TeamTalkSoundDeviceEffectsConfiguration {
+    public var automaticGainControlEnabled: Bool
+    public var denoiseEnabled: Bool
+    public var echoCancellationEnabled: Bool
+
+    public init(
+        automaticGainControlEnabled: Bool = false,
+        denoiseEnabled: Bool = false,
+        echoCancellationEnabled: Bool = false
+    ) {
+        self.automaticGainControlEnabled = automaticGainControlEnabled
+        self.denoiseEnabled = denoiseEnabled
+        self.echoCancellationEnabled = echoCancellationEnabled
+    }
+
+    public init(_ effects: TeamTalkSoundDeviceEffects) {
+        self.init(
+            automaticGainControlEnabled: effects.automaticGainControlEnabled,
+            denoiseEnabled: effects.denoiseEnabled,
+            echoCancellationEnabled: effects.echoCancellationEnabled
+        )
+    }
+
+    public var enabledEffects: TeamTalkSoundDeviceFeatures {
+        get {
+            var effects: TeamTalkSoundDeviceFeatures = []
+            if automaticGainControlEnabled {
+                effects.insert(.automaticGainControl)
+            }
+            if denoiseEnabled {
+                effects.insert(.denoise)
+            }
+            if echoCancellationEnabled {
+                effects.insert(.echoCancellation)
+            }
+            return effects
+        }
+        set {
+            automaticGainControlEnabled = newValue.contains(.automaticGainControl)
+            denoiseEnabled = newValue.contains(.denoise)
+            echoCancellationEnabled = newValue.contains(.echoCancellation)
+        }
+    }
+
+    public var cValue: SoundDeviceEffects {
+        var effects = SoundDeviceEffects()
+        effects.automaticGainControlEnabled = automaticGainControlEnabled
+        effects.denoiseEnabled = denoiseEnabled
+        effects.echoCancellationEnabled = echoCancellationEnabled
+        return effects
+    }
+}
+
+public struct TeamTalkSharedSoundDeviceConfiguration {
+    public var sampleRate: Int32
+    public var channels: Int32
+    public var frameSize: Int32
+
+    public init(
+        sampleRate: Int32 = 0,
+        channels: Int32 = 0,
+        frameSize: Int32 = 0
+    ) {
+        self.sampleRate = sampleRate
+        self.channels = channels
+        self.frameSize = frameSize
+    }
+
+    public var usesDefaultSampleRate: Bool {
+        sampleRate == 0
+    }
+
+    public var usesDefaultChannels: Bool {
+        channels == 0
+    }
+
+    public var usesDefaultFrameSize: Bool {
+        frameSize == 0
+    }
+
+    public var usesDefaultValues: Bool {
+        usesDefaultSampleRate && usesDefaultChannels && usesDefaultFrameSize
+    }
+}
+
+public struct TeamTalkSoundDuplexConfiguration {
+    public var inputDeviceID: TeamTalkSoundDeviceID
+    public var outputDeviceID: TeamTalkSoundDeviceID
+
+    public init(
+        inputDeviceID: TeamTalkSoundDeviceID,
+        outputDeviceID: TeamTalkSoundDeviceID
+    ) {
+        self.inputDeviceID = inputDeviceID
+        self.outputDeviceID = outputDeviceID
+    }
+
+    public init(
+        inputDevice: TeamTalkSoundDevice,
+        outputDevice: TeamTalkSoundDevice
+    ) {
+        self.init(
+            inputDeviceID: inputDevice.soundDeviceID,
+            outputDeviceID: outputDevice.soundDeviceID
+        )
+    }
+
+    public var inputDeviceRawID: Int32 {
+        inputDeviceID.cValue
+    }
+
+    public var outputDeviceRawID: Int32 {
+        outputDeviceID.cValue
+    }
+}
+
+public struct TeamTalkDesktopWindow {
+    public let width: Int32
+    public let height: Int32
+    public let bitmapFormat: TeamTalkBitmapFormat
+    public let bytesPerLine: Int32
+    public let sessionID: Int32
+    public let desktopProtocol: TeamTalkDesktopProtocol
+    public let frameBuffer: Data
+
+    public init(
+        width: Int32,
+        height: Int32,
+        bitmapFormat: TeamTalkBitmapFormat,
+        bytesPerLine: Int32 = 0,
+        sessionID: Int32 = 0,
+        desktopProtocol: TeamTalkDesktopProtocol = .zlib,
+        frameBuffer: Data
+    ) {
+        self.width = width
+        self.height = height
+        self.bitmapFormat = bitmapFormat
+        self.bytesPerLine = bytesPerLine
+        self.sessionID = sessionID
+        self.desktopProtocol = desktopProtocol
+        self.frameBuffer = frameBuffer
+    }
+
+    public init(_ rawValue: DesktopWindow) {
+        self.init(
+            width: rawValue.width,
+            height: rawValue.height,
+            bitmapFormat: rawValue.bitmapFormat,
+            bytesPerLine: rawValue.bytesPerLine,
+            sessionID: rawValue.sessionID,
+            desktopProtocol: rawValue.desktopProtocol,
+            frameBuffer: rawValue.frameBufferData
+        )
+    }
+
+    public var frameBufferSize: Int32 {
+        Int32(frameBuffer.count)
+    }
+
+    public var hasFrameBuffer: Bool {
+        !frameBuffer.isEmpty
+    }
+
+    public func withUnsafeCValue<Result>(_ body: (DesktopWindow) -> Result) -> Result {
+        frameBuffer.withUnsafeBytes { buffer in
+            var rawValue = DesktopWindow()
+            rawValue.nWidth = width
+            rawValue.nHeight = height
+            rawValue.bmpFormat = bitmapFormat.cValue
+            rawValue.nBytesPerLine = bytesPerLine
+            rawValue.nSessionID = sessionID
+            rawValue.nProtocol = desktopProtocol.cValue
+            rawValue.frameBuffer = buffer.isEmpty ? nil : UnsafeMutableRawPointer(mutating: buffer.baseAddress)
+            rawValue.nFrameBufferSize = frameBufferSize
+            return body(rawValue)
+        }
+    }
+}
+
+public struct TeamTalkDesktopInput {
+    public static let maximumCount = Int(TT_DESKTOPINPUT_MAX)
+
+    public let rawValue: DesktopInput
+
+    public init(_ rawValue: DesktopInput) {
+        self.rawValue = rawValue
+    }
+
+    public init(
+        mousePositionX: UInt16? = nil,
+        mousePositionY: UInt16? = nil,
+        keyCode: TeamTalkDesktopKeyCode = .ignore,
+        keyState: TeamTalkDesktopKeyState = .none
+    ) {
+        var input = DesktopInput()
+        input.mousePositionX = mousePositionX
+        input.mousePositionY = mousePositionY
+        input.keyCode = keyCode
+        input.keyState = keyState
+        self.rawValue = input
+    }
+
+    public var cValue: DesktopInput {
+        rawValue
+    }
+
+    public var mousePositionX: UInt16? {
+        rawValue.mousePositionX
+    }
+
+    public var mousePositionY: UInt16? {
+        rawValue.mousePositionY
+    }
+
+    public var mousePosition: (x: UInt16, y: UInt16)? {
+        rawValue.mousePosition
+    }
+
+    public var keyCode: TeamTalkDesktopKeyCode {
+        rawValue.keyCode
+    }
+
+    public var keyState: TeamTalkDesktopKeyState {
+        rawValue.keyState
+    }
+
+    public var hasMousePosition: Bool {
+        rawValue.hasMousePosition
+    }
+
+    public var ignoresKeyCode: Bool {
+        rawValue.ignoresKeyCode
+    }
+}
+
+public struct TeamTalkVideoCaptureDevice: Identifiable {
+    public let rawValue: VideoCaptureDevice
+
+    public init(_ rawValue: VideoCaptureDevice) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: VideoCaptureDevice {
+        rawValue
+    }
+
+    public var id: String {
+        deviceIdentifier
+    }
+
+    public var deviceIdentifier: String {
+        rawValue.deviceIdentifier
+    }
+
+    public var name: String {
+        rawValue.name
+    }
+
+    public var captureAPI: String {
+        rawValue.captureAPI
+    }
+
+    public var videoFormatsCount: Int32 {
+        rawValue.videoFormatsCount
+    }
+
+    public var videoFormats: [TeamTalkVideoFormat] {
+        rawValue.supportedFormats.map(TeamTalkVideoFormat.init)
+    }
+
+    public var defaultVideoFormat: TeamTalkVideoFormat? {
+        videoFormats.first
+    }
+
+    public var hasVideoFormats: Bool {
+        rawValue.hasFormats
+    }
+}
+
+public struct TeamTalkAudioFormatConfiguration {
+    public var format: TeamTalkAudioFileFormat
+    public var sampleRate: Int32
+    public var channels: Int32
+
+    public init(
+        format: TeamTalkAudioFileFormat = .wave,
+        sampleRate: Int32,
+        channels: Int32
+    ) {
+        self.format = format
+        self.sampleRate = sampleRate
+        self.channels = channels
+    }
+
+    public init(_ format: TeamTalkAudioFormat) {
+        self.init(
+            format: format.format,
+            sampleRate: format.sampleRate,
+            channels: format.channels
+        )
+    }
+
+    public var isValid: Bool {
+        sampleRate > 0 && channels > 0 && format != .none
+    }
+
+    public var cValue: AudioFormat {
+        var audioFormat = AudioFormat()
+        audioFormat.format = format
+        audioFormat.nSampleRate = sampleRate
+        audioFormat.nChannels = channels
+        return audioFormat
+    }
+}
+
+public struct TeamTalkAudioBlock {
+    public let streamID: Int32
+    public let sampleRate: Int32
+    public let channels: Int32
+    public let samplesPerChannel: Int32
+    public let sampleIndex: UInt32
+    public let streamTypes: TeamTalkStreamTypes
+    public let rawAudio: Data
+
+    public init(
+        streamID: Int32,
+        sampleRate: Int32,
+        channels: Int32,
+        samplesPerChannel: Int32,
+        sampleIndex: UInt32 = 0,
+        streamTypes: TeamTalkStreamTypes,
+        rawAudio: Data
+    ) {
+        self.streamID = streamID
+        self.sampleRate = sampleRate
+        self.channels = channels
+        self.samplesPerChannel = samplesPerChannel
+        self.sampleIndex = sampleIndex
+        self.streamTypes = streamTypes
+        self.rawAudio = rawAudio
+    }
+
+    public init(
+        streamID: Int32,
+        sampleRate: Int32,
+        channels: Int32,
+        sampleIndex: UInt32 = 0,
+        streamTypes: TeamTalkStreamTypes,
+        pcmSamples: [Int16]
+    ) {
+        let channels = max(1, channels)
+        let samplesPerChannel = channels > 0 ? Int32(pcmSamples.count / Int(channels)) : 0
+        self.init(
+            streamID: streamID,
+            sampleRate: sampleRate,
+            channels: channels,
+            samplesPerChannel: samplesPerChannel,
+            sampleIndex: sampleIndex,
+            streamTypes: streamTypes,
+            rawAudio: pcmSamples.withUnsafeBufferPointer { buffer in
+                Data(buffer: buffer)
+            }
+        )
+    }
+
+    public init(_ rawValue: AudioBlock) {
+        self.init(
+            streamID: rawValue.streamID,
+            sampleRate: rawValue.sampleRate,
+            channels: rawValue.channels,
+            samplesPerChannel: rawValue.samplesPerChannel,
+            sampleIndex: rawValue.sampleIndex,
+            streamTypes: rawValue.streamTypes,
+            rawAudio: rawValue.rawAudioData
+        )
+    }
+
+    public var totalSampleCount: Int {
+        max(0, Int(samplesPerChannel * max(0, channels)))
+    }
+
+    public var pcmSamples: [Int16] {
+        rawAudio.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else {
+                return []
+            }
+            let buffer = baseAddress.bindMemory(to: Int16.self, capacity: totalSampleCount)
+            return Array(UnsafeBufferPointer(start: buffer, count: totalSampleCount))
+        }
+    }
+
+    public var durationMilliseconds: Double? {
+        guard sampleRate > 0 else {
+            return nil
+        }
+        return (Double(samplesPerChannel) * 1000.0) / Double(sampleRate)
+    }
+
+    public func withUnsafeCValue<Result>(_ body: (AudioBlock) -> Result) -> Result {
+        rawAudio.withUnsafeBytes { buffer in
+            var audioBlock = AudioBlock()
+            audioBlock.nStreamID = streamID
+            audioBlock.nSampleRate = sampleRate
+            audioBlock.nChannels = channels
+            audioBlock.nSamples = samplesPerChannel
+            audioBlock.uSampleIndex = sampleIndex
+            audioBlock.uStreamTypes = streamTypes.cMask
+            audioBlock.lpRawAudio = buffer.isEmpty ? nil : UnsafeMutableRawPointer(mutating: buffer.baseAddress)
+            return body(audioBlock)
+        }
+    }
+}
+
+public struct TeamTalkAudioFormat {
+    public let rawValue: AudioFormat
+
+    public init(_ rawValue: AudioFormat) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: AudioFormat {
+        rawValue
+    }
+
+    public var format: TeamTalkAudioFileFormat {
+        rawValue.format
+    }
+
+    public var sampleRate: Int32 {
+        rawValue.sampleRate
+    }
+
+    public var channels: Int32 {
+        rawValue.channels
+    }
+
+    public var isAvailable: Bool {
+        rawValue.isAvailable
+    }
+}
+
+public struct TeamTalkVideoFormat {
+    public let rawValue: VideoFormat
+
+    public init(_ rawValue: VideoFormat) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: VideoFormat {
+        rawValue
+    }
+
+    public var width: Int32 {
+        rawValue.width
+    }
+
+    public var height: Int32 {
+        rawValue.height
+    }
+
+    public var frameRateNumerator: Int32 {
+        rawValue.frameRateNumerator
+    }
+
+    public var frameRateDenominator: Int32 {
+        rawValue.frameRateDenominator
+    }
+
+    public var pixelFormat: TeamTalkVideoPixelFormat {
+        rawValue.pixelFormat
+    }
+
+    public var framesPerSecond: Double? {
+        rawValue.framesPerSecond
+    }
+}
+
+public struct TeamTalkMediaFileInfo {
+    public let rawValue: MediaFileInfo
+
+    public init(_ rawValue: MediaFileInfo) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: MediaFileInfo {
+        rawValue
+    }
+
+    public var status: TeamTalkMediaFileStatus {
+        rawValue.status
+    }
+
+    public var fileName: String {
+        rawValue.fileName
+    }
+
+    public var audioFormat: TeamTalkAudioFormat {
+        TeamTalkAudioFormat(rawValue.audioFmt)
+    }
+
+    public var videoFormat: TeamTalkVideoFormat {
+        TeamTalkVideoFormat(rawValue.videoFmt)
+    }
+
+    public var durationMilliseconds: UInt32 {
+        rawValue.durationMilliseconds
+    }
+
+    public var elapsedMilliseconds: UInt32 {
+        rawValue.elapsedMilliseconds
+    }
+
+    public var progress: Double {
+        rawValue.progress
+    }
+}
+
+public struct TeamTalkMediaFilePlayback {
+    public let rawValue: MediaFilePlayback
+
+    public init(_ rawValue: MediaFilePlayback) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: MediaFilePlayback {
+        rawValue
+    }
+
+    public var offsetMilliseconds: UInt32? {
+        rawValue.offsetMilliseconds
+    }
+
+    public var isPaused: Bool {
+        rawValue.isPaused
+    }
+
+    public var audioPreprocessor: AudioPreprocessor {
+        rawValue.preprocessor
+    }
+
+    public var audioPreprocessorType: TeamTalkAudioPreprocessorType {
+        rawValue.preprocessorType
+    }
+}
+
+public struct TeamTalkMediaFilePlaybackConfiguration {
+    public var offsetMilliseconds: UInt32?
+    public var isPaused: Bool
+    public var audioPreprocessor: AudioPreprocessor
+
+    public init(
+        offsetMilliseconds: UInt32? = nil,
+        isPaused: Bool = false,
+        audioPreprocessor: AudioPreprocessor = TeamTalkAudioPreprocessor.makeAudioPreprocessor(NO_AUDIOPREPROCESSOR)
+    ) {
+        self.offsetMilliseconds = offsetMilliseconds
+        self.isPaused = isPaused
+        self.audioPreprocessor = audioPreprocessor
+    }
+
+    public init(_ playback: TeamTalkMediaFilePlayback) {
+        self.init(
+            offsetMilliseconds: playback.offsetMilliseconds,
+            isPaused: playback.isPaused,
+            audioPreprocessor: playback.audioPreprocessor
+        )
+    }
+
+    public var cValue: MediaFilePlayback {
+        var playback = MediaFilePlayback()
+        playback.offsetMilliseconds = offsetMilliseconds
+        playback.isPaused = isPaused
+        playback.preprocessor = audioPreprocessor
+        return playback
+    }
+}
+
+public struct TeamTalkUserMediaStorageConfiguration {
+    public var directoryURL: URL?
+    public var fileNamePattern: String
+    public var audioFileFormat: TeamTalkAudioFileFormat
+    public var stopRecordingExtraDelayMilliseconds: Int32?
+
+    public init(
+        directoryURL: URL? = nil,
+        fileNamePattern: String = "",
+        audioFileFormat: TeamTalkAudioFileFormat = .none,
+        stopRecordingExtraDelayMilliseconds: Int32? = nil
+    ) {
+        self.directoryURL = directoryURL
+        self.fileNamePattern = fileNamePattern
+        self.audioFileFormat = audioFileFormat
+        self.stopRecordingExtraDelayMilliseconds = stopRecordingExtraDelayMilliseconds
+    }
+
+    public var isDisabled: Bool {
+        directoryURL == nil || audioFileFormat == .none
+    }
+
+    public var usesDefaultFileNamePattern: Bool {
+        fileNamePattern.isEmpty
+    }
+}
+
 public struct TeamTalkServerProperties {
     public let rawValue: ServerProperties
 

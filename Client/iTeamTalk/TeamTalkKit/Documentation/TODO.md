@@ -22,15 +22,16 @@ Swift SDK.
 
 ## Wrapper Coverage Still Missing
 
-- Sound device enumeration and richer sound-device models.
-- Audio input/output configuration models beyond the current helper methods.
-- Media file playback APIs and typed media file models.
-- Desktop sharing and desktop input wrappers.
-- Video capture device wrappers.
-- Hotkey registration wrappers.
-- Local playback/recording wrappers.
-- Audio block APIs.
-- Advanced audio preprocessors and sound effects wrappers.
+- [x] Sound device enumeration and richer sound-device models.
+- [x] Audio input/output configuration models beyond the current helper methods.
+- [x] Sound device effects wrappers.
+- [x] Media file playback APIs and typed media file models.
+- [x] Desktop sharing and desktop input wrappers.
+- [x] Video capture device wrappers.
+- Hotkey registration wrappers (Windows-only).
+- [x] Local recording wrappers.
+- [x] Audio block APIs.
+- Advanced audio preprocessors wrappers.
 - Complete channel transmission list helpers for `transmitUsers` and
   `transmitUsersQueue`.
 - Channel path helpers and typed path components.

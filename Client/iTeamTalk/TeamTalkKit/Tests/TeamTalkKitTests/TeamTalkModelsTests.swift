@@ -1,3 +1,4 @@
+import Foundation
 import TeamTalkC
 import TeamTalkKit
 import XCTest
@@ -238,6 +239,469 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(roundTripped.udpConnectTimeoutMilliseconds, 10_000)
     }
 
+    func testSoundDeviceWrapperExposesFriendlyProperties() {
+        var rawDevice = SoundDevice()
+        rawDevice.nDeviceID = TeamTalkSoundDeviceID.voiceProcessingIO.cValue
+        rawDevice.nSoundSystem = SOUNDSYSTEM_AUDIOUNIT
+        rawDevice.nWaveDeviceID = -1
+        rawDevice.nMaxInputChannels = 2
+        rawDevice.nMaxOutputChannels = 2
+        rawDevice.nDefaultSampleRate = 48_000
+        rawDevice.uSoundDeviceFeatures = TeamTalkSoundDeviceFeatures([
+            .echoCancellation,
+            .automaticGainControl,
+            .denoise,
+            .defaultCommunicationDevice
+        ]).cValue
+
+        writeCString("Voice Processing I/O", to: &rawDevice.szDeviceName)
+        writeCString("com.apple.audio.voice-processing", to: &rawDevice.szDeviceID)
+        writeInt32Array([48_000, 44_100], to: &rawDevice.inputSampleRates)
+        writeInt32Array([48_000], to: &rawDevice.outputSampleRates)
+
+        let device = TeamTalkSoundDevice(rawDevice)
+
+        XCTAssertEqual(rawDevice.id, TeamTalkSoundDeviceID.voiceProcessingIO.cValue)
+        XCTAssertEqual(rawDevice.soundDeviceID, .voiceProcessingIO)
+        XCTAssertEqual(rawDevice.physicalDeviceID, TeamTalkSoundDeviceID(1))
+        XCTAssertEqual(rawDevice.name, "Voice Processing I/O")
+        XCTAssertEqual(rawDevice.deviceIdentifier, "com.apple.audio.voice-processing")
+        XCTAssertEqual(rawDevice.soundSystem, .audioUnit)
+        XCTAssertEqual(rawDevice.waveDeviceID, -1)
+        XCTAssertEqual(rawDevice.maxInputChannels, 2)
+        XCTAssertEqual(rawDevice.maxOutputChannels, 2)
+        XCTAssertEqual(rawDevice.supportedInputSampleRates, [48_000, 44_100])
+        XCTAssertEqual(rawDevice.supportedOutputSampleRates, [48_000])
+        XCTAssertEqual(rawDevice.defaultSampleRate, 48_000)
+        XCTAssertEqual(rawDevice.features, [.echoCancellation, .automaticGainControl, .denoise, .defaultCommunicationDevice])
+        XCTAssertTrue(rawDevice.isShared)
+        XCTAssertTrue(rawDevice.supportsEchoCancellation)
+        XCTAssertTrue(rawDevice.supportsAutomaticGainControl)
+        XCTAssertTrue(rawDevice.supportsDenoise)
+        XCTAssertFalse(rawDevice.supportsDuplexMode)
+        XCTAssertTrue(rawDevice.isDefaultCommunicationDevice)
+        XCTAssertTrue(rawDevice.hasFeature(.denoise))
+
+        XCTAssertEqual(device.id, TeamTalkSoundDeviceID.voiceProcessingIO.cValue)
+        XCTAssertEqual(device.soundDeviceID, .voiceProcessingIO)
+        XCTAssertEqual(device.physicalDeviceID, TeamTalkSoundDeviceID(1))
+        XCTAssertEqual(device.name, "Voice Processing I/O")
+        XCTAssertEqual(device.deviceIdentifier, "com.apple.audio.voice-processing")
+        XCTAssertEqual(device.soundSystem, .audioUnit)
+        XCTAssertEqual(device.waveDeviceID, -1)
+        XCTAssertEqual(device.maxInputChannels, 2)
+        XCTAssertEqual(device.maxOutputChannels, 2)
+        XCTAssertEqual(device.inputSampleRates, [48_000, 44_100])
+        XCTAssertEqual(device.outputSampleRates, [48_000])
+        XCTAssertEqual(device.defaultSampleRate, 48_000)
+        XCTAssertEqual(device.features, [.echoCancellation, .automaticGainControl, .denoise, .defaultCommunicationDevice])
+        XCTAssertTrue(device.isShared)
+        XCTAssertTrue(device.supportsEchoCancellation)
+        XCTAssertTrue(device.supportsAutomaticGainControl)
+        XCTAssertTrue(device.supportsDenoise)
+        XCTAssertFalse(device.supportsDuplexMode)
+        XCTAssertTrue(device.isDefaultCommunicationDevice)
+    }
+
+    func testSoundDeviceEffectsConfigurationRoundTrip() {
+        var rawEffects = SoundDeviceEffects()
+        XCTAssertFalse(rawEffects.automaticGainControlEnabled)
+        XCTAssertFalse(rawEffects.denoiseEnabled)
+        XCTAssertFalse(rawEffects.echoCancellationEnabled)
+
+        rawEffects.automaticGainControlEnabled = true
+        rawEffects.denoiseEnabled = true
+        XCTAssertEqual(rawEffects.enabledEffects, [.automaticGainControl, .denoise])
+        XCTAssertTrue(rawEffects.hasEffect(.automaticGainControl))
+        XCTAssertFalse(rawEffects.hasEffect(.echoCancellation))
+
+        rawEffects.enabledEffects = [.echoCancellation]
+        XCTAssertFalse(rawEffects.automaticGainControlEnabled)
+        XCTAssertFalse(rawEffects.denoiseEnabled)
+        XCTAssertTrue(rawEffects.echoCancellationEnabled)
+
+        var configuration = TeamTalkSoundDeviceEffectsConfiguration(
+            automaticGainControlEnabled: true,
+            denoiseEnabled: false,
+            echoCancellationEnabled: true
+        )
+        XCTAssertEqual(configuration.enabledEffects, [.automaticGainControl, .echoCancellation])
+
+        configuration.enabledEffects = [.denoise]
+        XCTAssertFalse(configuration.automaticGainControlEnabled)
+        XCTAssertTrue(configuration.denoiseEnabled)
+        XCTAssertFalse(configuration.echoCancellationEnabled)
+
+        let effects = TeamTalkSoundDeviceEffects(configuration.cValue)
+        XCTAssertFalse(effects.automaticGainControlEnabled)
+        XCTAssertTrue(effects.denoiseEnabled)
+        XCTAssertFalse(effects.echoCancellationEnabled)
+        XCTAssertEqual(effects.enabledEffects, [.denoise])
+        XCTAssertTrue(effects.hasEffect(.denoise))
+
+        let roundTripped = TeamTalkSoundDeviceEffectsConfiguration(effects)
+        XCTAssertFalse(roundTripped.automaticGainControlEnabled)
+        XCTAssertTrue(roundTripped.denoiseEnabled)
+        XCTAssertFalse(roundTripped.echoCancellationEnabled)
+    }
+
+    func testSharedSoundDeviceConfigurationHelpers() {
+        let defaults = TeamTalkSharedSoundDeviceConfiguration()
+        XCTAssertEqual(defaults.sampleRate, 0)
+        XCTAssertEqual(defaults.channels, 0)
+        XCTAssertEqual(defaults.frameSize, 0)
+        XCTAssertTrue(defaults.usesDefaultSampleRate)
+        XCTAssertTrue(defaults.usesDefaultChannels)
+        XCTAssertTrue(defaults.usesDefaultFrameSize)
+        XCTAssertTrue(defaults.usesDefaultValues)
+
+        let custom = TeamTalkSharedSoundDeviceConfiguration(sampleRate: 48_000, channels: 2, frameSize: 1_920)
+        XCTAssertEqual(custom.sampleRate, 48_000)
+        XCTAssertEqual(custom.channels, 2)
+        XCTAssertEqual(custom.frameSize, 1_920)
+        XCTAssertFalse(custom.usesDefaultSampleRate)
+        XCTAssertFalse(custom.usesDefaultChannels)
+        XCTAssertFalse(custom.usesDefaultFrameSize)
+        XCTAssertFalse(custom.usesDefaultValues)
+    }
+
+    func testSoundDuplexConfigurationPreservesTypedDeviceIDs() {
+        let rawInput = TeamTalkSoundDeviceID.voiceProcessingIO
+        let rawOutput = TeamTalkSoundDeviceID.remoteIO
+
+        let identifiersConfiguration = TeamTalkSoundDuplexConfiguration(
+            inputDeviceID: rawInput,
+            outputDeviceID: rawOutput
+        )
+
+        XCTAssertEqual(identifiersConfiguration.inputDeviceID, rawInput)
+        XCTAssertEqual(identifiersConfiguration.outputDeviceID, rawOutput)
+        XCTAssertEqual(identifiersConfiguration.inputDeviceRawID, rawInput.cValue)
+        XCTAssertEqual(identifiersConfiguration.outputDeviceRawID, rawOutput.cValue)
+
+        var rawInputDevice = SoundDevice()
+        rawInputDevice.nDeviceID = rawInput.cValue
+        var rawOutputDevice = SoundDevice()
+        rawOutputDevice.nDeviceID = rawOutput.cValue
+
+        let devicesConfiguration = TeamTalkSoundDuplexConfiguration(
+            inputDevice: TeamTalkSoundDevice(rawInputDevice),
+            outputDevice: TeamTalkSoundDevice(rawOutputDevice)
+        )
+
+        XCTAssertEqual(devicesConfiguration.inputDeviceID, rawInput)
+        XCTAssertEqual(devicesConfiguration.outputDeviceID, rawOutput)
+    }
+
+    func testDesktopWindowAndInputWrappersExposeFriendlyProperties() {
+        let pixels = Data([0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80])
+        var rawWindow = DesktopWindow()
+        rawWindow.nWidth = 640
+        rawWindow.nHeight = 480
+        rawWindow.bmpFormat = BMP_RGB32
+        rawWindow.nBytesPerLine = 2560
+        rawWindow.nSessionID = 13
+        rawWindow.nProtocol = DESKTOPPROTOCOL_ZLIB_1
+        rawWindow.nFrameBufferSize = Int32(pixels.count)
+
+        pixels.withUnsafeBytes { buffer in
+            rawWindow.frameBuffer = UnsafeMutableRawPointer(mutating: buffer.baseAddress)
+
+            XCTAssertEqual(rawWindow.width, 640)
+            XCTAssertEqual(rawWindow.height, 480)
+            XCTAssertEqual(rawWindow.bitmapFormat, .rgb32)
+            XCTAssertEqual(rawWindow.bytesPerLine, 2560)
+            XCTAssertEqual(rawWindow.sessionID, 13)
+            XCTAssertEqual(rawWindow.desktopProtocol, .zlib1)
+            XCTAssertEqual(rawWindow.frameBufferSize, Int32(pixels.count))
+            XCTAssertTrue(rawWindow.hasFrameBuffer)
+            XCTAssertEqual(rawWindow.frameBufferData, pixels)
+
+            let window = TeamTalkDesktopWindow(rawWindow)
+            XCTAssertEqual(window.width, 640)
+            XCTAssertEqual(window.height, 480)
+            XCTAssertEqual(window.bitmapFormat, .rgb32)
+            XCTAssertEqual(window.bytesPerLine, 2560)
+            XCTAssertEqual(window.sessionID, 13)
+            XCTAssertEqual(window.desktopProtocol, .zlib1)
+            XCTAssertEqual(window.frameBuffer, pixels)
+            XCTAssertEqual(window.frameBufferSize, Int32(pixels.count))
+            XCTAssertTrue(window.hasFrameBuffer)
+
+            window.withUnsafeCValue { roundTrippedWindow in
+                XCTAssertEqual(roundTrippedWindow.width, 640)
+                XCTAssertEqual(roundTrippedWindow.height, 480)
+                XCTAssertEqual(roundTrippedWindow.bitmapFormat, .rgb32)
+                XCTAssertEqual(roundTrippedWindow.bytesPerLine, 2560)
+                XCTAssertEqual(roundTrippedWindow.sessionID, 13)
+                XCTAssertEqual(roundTrippedWindow.desktopProtocol, .zlib1)
+                XCTAssertEqual(roundTrippedWindow.frameBufferData, pixels)
+            }
+        }
+
+        var rawInput = DesktopInput()
+        rawInput.mousePosition = nil
+        rawInput.keyCode = .ignore
+        rawInput.keyState = .none
+        XCTAssertNil(rawInput.mousePosition)
+        XCTAssertTrue(rawInput.ignoresKeyCode)
+        XCTAssertFalse(rawInput.hasMousePosition)
+
+        rawInput.mousePosition = (x: 320, y: 240)
+        rawInput.keyCode = .leftMouseButton
+        rawInput.keyState = [.down]
+        XCTAssertEqual(rawInput.mousePositionX, 320)
+        XCTAssertEqual(rawInput.mousePositionY, 240)
+        XCTAssertEqual(rawInput.mousePosition?.x, 320)
+        XCTAssertEqual(rawInput.mousePosition?.y, 240)
+        XCTAssertEqual(rawInput.keyCode, .leftMouseButton)
+        XCTAssertEqual(rawInput.keyState, [.down])
+        XCTAssertTrue(rawInput.hasMousePosition)
+        XCTAssertFalse(rawInput.ignoresKeyCode)
+
+        let input = TeamTalkDesktopInput(rawInput)
+        XCTAssertEqual(TeamTalkDesktopInput.maximumCount, Int(TT_DESKTOPINPUT_MAX))
+        XCTAssertEqual(input.mousePositionX, 320)
+        XCTAssertEqual(input.mousePositionY, 240)
+        XCTAssertEqual(input.mousePosition?.x, 320)
+        XCTAssertEqual(input.mousePosition?.y, 240)
+        XCTAssertEqual(input.keyCode, .leftMouseButton)
+        XCTAssertEqual(input.keyState, [.down])
+        XCTAssertTrue(input.hasMousePosition)
+        XCTAssertFalse(input.ignoresKeyCode)
+
+        let configuredInput = TeamTalkDesktopInput(
+            mousePositionX: 100,
+            mousePositionY: 200,
+            keyCode: .rightMouseButton,
+            keyState: [.up]
+        )
+        XCTAssertEqual(configuredInput.cValue.mousePositionX, 100)
+        XCTAssertEqual(configuredInput.cValue.mousePositionY, 200)
+        XCTAssertEqual(configuredInput.cValue.keyCode, .rightMouseButton)
+        XCTAssertEqual(configuredInput.cValue.keyState, [.up])
+    }
+
+    func testVideoCaptureDeviceWrapperExposesFriendlyProperties() {
+        var hdFormat = VideoFormat()
+        hdFormat.nWidth = 1280
+        hdFormat.nHeight = 720
+        hdFormat.nFPS_Numerator = 30
+        hdFormat.nFPS_Denominator = 1
+        hdFormat.picFourCC = FOURCC_RGB32
+
+        var sdFormat = VideoFormat()
+        sdFormat.nWidth = 640
+        sdFormat.nHeight = 480
+        sdFormat.nFPS_Numerator = 15
+        sdFormat.nFPS_Denominator = 1
+        sdFormat.picFourCC = FOURCC_I420
+
+        var rawDevice = VideoCaptureDevice()
+        writeCString("camera-1", to: &rawDevice.szDeviceID)
+        writeCString("FaceTime HD Camera", to: &rawDevice.szDeviceName)
+        writeCString("AVFoundation", to: &rawDevice.szCaptureAPI)
+        rawDevice.nVideoFormatsCount = 2
+        writeStructArray([hdFormat, sdFormat], to: &rawDevice.videoFormats)
+
+        let device = TeamTalkVideoCaptureDevice(rawDevice)
+
+        XCTAssertEqual(rawDevice.deviceIdentifier, "camera-1")
+        XCTAssertEqual(rawDevice.name, "FaceTime HD Camera")
+        XCTAssertEqual(rawDevice.captureAPI, "AVFoundation")
+        XCTAssertEqual(rawDevice.videoFormatsCount, 2)
+        XCTAssertTrue(rawDevice.hasFormats)
+        XCTAssertEqual(rawDevice.supportedFormats.count, 2)
+        XCTAssertEqual(rawDevice.supportedFormats[0].width, 1280)
+        XCTAssertEqual(rawDevice.supportedFormats[0].height, 720)
+        XCTAssertEqual(rawDevice.supportedFormats[0].pixelFormat, .rgb32)
+        XCTAssertEqual(rawDevice.supportedFormats[1].width, 640)
+        XCTAssertEqual(rawDevice.supportedFormats[1].height, 480)
+        XCTAssertEqual(rawDevice.supportedFormats[1].pixelFormat, .i420)
+
+        XCTAssertEqual(device.id, "camera-1")
+        XCTAssertEqual(device.deviceIdentifier, "camera-1")
+        XCTAssertEqual(device.name, "FaceTime HD Camera")
+        XCTAssertEqual(device.captureAPI, "AVFoundation")
+        XCTAssertEqual(device.videoFormatsCount, 2)
+        XCTAssertTrue(device.hasVideoFormats)
+        XCTAssertEqual(device.videoFormats.count, 2)
+        XCTAssertEqual(device.defaultVideoFormat?.width, 1280)
+        XCTAssertEqual(device.defaultVideoFormat?.height, 720)
+        XCTAssertEqual(device.defaultVideoFormat?.pixelFormat, .rgb32)
+        XCTAssertEqual(device.videoFormats[1].width, 640)
+        XCTAssertEqual(device.videoFormats[1].height, 480)
+        XCTAssertEqual(device.videoFormats[1].pixelFormat, .i420)
+    }
+
+    func testAudioFormatConfigurationAndAudioBlockSnapshotHelpers() {
+        let audioFormatConfiguration = TeamTalkAudioFormatConfiguration(
+            format: .wave,
+            sampleRate: 48_000,
+            channels: 2
+        )
+        XCTAssertTrue(audioFormatConfiguration.isValid)
+        XCTAssertEqual(audioFormatConfiguration.cValue.format, .wave)
+        XCTAssertEqual(audioFormatConfiguration.cValue.sampleRate, 48_000)
+        XCTAssertEqual(audioFormatConfiguration.cValue.channels, 2)
+
+        let pcmSamples: [Int16] = [100, -100, 200, -200]
+        let rawAudio = pcmSamples.withUnsafeBufferPointer { buffer in Data(buffer: buffer) }
+        var rawBlock = AudioBlock()
+        rawBlock.nStreamID = 77
+        rawBlock.nSampleRate = 48_000
+        rawBlock.nChannels = 2
+        rawBlock.nSamples = 2
+        rawBlock.uSampleIndex = 123
+        rawBlock.uStreamTypes = TeamTalkStreamTypes([.voice, .mediaFileAudio]).cMask
+        rawAudio.withUnsafeBytes { buffer in
+            rawBlock.lpRawAudio = UnsafeMutableRawPointer(mutating: buffer.baseAddress)
+
+            XCTAssertEqual(rawBlock.streamID, 77)
+            XCTAssertEqual(rawBlock.sampleRate, 48_000)
+            XCTAssertEqual(rawBlock.channels, 2)
+            XCTAssertEqual(rawBlock.samplesPerChannel, 2)
+            XCTAssertEqual(rawBlock.totalSampleCount, 4)
+            XCTAssertEqual(rawBlock.rawAudioByteCount, 8)
+            XCTAssertEqual(rawBlock.rawAudioData, rawAudio)
+            XCTAssertEqual(rawBlock.pcmSamples, pcmSamples)
+            XCTAssertEqual(rawBlock.sampleIndex, 123)
+            XCTAssertEqual(rawBlock.streamTypes, [.voice, .mediaFileAudio])
+            XCTAssertEqual(rawBlock.durationMilliseconds ?? 0, 2.0 / 48.0, accuracy: 0.0001)
+
+            let snapshot = TeamTalkAudioBlock(rawBlock)
+            XCTAssertEqual(snapshot.streamID, 77)
+            XCTAssertEqual(snapshot.sampleRate, 48_000)
+            XCTAssertEqual(snapshot.channels, 2)
+            XCTAssertEqual(snapshot.samplesPerChannel, 2)
+            XCTAssertEqual(snapshot.sampleIndex, 123)
+            XCTAssertEqual(snapshot.streamTypes, [.voice, .mediaFileAudio])
+            XCTAssertEqual(snapshot.rawAudio, rawAudio)
+            XCTAssertEqual(snapshot.totalSampleCount, 4)
+            XCTAssertEqual(snapshot.pcmSamples, pcmSamples)
+            XCTAssertEqual(snapshot.durationMilliseconds ?? 0, 2.0 / 48.0, accuracy: 0.0001)
+
+            snapshot.withUnsafeCValue { roundTripped in
+                XCTAssertEqual(roundTripped.streamID, 77)
+                XCTAssertEqual(roundTripped.sampleRate, 48_000)
+                XCTAssertEqual(roundTripped.channels, 2)
+                XCTAssertEqual(roundTripped.samplesPerChannel, 2)
+                XCTAssertEqual(roundTripped.sampleIndex, 123)
+                XCTAssertEqual(roundTripped.streamTypes, [.voice, .mediaFileAudio])
+                XCTAssertEqual(roundTripped.pcmSamples, pcmSamples)
+            }
+        }
+
+        let insertedBlock = TeamTalkAudioBlock(
+            streamID: 91,
+            sampleRate: 44_100,
+            channels: 1,
+            sampleIndex: 456,
+            streamTypes: [.voice],
+            pcmSamples: [10, 20, 30, 40]
+        )
+        XCTAssertEqual(insertedBlock.samplesPerChannel, 4)
+        XCTAssertEqual(insertedBlock.totalSampleCount, 4)
+        XCTAssertEqual(insertedBlock.pcmSamples, [10, 20, 30, 40])
+        XCTAssertEqual(insertedBlock.durationMilliseconds ?? 0, 4.0 * 1000.0 / 44_100.0, accuracy: 0.0001)
+    }
+
+    func testMediaFileInfoAndFormatsExposeFriendlyProperties() {
+        var rawMediaInfo = MediaFileInfo()
+        rawMediaInfo.nStatus = MFS_PLAYING
+        rawMediaInfo.audioFmt.nAudioFmt = AFF_MP3_128KBIT_FORMAT
+        rawMediaInfo.audioFmt.nSampleRate = 48_000
+        rawMediaInfo.audioFmt.nChannels = 2
+        rawMediaInfo.videoFmt.nWidth = 1_280
+        rawMediaInfo.videoFmt.nHeight = 720
+        rawMediaInfo.videoFmt.nFPS_Numerator = 30
+        rawMediaInfo.videoFmt.nFPS_Denominator = 1
+        rawMediaInfo.videoFmt.picFourCC = FOURCC_RGB32
+        rawMediaInfo.uDurationMSec = 120_000
+        rawMediaInfo.uElapsedMSec = 30_000
+        writeCString("demo.mp4", to: &rawMediaInfo.szFileName)
+
+        let mediaInfo = TeamTalkMediaFileInfo(rawMediaInfo)
+
+        XCTAssertEqual(rawMediaInfo.status, .playing)
+        XCTAssertEqual(rawMediaInfo.fileName, "demo.mp4")
+        XCTAssertEqual(rawMediaInfo.durationMilliseconds, 120_000)
+        XCTAssertEqual(rawMediaInfo.elapsedMilliseconds, 30_000)
+        XCTAssertEqual(rawMediaInfo.progress, 0.25, accuracy: 0.0001)
+
+        XCTAssertEqual(mediaInfo.status, .playing)
+        XCTAssertEqual(mediaInfo.fileName, "demo.mp4")
+        XCTAssertEqual(mediaInfo.durationMilliseconds, 120_000)
+        XCTAssertEqual(mediaInfo.elapsedMilliseconds, 30_000)
+        XCTAssertEqual(mediaInfo.progress, 0.25, accuracy: 0.0001)
+
+        XCTAssertEqual(mediaInfo.audioFormat.format, .mp3_128kbit)
+        XCTAssertEqual(mediaInfo.audioFormat.sampleRate, 48_000)
+        XCTAssertEqual(mediaInfo.audioFormat.channels, 2)
+        XCTAssertTrue(mediaInfo.audioFormat.isAvailable)
+
+        XCTAssertEqual(mediaInfo.videoFormat.width, 1_280)
+        XCTAssertEqual(mediaInfo.videoFormat.height, 720)
+        XCTAssertEqual(mediaInfo.videoFormat.frameRateNumerator, 30)
+        XCTAssertEqual(mediaInfo.videoFormat.frameRateDenominator, 1)
+        XCTAssertEqual(mediaInfo.videoFormat.pixelFormat, .rgb32)
+        XCTAssertEqual(mediaInfo.videoFormat.framesPerSecond ?? 0, 30, accuracy: 0.0001)
+    }
+
+    func testMediaFilePlaybackConfigurationRoundTrip() {
+        var rawPlayback = MediaFilePlayback()
+        rawPlayback.offsetMilliseconds = nil
+        rawPlayback.isPaused = true
+        rawPlayback.preprocessor = TeamTalkAudioPreprocessor.makeWebRTCPreprocessor()
+
+        XCTAssertNil(rawPlayback.offsetMilliseconds)
+        XCTAssertTrue(rawPlayback.isPaused)
+        XCTAssertEqual(rawPlayback.preprocessorType, .webRTC)
+
+        let playback = TeamTalkMediaFilePlayback(rawPlayback)
+        XCTAssertNil(playback.offsetMilliseconds)
+        XCTAssertTrue(playback.isPaused)
+        XCTAssertEqual(playback.audioPreprocessorType, .webRTC)
+
+        var configuration = TeamTalkMediaFilePlaybackConfiguration(playback)
+        XCTAssertNil(configuration.offsetMilliseconds)
+        XCTAssertTrue(configuration.isPaused)
+        XCTAssertEqual(configuration.audioPreprocessor.type, .webRTC)
+
+        configuration.offsetMilliseconds = 5_000
+        configuration.isPaused = false
+        configuration.audioPreprocessor = TeamTalkAudioPreprocessor.makeTeamTalkPreprocessor()
+
+        let roundTripped = TeamTalkMediaFilePlayback(configuration.cValue)
+        XCTAssertEqual(roundTripped.offsetMilliseconds, 5_000)
+        XCTAssertFalse(roundTripped.isPaused)
+        XCTAssertEqual(roundTripped.audioPreprocessorType, .teamTalk)
+    }
+
+    func testUserMediaStorageConfigurationHelpers() {
+        let defaults = TeamTalkUserMediaStorageConfiguration()
+        XCTAssertNil(defaults.directoryURL)
+        XCTAssertEqual(defaults.fileNamePattern, "")
+        XCTAssertEqual(defaults.audioFileFormat, .none)
+        XCTAssertNil(defaults.stopRecordingExtraDelayMilliseconds)
+        XCTAssertTrue(defaults.isDisabled)
+        XCTAssertTrue(defaults.usesDefaultFileNamePattern)
+
+        let directoryURL = URL(fileURLWithPath: "/tmp/recordings")
+        let custom = TeamTalkUserMediaStorageConfiguration(
+            directoryURL: directoryURL,
+            fileNamePattern: "%username%-%counter%",
+            audioFileFormat: .wave,
+            stopRecordingExtraDelayMilliseconds: 750
+        )
+        XCTAssertEqual(custom.directoryURL, directoryURL)
+        XCTAssertEqual(custom.fileNamePattern, "%username%-%counter%")
+        XCTAssertEqual(custom.audioFileFormat, .wave)
+        XCTAssertEqual(custom.stopRecordingExtraDelayMilliseconds, 750)
+        XCTAssertFalse(custom.isDisabled)
+        XCTAssertFalse(custom.usesDefaultFileNamePattern)
+    }
+
     func testBanConfigurationRoundTrip() {
         let configuration = TeamTalkBanConfiguration(
             ipAddress: "192.168.1.*",
@@ -290,5 +754,37 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(error.code, TeamTalkErrorCode.fileNotFound.cValue)
         XCTAssertEqual(error.errorCode, .fileNotFound)
         XCTAssertTrue(error.errorCode.isCommandError)
+    }
+
+    private func writeCString<T>(_ string: String, to storage: inout T) {
+        let utf8 = Array(string.utf8)
+        withUnsafeMutableBytes(of: &storage) { rawBuffer in
+            for index in rawBuffer.indices {
+                rawBuffer[index] = 0
+            }
+            rawBuffer.copyBytes(from: utf8.prefix(max(0, rawBuffer.count - 1)))
+        }
+    }
+
+    private func writeInt32Array<T>(_ values: [Int32], to storage: inout T) {
+        withUnsafeMutableBytes(of: &storage) { rawBuffer in
+            let buffer = rawBuffer.bindMemory(to: Int32.self)
+            for index in buffer.indices {
+                buffer[index] = 0
+            }
+            for (index, value) in values.prefix(buffer.count).enumerated() {
+                buffer[index] = value
+            }
+        }
+    }
+
+    private func writeStructArray<T, Element>(_ values: [Element], to storage: inout T) {
+        withUnsafeMutableBytes(of: &storage) { rawBuffer in
+            rawBuffer.initializeMemory(as: UInt8.self, repeating: 0)
+            let buffer = rawBuffer.bindMemory(to: Element.self)
+            for (index, value) in values.prefix(buffer.count).enumerated() {
+                buffer[index] = value
+            }
+        }
     }
 }
