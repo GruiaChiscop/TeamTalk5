@@ -106,6 +106,13 @@ public final class TeamTalkClient {
             var fileTransfer = FileTransfer()
             TT_GetFileTransferInfo(nil, 0, &fileTransfer)
             TT_CancelFileTransfer(nil, 0)
+            var clientStatistics = ClientStatistics()
+            TT_GetClientStatistics(nil, &clientStatistics)
+            var clientKeepAlive = ClientKeepAlive()
+            TT_GetClientKeepAlive(nil, &clientKeepAlive)
+            TT_SetClientKeepAlive(nil, &clientKeepAlive)
+            var userStatistics = UserStatistics()
+            TT_GetUserStatistics(nil, 0, &userStatistics)
         }
     }
 
@@ -263,6 +270,83 @@ public final class TeamTalkClient {
             return nil
         }
         return TeamTalkUserAccount(account)
+    }
+
+    public func clientStatisticsInfo() -> ClientStatistics? {
+        guard let instance else {
+            return nil
+        }
+
+        var statistics = ClientStatistics()
+        guard TT_GetClientStatistics(instance, &statistics) != 0 else {
+            return nil
+        }
+        return statistics
+    }
+
+    public func clientStatistics() -> TeamTalkClientStatistics? {
+        clientStatisticsInfo().map(TeamTalkClientStatistics.init)
+    }
+
+    public func clientKeepAliveInfo() -> ClientKeepAlive? {
+        guard let instance else {
+            return nil
+        }
+
+        var keepAlive = ClientKeepAlive()
+        guard TT_GetClientKeepAlive(instance, &keepAlive) != 0 else {
+            return nil
+        }
+        return keepAlive
+    }
+
+    public func clientKeepAlive() -> TeamTalkClientKeepAlive? {
+        clientKeepAliveInfo().map(TeamTalkClientKeepAlive.init)
+    }
+
+    @discardableResult
+    public func setClientKeepAlive(_ keepAlive: inout ClientKeepAlive) -> Bool {
+        guard let instance else {
+            return false
+        }
+
+        return TT_SetClientKeepAlive(instance, &keepAlive) != 0
+    }
+
+    @discardableResult
+    public func setClientKeepAlive(_ configuration: TeamTalkClientKeepAliveConfiguration) -> Bool {
+        var keepAlive = configuration.cValue
+        return setClientKeepAlive(&keepAlive)
+    }
+
+    @discardableResult
+    public func setClientKeepAlive(_ keepAlive: TeamTalkClientKeepAlive) -> Bool {
+        var rawKeepAlive = keepAlive.cValue
+        return setClientKeepAlive(&rawKeepAlive)
+    }
+
+    public func userStatisticsInfo(id userID: Int32) -> UserStatistics? {
+        guard let instance else {
+            return nil
+        }
+
+        var statistics = UserStatistics()
+        guard TT_GetUserStatistics(instance, userID, &statistics) != 0 else {
+            return nil
+        }
+        return statistics
+    }
+
+    public func userStatisticsInfo(id userID: TeamTalkUserID) -> UserStatistics? {
+        userStatisticsInfo(id: userID.cValue)
+    }
+
+    public func userStatistics(id userID: Int32) -> TeamTalkUserStatistics? {
+        userStatisticsInfo(id: userID).map(TeamTalkUserStatistics.init)
+    }
+
+    public func userStatistics(id userID: TeamTalkUserID) -> TeamTalkUserStatistics? {
+        userStatistics(id: userID.cValue)
     }
 
     public func serverUsers() -> [TeamTalkUser] {

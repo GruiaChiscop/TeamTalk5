@@ -1,0 +1,4 @@
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativemacOS.xcframework/Info.plist
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativemacOS.xcframework/macos-arm64_x86_64/Headers/TeamTalk.h
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativemacOS.xcframework/macos-arm64_x86_64/Headers/TeamTalkSrv.h
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativemacOS.xcframework/macos-arm64_x86_64/libTeamTalk5.dylib

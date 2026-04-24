@@ -1,0 +1,388 @@
+diff --git a/Build/.gitignore b/Build/.gitignore
+index 1aaaf52ff..4cd786197 100644
+--- a/Build/.gitignore
++++ b/Build/.gitignore
+@@ -1 +1,2 @@
+ /build-*
++/install-*
+diff --git a/Build/Makefile b/Build/Makefile
+index 9a49d8d6d..f2b908831 100644
+--- a/Build/Makefile
++++ b/Build/Makefile
+@@ -1,5 +1,6 @@
+-TEAMTALK_ROOT?=$(PWD)/..
++TEAMTALK_ROOT?=$(abspath $(CURDIR)/..)
+ CONFIGTYPE?=release
++INSTALLDIR?=$(TEAMTALK_ROOT)/Build/install-$(CONFIGTYPE)-ios
+ 
+ SHELL := /bin/bash
+ 
+@@ -97,6 +98,10 @@ ios-build:
+         -DFEATURE_FFMPEG=OFF \
+         -DFEATURE_OGG=OFF \
+         -DFEATURE_OPUSTOOLS=OFF \
++        -DTOOLCHAIN_CATCH2=OFF \
++        -DTOOLCHAIN_FFMPEG=OFF \
++        -DTOOLCHAIN_OGG=OFF \
++        -DTOOLCHAIN_PORTAUDIO=OFF \
+         -DTOOLCHAIN_ZLIB=OFF" \
+         buildlib
+ 
+@@ -104,11 +109,15 @@ ios-arm64:
+ 	$(MAKE) CMAKE_EXTRA+="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT=iphoneos -DTOOLCHAIN_INSTALL_PREFIX=$(INSTALLDIR)/arm64" BUILDDIR=build-$(CONFIGTYPE)-$@ ios-build
+ 	$(MAKE) ARCH=arm64 lipo-arch
+ 
++ios-arm64-simulator:
++	$(MAKE) CMAKE_EXTRA+="-DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_OSX_SYSROOT=iphonesimulator -DTOOLCHAIN_INSTALL_PREFIX=$(INSTALLDIR)/arm64-simulator" BUILDDIR=build-$(CONFIGTYPE)-$@ ios-build
++	$(MAKE) ARCH=arm64-simulator lipo-arch
++
+ ios-x64:
+ 	$(MAKE) CMAKE_EXTRA+="-DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_OSX_SYSROOT=iphonesimulator -DTOOLCHAIN_INSTALL_PREFIX=$(INSTALLDIR)/x86_64" BUILDDIR=build-$(CONFIGTYPE)-$@ ios-build
+ 	$(MAKE) ARCH=x86_64 lipo-arch
+ 
+-ios-all: ios-arm64 ios-x64 lipo
++ios-all: ios-arm64 ios-x64 ios-arm64-simulator lipo lipo-simulator
+ 
+ lipo-arch: teamtalk-env
+ 	test -d "$(INSTALLDIR)"
+@@ -149,6 +158,15 @@ lipo: teamtalk-env
+ 	$(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5Pro-arm64.a \
+ 	-create -output $(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5Pro.a
+ 
++lipo-simulator: teamtalk-env
++	lipo $(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5-x86_64.a \
++	$(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5-arm64-simulator.a \
++	-create -output $(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5-simulator.a
++
++	lipo $(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5Pro-x86_64.a \
++	$(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5Pro-arm64-simulator.a \
++	-create -output $(TEAMTALK_ROOT)/Library/TeamTalk_DLL/libTeamTalk5Pro-simulator.a
++
+ xcodeswap-apps:
+ 	@echo "Changing to /Applications/Xcode.app/Contents/Developer"
+ 	sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+diff --git a/Library/TeamTalkLib/CMakeLists.txt b/Library/TeamTalkLib/CMakeLists.txt
+index a97a8e1e1..b4afc6cbf 100644
+--- a/Library/TeamTalkLib/CMakeLists.txt
++++ b/Library/TeamTalkLib/CMakeLists.txt
+@@ -56,6 +56,17 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+ 
++  set (TEAMTALK_IOS_SIMULATOR OFF)
++  string (TOLOWER "${CMAKE_OSX_SYSROOT}" TEAMTALK_OSX_SYSROOT_LOWER)
++  if ("${TEAMTALK_OSX_SYSROOT_LOWER}" MATCHES "iphonesimulator")
++    set (TEAMTALK_IOS_SIMULATOR ON)
++  endif()
++
++  set (TEAMTALK_IOS_OUTPUT_ARCH ${CMAKE_OSX_ARCHITECTURES})
++  if (TEAMTALK_IOS_SIMULATOR AND "arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++    set (TEAMTALK_IOS_OUTPUT_ARCH arm64-simulator)
++  endif()
++
+   if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+     set (CMAKE_OSX_DEPLOYMENT_TARGET 8.0)
+     message(WARNING "No deployment target specified. Defaulting to ${CMAKE_OSX_DEPLOYMENT_TARGET}")
+@@ -171,7 +182,7 @@ if (BUILD_TEAMTALK_LIBRARY_DLL)
+   if (${CMAKE_SYSTEM_NAME} MATCHES "Android")
+     set_output_dir(TeamTalk5DLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_ANDROID_ARCH_ABI})
+   elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+-    set_output_dir(TeamTalk5DLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_OSX_ARCHITECTURES})
++    set_output_dir(TeamTalk5DLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${TEAMTALK_IOS_OUTPUT_ARCH})
+   else()
+     set_output_dir(TeamTalk5DLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL)
+   endif()
+@@ -209,7 +220,7 @@ if (BUILD_TEAMTALK_LIBRARY_LIB)
+   if (${CMAKE_SYSTEM_NAME} MATCHES "Android")
+     set_output_dir(TeamTalk5Lib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_ANDROID_ARCH_ABI})
+   elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+-    set_output_dir(TeamTalk5Lib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_OSX_ARCHITECTURES})
++    set_output_dir(TeamTalk5Lib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${TEAMTALK_IOS_OUTPUT_ARCH})
+   else()
+     set_output_dir(TeamTalk5Lib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL)
+   endif()
+@@ -251,7 +262,7 @@ if (BUILD_TEAMTALK_LIBRARY_DLLPRO)
+   if (${CMAKE_SYSTEM_NAME} MATCHES "Android")
+     set_output_dir(TeamTalk5ProDLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_ANDROID_ARCH_ABI})
+   elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+-    set_output_dir(TeamTalk5ProDLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_OSX_ARCHITECTURES})
++    set_output_dir(TeamTalk5ProDLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${TEAMTALK_IOS_OUTPUT_ARCH})
+   else()
+     set_output_dir(TeamTalk5ProDLL ${TEAMTALK_ROOT}/Library/TeamTalk_DLL)
+   endif()
+@@ -296,7 +307,7 @@ if (BUILD_TEAMTALK_LIBRARY_LIBPRO)
+   if (${CMAKE_SYSTEM_NAME} MATCHES "Android")
+     set_output_dir(TeamTalk5ProLib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_ANDROID_ARCH_ABI})
+   elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+-    set_output_dir(TeamTalk5ProLib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${CMAKE_OSX_ARCHITECTURES})
++    set_output_dir(TeamTalk5ProLib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL/${TEAMTALK_IOS_OUTPUT_ARCH})
+   else()
+     set_output_dir(TeamTalk5ProLib ${TEAMTALK_ROOT}/Library/TeamTalk_DLL)
+   endif()
+diff --git a/Library/TeamTalkLib/README.md b/Library/TeamTalkLib/README.md
+index e6e33dc6d..ed62f9966 100644
+--- a/Library/TeamTalkLib/README.md
++++ b/Library/TeamTalkLib/README.md
+@@ -175,8 +175,19 @@ Run the following command in TEAMTALK_ROOT:
+ 
+ `make -C Build ios-all`
+ 
+-This will build TeamTalk binaries for architectures *armv7*,
+-*arm64*, *i386* and *x64*.
++This will build TeamTalk binaries for iOS device architecture *arm64* and iOS
++simulator architectures *x64* and *arm64-simulator*.
++
++The first iOS build may download WebRTC into `$HOME/webrtc/iOS`, which is a
++large checkout. The per-architecture static archives are written to
++`Library/TeamTalk_DLL` as `libTeamTalk5-arm64.a`,
++`libTeamTalk5-x86_64.a` and `libTeamTalk5-arm64-simulator.a`.
++`ios-all` now also produces `libTeamTalk5-simulator.a` by combining the two
++simulator archives.
++When creating an XCFramework, combine only simulator archives with `lipo`
++(`x86_64` and `arm64-simulator`). Do not combine the `arm64-simulator` archive
++with the `arm64` device archive, even though both report the same CPU
++architecture.
+ 
+ 
+ ## Toolchain Toggles for TeamTalk Build Targets
+diff --git a/Library/TeamTalkLib/build/ace/CMakeLists.txt b/Library/TeamTalkLib/build/ace/CMakeLists.txt
+index 7f4ecb879..420aa2d6a 100644
+--- a/Library/TeamTalkLib/build/ace/CMakeLists.txt
++++ b/Library/TeamTalkLib/build/ace/CMakeLists.txt
+@@ -226,14 +226,14 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+ 
+-  if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+-    set (ACE_CPPFLAGS -fembed-bitcode -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+-    set (ACE_TARGET HARDWARE)
+-    set (ACE_EXPORT export ACE_ROOT=<SOURCE_DIR>/ACE)
+-  else()
++  if (TEAMTALK_IOS_SIMULATOR)
+     set (ACE_CPPFLAGS -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+     set (ACE_TARGET SIMULATOR)
+     set (ACE_EXPORT export ACE_ROOT=<SOURCE_DIR>/ACE)
++  else()
++    set (ACE_CPPFLAGS -fembed-bitcode -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
++    set (ACE_TARGET HARDWARE)
++    set (ACE_EXPORT export ACE_ROOT=<SOURCE_DIR>/ACE)
+   endif()
+ 
+   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+diff --git a/Library/TeamTalkLib/build/libvpx/CMakeLists.txt b/Library/TeamTalkLib/build/libvpx/CMakeLists.txt
+index 5fde574ea..cfe7eee74 100644
+--- a/Library/TeamTalkLib/build/libvpx/CMakeLists.txt
++++ b/Library/TeamTalkLib/build/libvpx/CMakeLists.txt
+@@ -141,18 +141,28 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+ 
+-  if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++  set (LIBVPX_CONFIGURE_ENV)
++
++  if (TEAMTALK_IOS_SIMULATOR)
++    set (LIBVPX_CPPFLAGS -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
++    if ("i386" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++      set (LIBVPX_TARGET x86-iphonesimulator-gcc)
++    elseif ("x86_64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++      set (LIBVPX_TARGET x86_64-iphonesimulator-gcc)
++    elseif ("arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++      set (LIBVPX_CPPFLAGS "-arch arm64 -isysroot ${CMAKE_OSX_SYSROOT} -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
++      set (LIBVPX_TARGET generic-gnu)
++      set (LIBVPX_CONFIGURE_ENV ${CMAKE_COMMAND} -E env
++        CC=clang
++        CXX=clang++
++        "LDFLAGS=${LIBVPX_CPPFLAGS}")
++    endif()
++  elseif ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+     set (LIBVPX_CPPFLAGS -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+     set (LIBVPX_TARGET armv7-darwin-gcc)
+   elseif ("arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+     set (LIBVPX_CPPFLAGS -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+     set (LIBVPX_TARGET arm64-darwin-gcc)
+-  elseif ("i386" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+-    set (LIBVPX_CPPFLAGS -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+-    set (LIBVPX_TARGET x86-iphonesimulator-gcc)
+-  elseif ("x86_64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+-    set (LIBVPX_CPPFLAGS -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+-    set (LIBVPX_TARGET x86_64-iphonesimulator-gcc)
+   endif()
+ 
+   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+@@ -163,7 +173,8 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/libvpx
+       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX}/libvpx
+-      CONFIGURE_COMMAND <SOURCE_DIR>/configure --extra-cflags=${LIBVPX_CPPFLAGS}
++      CONFIGURE_COMMAND ${LIBVPX_CONFIGURE_ENV} <SOURCE_DIR>/configure
++      "--extra-cflags=${LIBVPX_CPPFLAGS}"
+       --prefix=<INSTALL_DIR> --target=${LIBVPX_TARGET}
+       --disable-examples --disable-docs --disable-unit-tests
+       BUILD_COMMAND     make ${TOOLCHAIN_BUILD_MAKEJOBS}
+diff --git a/Library/TeamTalkLib/build/openssl/CMakeLists.txt b/Library/TeamTalkLib/build/openssl/CMakeLists.txt
+index 1a95e0b2b..6bb2ee98c 100644
+--- a/Library/TeamTalkLib/build/openssl/CMakeLists.txt
++++ b/Library/TeamTalkLib/build/openssl/CMakeLists.txt
+@@ -2,6 +2,10 @@ project(OpenSSL)
+ 
+ include(ExternalProject)
+ 
++if (POLICY CMP0097)
++  cmake_policy(SET CMP0097 NEW)
++endif()
++
+ ##################################################
+ # OpenSSL
+ ##################################################
+@@ -26,6 +30,7 @@ if (MSVC)
+       GIT_REPOSITORY    https://github.com/openssl/openssl.git
+       GIT_TAG           openssl-3.6.2
+       GIT_SHALLOW       TRUE
++      GIT_SUBMODULES    ""
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
+       CONFIGURE_COMMAND ""
+@@ -71,6 +76,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+       GIT_REPOSITORY    https://github.com/openssl/openssl.git
+       GIT_TAG           openssl-3.6.2
+       GIT_SHALLOW       TRUE
++      GIT_SUBMODULES    ""
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl-intel
+       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}-intel
+@@ -87,6 +93,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+       GIT_REPOSITORY    https://github.com/openssl/openssl.git
+       GIT_TAG           openssl-3.6.2
+       GIT_SHALLOW       TRUE
++      GIT_SUBMODULES    ""
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl-arm64
+       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}-arm64
+@@ -141,14 +148,14 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+ 
+-  if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+-    set (OPENSSL_CFG_PREFIX export CROSS_TOP=${CMAKE_OSX_SYSROOT}/../.. && export CROSS_SDK=iPhoneOS.sdk)
+-    set (OPENSSL_CFG_TARGET iphoneos-cross)
+-    set (OPENSSL_CFG_POSTFIX -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+-  else()
++  if (TEAMTALK_IOS_SIMULATOR)
+     set (OPENSSL_CFG_PREFIX export CROSS_TOP=${CMAKE_OSX_SYSROOT}/../.. && export CROSS_SDK=iPhoneSimulator.sdk)
+     set (OPENSSL_CFG_TARGET iossimulator-xcrun)
+     set (OPENSSL_CFG_POSTFIX -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
++  else()
++    set (OPENSSL_CFG_PREFIX export CROSS_TOP=${CMAKE_OSX_SYSROOT}/../.. && export CROSS_SDK=iPhoneOS.sdk)
++    set (OPENSSL_CFG_TARGET iphoneos-cross)
++    set (OPENSSL_CFG_POSTFIX -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+   endif()
+ 
+   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+@@ -156,6 +163,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+       GIT_REPOSITORY    https://github.com/openssl/openssl.git
+       GIT_TAG           openssl-3.6.2
+       GIT_SHALLOW       TRUE
++      GIT_SUBMODULES    ""
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
+       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
+@@ -194,6 +202,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+       GIT_REPOSITORY    https://github.com/openssl/openssl.git
+       GIT_TAG           openssl-3.6.2
+       GIT_SHALLOW       TRUE
++      GIT_SUBMODULES    ""
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
+       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
+@@ -250,6 +259,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Android")
+       GIT_REPOSITORY    https://github.com/openssl/openssl.git
+       GIT_TAG           openssl-3.6.2
+       GIT_SHALLOW       TRUE
++      GIT_SUBMODULES    ""
+       UPDATE_COMMAND    ""
+       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
+       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
+diff --git a/Library/TeamTalkLib/build/speex/CMakeLists.txt b/Library/TeamTalkLib/build/speex/CMakeLists.txt
+index c130121e3..44e953c85 100644
+--- a/Library/TeamTalkLib/build/speex/CMakeLists.txt
++++ b/Library/TeamTalkLib/build/speex/CMakeLists.txt
+@@ -115,15 +115,20 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+ 
+-  if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++  if (TEAMTALK_IOS_SIMULATOR)
++    if ("arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++      set (SPEEX_HOST aarch64-apple-darwin)
++    else()
++      set (SPEEX_HOST ${CMAKE_OSX_ARCHITECTURES})
++    endif()
++    set (SPEEX_GEN_FLAGS --host=${SPEEX_HOST})
++    set (SPEEX_CFG_FLAGS --host=${SPEEX_HOST} --enable-shared=no --enable-static=yes --disable-binaries)
++    set (SPEEX_CFLAGS " -arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET} -fembed-bitcode")
++  elseif ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+     set (SPEEX_GEN_FLAGS --host=arm-apple-darwin)
+     set (SPEEX_CFG_FLAGS --host=arm-apple-darwin --enable-shared=no --enable-static=yes --disable-binaries --enable-fixed-point)
+ 
+     set (SPEEX_CFLAGS " -arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET} -fembed-bitcode")
+-  elseif ("i386" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "x86_64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+-    set (SPEEX_GEN_FLAGS --host=${CMAKE_OSX_ARCHITECTURES})
+-    set (SPEEX_CFG_FLAGS --host=${CMAKE_OSX_ARCHITECTURES} --enable-shared=no --enable-static=yes --disable-binaries)
+-    set (SPEEX_CFLAGS " -arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET} -fembed-bitcode")
+   else()
+     message(FATAL_ERROR "What iOS architecture is this?")
+   endif()
+diff --git a/Library/TeamTalkLib/build/speexdsp/CMakeLists.txt b/Library/TeamTalkLib/build/speexdsp/CMakeLists.txt
+index bad0ffbcc..8b15ca37b 100644
+--- a/Library/TeamTalkLib/build/speexdsp/CMakeLists.txt
++++ b/Library/TeamTalkLib/build/speexdsp/CMakeLists.txt
+@@ -113,7 +113,16 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+ 
+ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+ 
+-  if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++  if (TEAMTALK_IOS_SIMULATOR)
++    if ("arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
++      set (SPEEXDSP_HOST aarch64-apple-darwin)
++    else()
++      set (SPEEXDSP_HOST ${CMAKE_OSX_ARCHITECTURES})
++    endif()
++    set (SPEEXDSP_GEN_FLAGS --host=${SPEEXDSP_HOST})
++    set (SPEEXDSP_CFG_FLAGS --host=${SPEEXDSP_HOST} --enable-shared=no --enable-static=yes)
++    set (SPEEXDSP_CFLAGS "-arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
++  elseif ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+     set (SPEEXDSP_GEN_FLAGS --host=arm-apple-darwin)
+     set (SPEEXDSP_CFG_FLAGS --host=arm-apple-darwin --enable-shared=no --enable-static=yes --enable-fixed-point --enable-neon --disable-examples)
+     set (SPEEXDSP_CFLAGS "-arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET} -fembed-bitcode")
+@@ -121,10 +130,6 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+     set (SPEEXDSP_GEN_FLAGS --host=arm-apple-darwin)
+     set (SPEEXDSP_CFG_FLAGS --host=arm-apple-darwin --enable-shared=no --enable-static=yes --disable-neon --disable-examples)
+     set (SPEEXDSP_CFLAGS "-arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET} -fembed-bitcode")
+-  elseif ("i386" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "x86_64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+-    set (SPEEXDSP_GEN_FLAGS --host=${CMAKE_OSX_ARCHITECTURES})
+-    set (SPEEXDSP_CFG_FLAGS --host=${CMAKE_OSX_ARCHITECTURES} --enable-shared=no --enable-static=yes)
+-    set (SPEEXDSP_CFLAGS "-arch ${CMAKE_OSX_ARCHITECTURES} -isysroot ${CMAKE_OSX_SYSROOT} -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET}")
+   endif()
+ 
+   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
+diff --git a/Library/TeamTalkLib/build/webrtc/CMakeLists.txt b/Library/TeamTalkLib/build/webrtc/CMakeLists.txt
+index 230a6a35a..43ea59a44 100644
+--- a/Library/TeamTalkLib/build/webrtc/CMakeLists.txt
++++ b/Library/TeamTalkLib/build/webrtc/CMakeLists.txt
+@@ -141,10 +141,15 @@ else()
+ 
+   if (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
+     set (WEBRTC_FETCH_PATH $ENV{HOME}/webrtc/${CMAKE_SYSTEM_NAME} CACHE FILEPATH "Root folder for WebRTC repository")
++    set (WEBRTC_CFG_EXTRA "")
++
++    if (TEAMTALK_IOS_SIMULATOR)
++      string (APPEND WEBRTC_CFG_EXTRA "target_environment=\"simulator\"\n")
++    endif()
+ 
+     if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+       set (WEBRTC_ARCH arm)
+-      set (WEBRTC_CFG_EXTRA arm_use_neon=true)
++      string (APPEND WEBRTC_CFG_EXTRA "arm_use_neon=true\n")
+     elseif ("arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
+       set (WEBRTC_ARCH arm64)
+     elseif ("i386" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")

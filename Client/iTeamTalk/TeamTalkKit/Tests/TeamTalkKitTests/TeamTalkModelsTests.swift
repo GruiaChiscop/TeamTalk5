@@ -135,6 +135,109 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertTrue(properties.autoSave)
     }
 
+    func testUserStatisticsExposeFriendlyProperties() {
+        var rawStatistics = UserStatistics()
+        rawStatistics.nVoicePacketsRecv = 101
+        rawStatistics.nVoicePacketsLost = 7
+        rawStatistics.nVideoCapturePacketsRecv = 88
+        rawStatistics.nVideoCaptureFramesRecv = 44
+        rawStatistics.nVideoCaptureFramesLost = 3
+        rawStatistics.nVideoCaptureFramesDropped = 2
+        rawStatistics.nMediaFileAudioPacketsRecv = 65
+        rawStatistics.nMediaFileAudioPacketsLost = 5
+        rawStatistics.nMediaFileVideoPacketsRecv = 54
+        rawStatistics.nMediaFileVideoFramesRecv = 27
+        rawStatistics.nMediaFileVideoFramesLost = 4
+        rawStatistics.nMediaFileVideoFramesDropped = 1
+
+        let statistics = TeamTalkUserStatistics(rawStatistics)
+
+        XCTAssertEqual(statistics.voicePacketsReceived, 101)
+        XCTAssertEqual(statistics.voicePacketsLost, 7)
+        XCTAssertEqual(statistics.videoCapturePacketsReceived, 88)
+        XCTAssertEqual(statistics.videoCaptureFramesReceived, 44)
+        XCTAssertEqual(statistics.videoCaptureFramesLost, 3)
+        XCTAssertEqual(statistics.videoCaptureFramesDropped, 2)
+        XCTAssertEqual(statistics.mediaFileAudioPacketsReceived, 65)
+        XCTAssertEqual(statistics.mediaFileAudioPacketsLost, 5)
+        XCTAssertEqual(statistics.mediaFileVideoPacketsReceived, 54)
+        XCTAssertEqual(statistics.mediaFileVideoFramesReceived, 27)
+        XCTAssertEqual(statistics.mediaFileVideoFramesLost, 4)
+        XCTAssertEqual(statistics.mediaFileVideoFramesDropped, 1)
+        XCTAssertEqual(rawStatistics.voicePacketsReceived, 101)
+    }
+
+    func testClientStatisticsExposeFriendlyProperties() {
+        var rawStatistics = ClientStatistics()
+        rawStatistics.nUdpBytesSent = 1000
+        rawStatistics.nUdpBytesRecv = 1100
+        rawStatistics.nVoiceBytesSent = 1200
+        rawStatistics.nVoiceBytesRecv = 1300
+        rawStatistics.nVideoCaptureBytesSent = 1400
+        rawStatistics.nVideoCaptureBytesRecv = 1500
+        rawStatistics.nMediaFileAudioBytesSent = 1600
+        rawStatistics.nMediaFileAudioBytesRecv = 1700
+        rawStatistics.nMediaFileVideoBytesSent = 1800
+        rawStatistics.nMediaFileVideoBytesRecv = 1900
+        rawStatistics.nDesktopBytesSent = 2000
+        rawStatistics.nDesktopBytesRecv = 2100
+        rawStatistics.nUdpPingTimeMs = -1
+        rawStatistics.nTcpPingTimeMs = 42
+        rawStatistics.nTcpServerSilenceSec = 9
+        rawStatistics.nUdpServerSilenceSec = 11
+        rawStatistics.nSoundInputDeviceDelayMSec = 17
+
+        let statistics = TeamTalkClientStatistics(rawStatistics)
+
+        XCTAssertEqual(statistics.udpBytesSent, 1000)
+        XCTAssertEqual(statistics.udpBytesReceived, 1100)
+        XCTAssertEqual(statistics.voiceBytesSent, 1200)
+        XCTAssertEqual(statistics.voiceBytesReceived, 1300)
+        XCTAssertEqual(statistics.videoCaptureBytesSent, 1400)
+        XCTAssertEqual(statistics.videoCaptureBytesReceived, 1500)
+        XCTAssertEqual(statistics.mediaFileAudioBytesSent, 1600)
+        XCTAssertEqual(statistics.mediaFileAudioBytesReceived, 1700)
+        XCTAssertEqual(statistics.mediaFileVideoBytesSent, 1800)
+        XCTAssertEqual(statistics.mediaFileVideoBytesReceived, 1900)
+        XCTAssertEqual(statistics.desktopBytesSent, 2000)
+        XCTAssertEqual(statistics.desktopBytesReceived, 2100)
+        XCTAssertNil(statistics.udpPingTimeMilliseconds)
+        XCTAssertEqual(statistics.tcpPingTimeMilliseconds, 42)
+        XCTAssertEqual(statistics.tcpServerSilenceSeconds, 9)
+        XCTAssertEqual(statistics.udpServerSilenceSeconds, 11)
+        XCTAssertEqual(statistics.soundInputDeviceDelayMilliseconds, 17)
+        XCTAssertNil(rawStatistics.udpPingTimeMilliseconds)
+        XCTAssertEqual(rawStatistics.tcpPingTimeMilliseconds, 42)
+    }
+
+    func testClientKeepAliveConfigurationRoundTrip() {
+        let configuration = TeamTalkClientKeepAliveConfiguration(
+            connectionLostMilliseconds: 15_000,
+            tcpKeepAliveIntervalMilliseconds: 7_500,
+            udpKeepAliveIntervalMilliseconds: 2_000,
+            udpKeepAliveRetransmitMilliseconds: 500,
+            udpConnectRetransmitMilliseconds: 750,
+            udpConnectTimeoutMilliseconds: 10_000
+        )
+
+        let keepAlive = TeamTalkClientKeepAlive(configuration.cValue)
+
+        XCTAssertEqual(keepAlive.connectionLostMilliseconds, 15_000)
+        XCTAssertEqual(keepAlive.tcpKeepAliveIntervalMilliseconds, 7_500)
+        XCTAssertEqual(keepAlive.udpKeepAliveIntervalMilliseconds, 2_000)
+        XCTAssertEqual(keepAlive.udpKeepAliveRetransmitMilliseconds, 500)
+        XCTAssertEqual(keepAlive.udpConnectRetransmitMilliseconds, 750)
+        XCTAssertEqual(keepAlive.udpConnectTimeoutMilliseconds, 10_000)
+
+        let roundTripped = TeamTalkClientKeepAliveConfiguration(keepAlive).cValue
+        XCTAssertEqual(roundTripped.connectionLostMilliseconds, 15_000)
+        XCTAssertEqual(roundTripped.tcpKeepAliveIntervalMilliseconds, 7_500)
+        XCTAssertEqual(roundTripped.udpKeepAliveIntervalMilliseconds, 2_000)
+        XCTAssertEqual(roundTripped.udpKeepAliveRetransmitMilliseconds, 500)
+        XCTAssertEqual(roundTripped.udpConnectRetransmitMilliseconds, 750)
+        XCTAssertEqual(roundTripped.udpConnectTimeoutMilliseconds, 10_000)
+    }
+
     func testBanConfigurationRoundTrip() {
         let configuration = TeamTalkBanConfiguration(
             ipAddress: "192.168.1.*",

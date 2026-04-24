@@ -27,6 +27,8 @@ Swift SDK.
 - Media file playback APIs and typed media file models.
 - Desktop sharing and desktop input wrappers.
 - Video capture device wrappers.
+- User statistics and client statistics wrappers.
+- Keep-alive and connection statistics wrappers.
 - Hotkey registration wrappers.
 - Local playback/recording wrappers.
 - Audio block APIs.

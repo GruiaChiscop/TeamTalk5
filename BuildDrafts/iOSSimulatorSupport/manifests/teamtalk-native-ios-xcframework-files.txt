@@ -1,0 +1,7 @@
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/Info.plist
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/ios-arm64/Headers/TeamTalk.h
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/ios-arm64/Headers/TeamTalkSrv.h
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/ios-arm64/libTeamTalk5.a
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/ios-arm64_x86_64-simulator/Headers/TeamTalk.h
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/ios-arm64_x86_64-simulator/Headers/TeamTalkSrv.h
+Client/iTeamTalk/TeamTalkKit/Vendor/TeamTalkNativeiOS.xcframework/ios-arm64_x86_64-simulator/libTeamTalk5-simulator.a

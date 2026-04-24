@@ -1083,6 +1083,158 @@ public extension ServerProperties {
     }
 }
 
+public extension UserStatistics {
+    var voicePacketsReceived: Int64 {
+        nVoicePacketsRecv
+    }
+
+    var voicePacketsLost: Int64 {
+        nVoicePacketsLost
+    }
+
+    var videoCapturePacketsReceived: Int64 {
+        nVideoCapturePacketsRecv
+    }
+
+    var videoCaptureFramesReceived: Int64 {
+        nVideoCaptureFramesRecv
+    }
+
+    var videoCaptureFramesLost: Int64 {
+        nVideoCaptureFramesLost
+    }
+
+    var videoCaptureFramesDropped: Int64 {
+        nVideoCaptureFramesDropped
+    }
+
+    var mediaFileAudioPacketsReceived: Int64 {
+        nMediaFileAudioPacketsRecv
+    }
+
+    var mediaFileAudioPacketsLost: Int64 {
+        nMediaFileAudioPacketsLost
+    }
+
+    var mediaFileVideoPacketsReceived: Int64 {
+        nMediaFileVideoPacketsRecv
+    }
+
+    var mediaFileVideoFramesReceived: Int64 {
+        nMediaFileVideoFramesRecv
+    }
+
+    var mediaFileVideoFramesLost: Int64 {
+        nMediaFileVideoFramesLost
+    }
+
+    var mediaFileVideoFramesDropped: Int64 {
+        nMediaFileVideoFramesDropped
+    }
+}
+
+public extension ClientStatistics {
+    var udpBytesSent: Int64 {
+        nUdpBytesSent
+    }
+
+    var udpBytesReceived: Int64 {
+        nUdpBytesRecv
+    }
+
+    var voiceBytesSent: Int64 {
+        nVoiceBytesSent
+    }
+
+    var voiceBytesReceived: Int64 {
+        nVoiceBytesRecv
+    }
+
+    var videoCaptureBytesSent: Int64 {
+        nVideoCaptureBytesSent
+    }
+
+    var videoCaptureBytesReceived: Int64 {
+        nVideoCaptureBytesRecv
+    }
+
+    var mediaFileAudioBytesSent: Int64 {
+        nMediaFileAudioBytesSent
+    }
+
+    var mediaFileAudioBytesReceived: Int64 {
+        nMediaFileAudioBytesRecv
+    }
+
+    var mediaFileVideoBytesSent: Int64 {
+        nMediaFileVideoBytesSent
+    }
+
+    var mediaFileVideoBytesReceived: Int64 {
+        nMediaFileVideoBytesRecv
+    }
+
+    var desktopBytesSent: Int64 {
+        nDesktopBytesSent
+    }
+
+    var desktopBytesReceived: Int64 {
+        nDesktopBytesRecv
+    }
+
+    var udpPingTimeMilliseconds: Int32? {
+        nUdpPingTimeMs >= 0 ? nUdpPingTimeMs : nil
+    }
+
+    var tcpPingTimeMilliseconds: Int32? {
+        nTcpPingTimeMs >= 0 ? nTcpPingTimeMs : nil
+    }
+
+    var tcpServerSilenceSeconds: Int32 {
+        nTcpServerSilenceSec
+    }
+
+    var udpServerSilenceSeconds: Int32 {
+        nUdpServerSilenceSec
+    }
+
+    var soundInputDeviceDelayMilliseconds: Int32 {
+        nSoundInputDeviceDelayMSec
+    }
+}
+
+public extension ClientKeepAlive {
+    var connectionLostMilliseconds: Int32 {
+        get { nConnectionLostMSec }
+        set { nConnectionLostMSec = newValue }
+    }
+
+    var tcpKeepAliveIntervalMilliseconds: Int32 {
+        get { nTcpKeepAliveIntervalMSec }
+        set { nTcpKeepAliveIntervalMSec = newValue }
+    }
+
+    var udpKeepAliveIntervalMilliseconds: Int32 {
+        get { nUdpKeepAliveIntervalMSec }
+        set { nUdpKeepAliveIntervalMSec = newValue }
+    }
+
+    var udpKeepAliveRetransmitMilliseconds: Int32 {
+        get { nUdpKeepAliveRTXMSec }
+        set { nUdpKeepAliveRTXMSec = newValue }
+    }
+
+    var udpConnectRetransmitMilliseconds: Int32 {
+        get { nUdpConnectRTXMSec }
+        set { nUdpConnectRTXMSec = newValue }
+    }
+
+    var udpConnectTimeoutMilliseconds: Int32 {
+        get { nUdpConnectTimeoutMSec }
+        set { nUdpConnectTimeoutMSec = newValue }
+    }
+}
+
 public extension Channel {
     var id: Int32 {
         nChannelID

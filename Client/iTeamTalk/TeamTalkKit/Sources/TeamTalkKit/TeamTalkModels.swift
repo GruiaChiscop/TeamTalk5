@@ -460,6 +460,127 @@ public struct TeamTalkServerStatistics {
     public var uptimeMilliseconds: Int64 { rawValue.nUptimeMSec }
 }
 
+public struct TeamTalkUserStatistics {
+    public let rawValue: UserStatistics
+
+    public init(_ rawValue: UserStatistics) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: UserStatistics {
+        rawValue
+    }
+
+    public var voicePacketsReceived: Int64 { rawValue.voicePacketsReceived }
+    public var voicePacketsLost: Int64 { rawValue.voicePacketsLost }
+    public var videoCapturePacketsReceived: Int64 { rawValue.videoCapturePacketsReceived }
+    public var videoCaptureFramesReceived: Int64 { rawValue.videoCaptureFramesReceived }
+    public var videoCaptureFramesLost: Int64 { rawValue.videoCaptureFramesLost }
+    public var videoCaptureFramesDropped: Int64 { rawValue.videoCaptureFramesDropped }
+    public var mediaFileAudioPacketsReceived: Int64 { rawValue.mediaFileAudioPacketsReceived }
+    public var mediaFileAudioPacketsLost: Int64 { rawValue.mediaFileAudioPacketsLost }
+    public var mediaFileVideoPacketsReceived: Int64 { rawValue.mediaFileVideoPacketsReceived }
+    public var mediaFileVideoFramesReceived: Int64 { rawValue.mediaFileVideoFramesReceived }
+    public var mediaFileVideoFramesLost: Int64 { rawValue.mediaFileVideoFramesLost }
+    public var mediaFileVideoFramesDropped: Int64 { rawValue.mediaFileVideoFramesDropped }
+}
+
+public struct TeamTalkClientStatistics {
+    public let rawValue: ClientStatistics
+
+    public init(_ rawValue: ClientStatistics) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: ClientStatistics {
+        rawValue
+    }
+
+    public var udpBytesSent: Int64 { rawValue.udpBytesSent }
+    public var udpBytesReceived: Int64 { rawValue.udpBytesReceived }
+    public var voiceBytesSent: Int64 { rawValue.voiceBytesSent }
+    public var voiceBytesReceived: Int64 { rawValue.voiceBytesReceived }
+    public var videoCaptureBytesSent: Int64 { rawValue.videoCaptureBytesSent }
+    public var videoCaptureBytesReceived: Int64 { rawValue.videoCaptureBytesReceived }
+    public var mediaFileAudioBytesSent: Int64 { rawValue.mediaFileAudioBytesSent }
+    public var mediaFileAudioBytesReceived: Int64 { rawValue.mediaFileAudioBytesReceived }
+    public var mediaFileVideoBytesSent: Int64 { rawValue.mediaFileVideoBytesSent }
+    public var mediaFileVideoBytesReceived: Int64 { rawValue.mediaFileVideoBytesReceived }
+    public var desktopBytesSent: Int64 { rawValue.desktopBytesSent }
+    public var desktopBytesReceived: Int64 { rawValue.desktopBytesReceived }
+    public var udpPingTimeMilliseconds: Int32? { rawValue.udpPingTimeMilliseconds }
+    public var tcpPingTimeMilliseconds: Int32? { rawValue.tcpPingTimeMilliseconds }
+    public var tcpServerSilenceSeconds: Int32 { rawValue.tcpServerSilenceSeconds }
+    public var udpServerSilenceSeconds: Int32 { rawValue.udpServerSilenceSeconds }
+    public var soundInputDeviceDelayMilliseconds: Int32 { rawValue.soundInputDeviceDelayMilliseconds }
+}
+
+public struct TeamTalkClientKeepAlive {
+    public let rawValue: ClientKeepAlive
+
+    public init(_ rawValue: ClientKeepAlive) {
+        self.rawValue = rawValue
+    }
+
+    public var cValue: ClientKeepAlive {
+        rawValue
+    }
+
+    public var connectionLostMilliseconds: Int32 { rawValue.connectionLostMilliseconds }
+    public var tcpKeepAliveIntervalMilliseconds: Int32 { rawValue.tcpKeepAliveIntervalMilliseconds }
+    public var udpKeepAliveIntervalMilliseconds: Int32 { rawValue.udpKeepAliveIntervalMilliseconds }
+    public var udpKeepAliveRetransmitMilliseconds: Int32 { rawValue.udpKeepAliveRetransmitMilliseconds }
+    public var udpConnectRetransmitMilliseconds: Int32 { rawValue.udpConnectRetransmitMilliseconds }
+    public var udpConnectTimeoutMilliseconds: Int32 { rawValue.udpConnectTimeoutMilliseconds }
+}
+
+public struct TeamTalkClientKeepAliveConfiguration {
+    public var connectionLostMilliseconds: Int32
+    public var tcpKeepAliveIntervalMilliseconds: Int32
+    public var udpKeepAliveIntervalMilliseconds: Int32
+    public var udpKeepAliveRetransmitMilliseconds: Int32
+    public var udpConnectRetransmitMilliseconds: Int32
+    public var udpConnectTimeoutMilliseconds: Int32
+
+    public init(
+        connectionLostMilliseconds: Int32,
+        tcpKeepAliveIntervalMilliseconds: Int32 = 0,
+        udpKeepAliveIntervalMilliseconds: Int32 = 0,
+        udpKeepAliveRetransmitMilliseconds: Int32 = 0,
+        udpConnectRetransmitMilliseconds: Int32 = 0,
+        udpConnectTimeoutMilliseconds: Int32 = 0
+    ) {
+        self.connectionLostMilliseconds = connectionLostMilliseconds
+        self.tcpKeepAliveIntervalMilliseconds = tcpKeepAliveIntervalMilliseconds
+        self.udpKeepAliveIntervalMilliseconds = udpKeepAliveIntervalMilliseconds
+        self.udpKeepAliveRetransmitMilliseconds = udpKeepAliveRetransmitMilliseconds
+        self.udpConnectRetransmitMilliseconds = udpConnectRetransmitMilliseconds
+        self.udpConnectTimeoutMilliseconds = udpConnectTimeoutMilliseconds
+    }
+
+    public init(_ keepAlive: TeamTalkClientKeepAlive) {
+        self.init(
+            connectionLostMilliseconds: keepAlive.connectionLostMilliseconds,
+            tcpKeepAliveIntervalMilliseconds: keepAlive.tcpKeepAliveIntervalMilliseconds,
+            udpKeepAliveIntervalMilliseconds: keepAlive.udpKeepAliveIntervalMilliseconds,
+            udpKeepAliveRetransmitMilliseconds: keepAlive.udpKeepAliveRetransmitMilliseconds,
+            udpConnectRetransmitMilliseconds: keepAlive.udpConnectRetransmitMilliseconds,
+            udpConnectTimeoutMilliseconds: keepAlive.udpConnectTimeoutMilliseconds
+        )
+    }
+
+    public var cValue: ClientKeepAlive {
+        var keepAlive = ClientKeepAlive()
+        keepAlive.connectionLostMilliseconds = connectionLostMilliseconds
+        keepAlive.tcpKeepAliveIntervalMilliseconds = tcpKeepAliveIntervalMilliseconds
+        keepAlive.udpKeepAliveIntervalMilliseconds = udpKeepAliveIntervalMilliseconds
+        keepAlive.udpKeepAliveRetransmitMilliseconds = udpKeepAliveRetransmitMilliseconds
+        keepAlive.udpConnectRetransmitMilliseconds = udpConnectRetransmitMilliseconds
+        keepAlive.udpConnectTimeoutMilliseconds = udpConnectTimeoutMilliseconds
+        return keepAlive
+    }
+}
+
 public struct TeamTalkChannel: Identifiable {
     public let rawValue: Channel
 

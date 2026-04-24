@@ -1,0 +1,174 @@
+diff --git a/Client/iTeamTalk/TeamTalkKit/Documentation/Advanced.md b/Client/iTeamTalk/TeamTalkKit/Documentation/Advanced.md
+index 30f72d5e0..7ad62e7c8 100644
+--- a/Client/iTeamTalk/TeamTalkKit/Documentation/Advanced.md
++++ b/Client/iTeamTalk/TeamTalkKit/Documentation/Advanced.md
+@@ -5,8 +5,10 @@ working.
+ 
+ ## Package Layers
+ 
+-TeamTalkKit is organized around four layers:
++TeamTalkKit is organized around five layers:
+ 
++- `TeamTalkNativeiOS` and `TeamTalkNativemacOS`: vendored TeamTalk native SDK
++  binaries linked by SwiftPM for the matching platform;
+ - `TeamTalkC`: a small C bridge over the TeamTalk SDK header, mostly for fixed
+   string arrays, C unions and helper constructors;
+ - `TeamTalkTypes.swift`: Swift wrappers for C enums and bitmasks;
+@@ -18,6 +20,20 @@ The package still exports raw C APIs through `TeamTalkC`. This is intentional:
+ the modern wrapper is growing incrementally, and app code can still drop to C
+ types when a TeamTalk feature has not been wrapped yet.
+ 
++## Native SDK Artifacts
++
++The TeamTalk SDK headers and libraries are vendored inside the package:
++
++- `Sources/TeamTalkC/include/TeamTalk.h` is the public C SDK header used by the
++  bridge;
++- `Vendor/TeamTalkNativeiOS.xcframework` contains the iOS static library slices;
++- `Vendor/TeamTalkNativemacOS.xcframework` contains the macOS dynamic library
++  slice.
++
++This keeps TeamTalkKit usable as a normal Swift package dependency. A consumer
++should be able to add the package URL in Xcode without also arranging a
++repository-relative `Library/TeamTalk_DLL` folder.
++
+ ## Raw Values And C Values
+ 
+ Most Swift wrappers expose both:
+diff --git a/Client/iTeamTalk/TeamTalkKit/Documentation/GettingStarted.md b/Client/iTeamTalk/TeamTalkKit/Documentation/GettingStarted.md
+index 7e9b75655..f66cbd29c 100644
+--- a/Client/iTeamTalk/TeamTalkKit/Documentation/GettingStarted.md
++++ b/Client/iTeamTalk/TeamTalkKit/Documentation/GettingStarted.md
+@@ -6,6 +6,8 @@ typed APIs.
+ 
+ ## Import
+ 
++Add TeamTalkKit as a Swift package dependency, then import it:
++
+ ```swift
+ import TeamTalkKit
+ ```
+diff --git a/Client/iTeamTalk/TeamTalkKit/Documentation/TODO.md b/Client/iTeamTalk/TeamTalkKit/Documentation/TODO.md
+index 791bb984c..33fe3760f 100644
+--- a/Client/iTeamTalk/TeamTalkKit/Documentation/TODO.md
++++ b/Client/iTeamTalk/TeamTalkKit/Documentation/TODO.md
+@@ -15,6 +15,7 @@ Swift SDK.
+ - [x] Cover initial model/configuration round trips, especially string fields
+   copied through `TeamTalkC`.
+ - [x] Cover initial `TeamTalkEvent.Kind` decoding for common event payloads.
++- [x] Vendor TeamTalk native SDK artifacts inside the Swift package.
+ - [ ] Decide which APIs should be public compatibility APIs and which should be
+   deprecated once the app migrates to the Swift model layer.
+ - [ ] Add documentation comments to the public Swift API once the names settle.
+@@ -56,14 +57,21 @@ Swift SDK.
+ 
+ ## macOS Follow-Ups
+ 
+-- Validate runtime linking with a macOS TeamTalk library.
++- Validate runtime linking with the vendored macOS TeamTalk library from an app
++  target, not only from package tests.
+ - Add a small macOS command-line smoke test target if practical.
+-- Replace the unit-test dynamic lookup workaround with real macOS linkage or
+-  dedicated test stubs before adding tests that call `TeamTalkClient` runtime
+-  methods.
+ - Test sound device initialization on macOS.
+ - Test file upload/download paths on macOS sandboxed and non-sandboxed apps.
+-- Document required linker flags/library search paths for macOS consumers.
++- Document any runtime embedding requirements for macOS app consumers if Xcode
++  does not handle the vendored `.dylib` automatically.
++
++## Native SDK Follow-Ups
++
++- Add a repeatable script for regenerating `TeamTalkNativeiOS.xcframework` from
++  `Library/TeamTalkLib` outputs.
++- Track the vendored TeamTalk SDK version and update steps.
++- Add or link the upstream license text if the SDK distribution provides a
++  separate license file.
+ 
+ ## Application Migration
+ 
+diff --git a/Client/iTeamTalk/TeamTalkKit/Package.swift b/Client/iTeamTalk/TeamTalkKit/Package.swift
+index 45b1ea276..f9b79ceec 100644
+--- a/Client/iTeamTalk/TeamTalkKit/Package.swift
++++ b/Client/iTeamTalk/TeamTalkKit/Package.swift
+@@ -14,17 +14,24 @@ let package = Package(
+             targets: ["TeamTalkKit"])
+     ],
+     targets: [
++        .binaryTarget(
++            name: "TeamTalkNativeiOS",
++            path: "Vendor/TeamTalkNativeiOS.xcframework"),
++        .binaryTarget(
++            name: "TeamTalkNativemacOS",
++            path: "Vendor/TeamTalkNativemacOS.xcframework"),
+         .target(
+             name: "TeamTalkC",
++            dependencies: [
++                .target(name: "TeamTalkNativeiOS", condition: .when(platforms: [.iOS])),
++                .target(name: "TeamTalkNativemacOS", condition: .when(platforms: [.macOS]))
++            ],
+             publicHeadersPath: "include"),
+         .target(
+             name: "TeamTalkKit",
+             dependencies: ["TeamTalkC"]),
+         .testTarget(
+             name: "TeamTalkKitTests",
+-            dependencies: ["TeamTalkKit", "TeamTalkC"],
+-            linkerSettings: [
+-                .unsafeFlags(["-Xlinker", "-undefined", "-Xlinker", "dynamic_lookup"], .when(platforms: [.macOS]))
+-            ])
++            dependencies: ["TeamTalkKit", "TeamTalkC"])
+     ]
+ )
+diff --git a/Client/iTeamTalk/TeamTalkKit/README.md b/Client/iTeamTalk/TeamTalkKit/README.md
+index c2c8a8859..f69dbe9f3 100644
+--- a/Client/iTeamTalk/TeamTalkKit/README.md
++++ b/Client/iTeamTalk/TeamTalkKit/README.md
+@@ -18,10 +18,17 @@ underlying C values through `rawValue` and `cValue`.
+ - iOS 16 and newer
+ - macOS 10.15 and newer
+ 
+-The macOS declaration makes the Swift package buildable from SwiftPM on macOS,
+-especially because the event stream API uses `AsyncStream`. It does not by
+-itself prove that a macOS app can run TeamTalkKit end to end. A macOS consumer
+-still needs the correct TeamTalk runtime/library linkage and runtime testing.
++The package vendors the TeamTalk native SDK artifacts it needs under
++`Vendor/`, so consumers should not need a sibling `Library/TeamTalk_DLL`
++checkout just to build the Swift package. SwiftPM links the bundled native
++artifact conditionally per platform:
++
++- `TeamTalkNativeiOS.xcframework` for iOS device and iOS simulator;
++- `TeamTalkNativemacOS.xcframework` for macOS.
++
++The iOS artifact contains an `arm64` device slice and a universal simulator
++slice with both `x86_64` and `arm64`, so it can be used on Intel and Apple
++Silicon simulator hosts.
+ 
+ ## Documentation
+ 
+@@ -55,6 +62,7 @@ From the package directory:
+ 
+ ```sh
+ swift build
++swift test
+ ```
+ 
+ From the iTeamTalk workspace:
+@@ -63,5 +71,5 @@ From the iTeamTalk workspace:
+ xcodebuild -scheme iTeamTalk -configuration Debug -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+ ```
+ 
+-The iTeamTalk build may emit warnings from the bundled `libTeamTalk5.a`; those
+-warnings are currently unrelated to the Swift wrapper layer.
++Native TeamTalk SDK warnings from the bundled artifacts are currently unrelated
++to the Swift wrapper layer.
+diff --git a/Client/iTeamTalk/TeamTalkKit/Sources/TeamTalkC/include/TeamTalkC.h b/Client/iTeamTalk/TeamTalkKit/Sources/TeamTalkC/include/TeamTalkC.h
+index 67a634bb7..e99f18d16 100644
+--- a/Client/iTeamTalk/TeamTalkKit/Sources/TeamTalkC/include/TeamTalkC.h
++++ b/Client/iTeamTalk/TeamTalkKit/Sources/TeamTalkC/include/TeamTalkC.h
+@@ -1,4 +1,4 @@
+-#include "../../../../../../Library/TeamTalk_DLL/TeamTalk.h"
++#include "TeamTalk.h"
+ 
+ typedef enum {
+     TTKitUserStringNickname,
