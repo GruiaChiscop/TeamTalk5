@@ -58,11 +58,50 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(account.rights, [.canUploadFiles, .canDownloadFiles, .canSendChannelTextMessages])
         XCTAssertEqual(account.userData, 17)
         XCTAssertEqual(account.autoOperatorChannelIDs, [10, 20])
+        XCTAssertEqual(account.autoOperatorChannelIdentifiers, [TeamTalkChannelID(10), TeamTalkChannelID(20)])
         XCTAssertEqual(account.audioCodecBitrateLimit, 64_000)
+        XCTAssertEqual(account.abusePrevention.commandLimit, 12)
+        XCTAssertEqual(account.abusePrevention.commandIntervalMilliseconds, 1_500)
+        XCTAssertFalse(account.abusePrevention.isDisabled)
         XCTAssertEqual(account.commandLimit, 12)
         XCTAssertEqual(account.commandIntervalMilliseconds, 1_500)
         XCTAssertTrue(account.getUserRight(.canUploadFiles))
         XCTAssertEqual(account.cValue.autoOperatorChannelIdentifiers, [TeamTalkChannelID(10), TeamTalkChannelID(20)])
+    }
+
+    func testAbusePreventionConfigurationSupportsTypedAndCompatibilityAccessors() {
+        var configuration = TeamTalkUserAccountConfiguration(
+            username: "member",
+            abusePrevention: TeamTalkAbusePreventionConfiguration(
+                commandLimit: 5,
+                commandIntervalMilliseconds: 2_000
+            )
+        )
+
+        XCTAssertEqual(configuration.commandLimit, 5)
+        XCTAssertEqual(configuration.commandIntervalMilliseconds, 2_000)
+        XCTAssertFalse(configuration.abusePrevention.isDisabled)
+
+        configuration.commandLimit = 7
+        configuration.commandIntervalMilliseconds = 3_500
+        configuration.autoOperatorChannelIdentifiers = [TeamTalkChannelID(11), TeamTalkChannelID(12)]
+
+        let account = TeamTalkUserAccount(configuration.cValue)
+
+        XCTAssertEqual(account.abusePrevention.commandLimit, 7)
+        XCTAssertEqual(account.abusePrevention.commandIntervalMilliseconds, 3_500)
+        XCTAssertEqual(account.commandLimit, 7)
+        XCTAssertEqual(account.commandIntervalMilliseconds, 3_500)
+        XCTAssertEqual(configuration.autoOperatorChannelIDs, [11, 12])
+        XCTAssertEqual(account.autoOperatorChannelIdentifiers, [TeamTalkChannelID(11), TeamTalkChannelID(12)])
+
+        let typedConfiguration = TeamTalkAbusePreventionConfiguration(account.abusePrevention)
+        XCTAssertEqual(typedConfiguration.commandLimit, 7)
+        XCTAssertEqual(typedConfiguration.commandIntervalMilliseconds, 3_500)
+
+        let disabled = TeamTalkAbusePreventionConfiguration()
+        XCTAssertTrue(disabled.isDisabled)
+        XCTAssertTrue(TeamTalkAbusePrevention(disabled.cValue).isDisabled)
     }
 
     func testChannelConfigurationRoundTrip() {
@@ -76,7 +115,14 @@ final class TeamTalkModelsTests: XCTestCase {
             types: [.permanent, .noRecording],
             userData: 99,
             diskQuota: 4_096,
-            maxUsers: 25
+            maxUsers: 25,
+            transmitUsers: [
+                TeamTalkChannelTransmitUser(userID: TeamTalkUserID(42), streamTypes: [.voice, .videoCapture]),
+                .classroomFreeForAll(streamTypes: [.desktopInput])
+            ],
+            transmitUsersQueueDelayMilliseconds: 750,
+            voiceTimeoutMilliseconds: 1_500,
+            mediaFileTimeoutMilliseconds: 3_000
         )
 
         let channel = TeamTalkChannel(configuration.cValue)
@@ -93,7 +139,38 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(channel.userData, 99)
         XCTAssertEqual(channel.diskQuota, 4_096)
         XCTAssertEqual(channel.maxUsers, 25)
+        XCTAssertEqual(channel.transmitUsers.count, 2)
+        XCTAssertEqual(channel.transmitUsers[0].userIdentifier, TeamTalkUserID(42))
+        XCTAssertEqual(channel.transmitUsers[0].streamTypes, [.voice, .videoCapture])
+        XCTAssertTrue(channel.transmitUsers[1].isClassroomFreeForAll)
+        XCTAssertEqual(channel.transmitUsers[1].streamTypes, [.desktopInput])
+        XCTAssertEqual(channel.transmitUsersQueueDelayMilliseconds, 750)
+        XCTAssertEqual(channel.voiceTimeoutMilliseconds, 1_500)
+        XCTAssertEqual(channel.mediaFileTimeoutMilliseconds, 3_000)
         XCTAssertTrue(channel.isPasswordProtected)
+    }
+
+    func testChannelTransmitUserAndQueueHelpers() {
+        var rawChannel = Channel()
+        rawChannel.transmitUserList = [
+            TeamTalkChannelTransmitUser(userID: TeamTalkUserID(12), streamTypes: [.voice]),
+            .classroomFreeForAll(streamTypes: [.videoCapture, .mediaFileAudio])
+        ]
+        rawChannel.transmitQueueUsers = [TeamTalkUserID(20), TeamTalkUserID(21)]
+        rawChannel.transmitQueueDelayMilliseconds = 650
+        rawChannel.voiceTimeoutMilliseconds = 2_500
+        rawChannel.mediaFileTimeoutMilliseconds = 5_000
+
+        XCTAssertEqual(rawChannel.transmitUserList.count, 2)
+        XCTAssertEqual(rawChannel.transmitUserList[0].userIdentifier, TeamTalkUserID(12))
+        XCTAssertEqual(rawChannel.transmitUserList[0].streamTypes, [.voice])
+        XCTAssertTrue(rawChannel.transmitUserList[1].isClassroomFreeForAll)
+        XCTAssertNil(rawChannel.transmitUserList[1].userIdentifier)
+        XCTAssertEqual(rawChannel.transmitUserList[1].streamTypes, [.videoCapture, .mediaFileAudio])
+        XCTAssertEqual(rawChannel.transmitQueueUsers, [TeamTalkUserID(20), TeamTalkUserID(21)])
+        XCTAssertEqual(rawChannel.transmitQueueDelayMilliseconds, 650)
+        XCTAssertEqual(rawChannel.voiceTimeoutMilliseconds, 2_500)
+        XCTAssertEqual(rawChannel.mediaFileTimeoutMilliseconds, 5_000)
     }
 
     func testServerPropertiesConfigurationRoundTrip() {
@@ -133,6 +210,9 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(properties.userTimeout, 60)
         XCTAssertEqual(properties.loginDelayMilliseconds, 250)
         XCTAssertEqual(properties.logEvents, [.userLoggedIn, .fileUploaded])
+        XCTAssertTrue(properties.hasLogEvent(.userLoggedIn))
+        XCTAssertFalse(properties.hasLogEvent(.serverUpdated))
+        XCTAssertTrue(configuration.hasLogEvent(.fileUploaded))
         XCTAssertTrue(properties.autoSave)
     }
 
@@ -412,6 +492,7 @@ final class TeamTalkModelsTests: XCTestCase {
             XCTAssertEqual(rawWindow.bitmapFormat, .rgb32)
             XCTAssertEqual(rawWindow.bytesPerLine, 2560)
             XCTAssertEqual(rawWindow.sessionID, 13)
+            XCTAssertEqual(rawWindow.sessionIdentifier, TeamTalkDesktopSessionID(13))
             XCTAssertEqual(rawWindow.desktopProtocol, .zlib1)
             XCTAssertEqual(rawWindow.frameBufferSize, Int32(pixels.count))
             XCTAssertTrue(rawWindow.hasFrameBuffer)
@@ -423,6 +504,7 @@ final class TeamTalkModelsTests: XCTestCase {
             XCTAssertEqual(window.bitmapFormat, .rgb32)
             XCTAssertEqual(window.bytesPerLine, 2560)
             XCTAssertEqual(window.sessionID, 13)
+            XCTAssertEqual(window.sessionIdentifier, TeamTalkDesktopSessionID(13))
             XCTAssertEqual(window.desktopProtocol, .zlib1)
             XCTAssertEqual(window.frameBuffer, pixels)
             XCTAssertEqual(window.frameBufferSize, Int32(pixels.count))
@@ -434,6 +516,7 @@ final class TeamTalkModelsTests: XCTestCase {
                 XCTAssertEqual(roundTrippedWindow.bitmapFormat, .rgb32)
                 XCTAssertEqual(roundTrippedWindow.bytesPerLine, 2560)
                 XCTAssertEqual(roundTrippedWindow.sessionID, 13)
+                XCTAssertEqual(roundTrippedWindow.sessionIdentifier, TeamTalkDesktopSessionID(13))
                 XCTAssertEqual(roundTrippedWindow.desktopProtocol, .zlib1)
                 XCTAssertEqual(roundTrippedWindow.frameBufferData, pixels)
             }
@@ -678,6 +761,105 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(roundTripped.audioPreprocessorType, .teamTalk)
     }
 
+    func testAudioPreprocessorConfigurationsRoundTrip() {
+        var rawSpeex = TeamTalkAudioPreprocessor.makeSpeexDSP()
+        XCTAssertFalse(rawSpeex.automaticGainControlEnabled)
+        XCTAssertFalse(rawSpeex.denoiseEnabled)
+        XCTAssertFalse(rawSpeex.echoCancellationEnabled)
+
+        rawSpeex.automaticGainControlEnabled = true
+        rawSpeex.gainLevel = 9_000
+        rawSpeex.maxGainIncreaseDecibelsPerSecond = 18
+        rawSpeex.maxGainDecreaseDecibelsPerSecond = -24
+        rawSpeex.maxGainDecibels = 40
+        rawSpeex.denoiseEnabled = true
+        rawSpeex.maxNoiseSuppressionDecibels = -35
+        rawSpeex.echoCancellationEnabled = true
+        rawSpeex.echoSuppressionDecibels = -42
+        rawSpeex.echoSuppressionActiveDecibels = -18
+
+        let speexConfiguration = TeamTalkSpeexDSPConfiguration(rawSpeex)
+        XCTAssertTrue(speexConfiguration.automaticGainControlEnabled)
+        XCTAssertEqual(speexConfiguration.gainLevel, 9_000)
+        XCTAssertEqual(speexConfiguration.maxGainIncreaseDecibelsPerSecond, 18)
+        XCTAssertEqual(speexConfiguration.maxGainDecreaseDecibelsPerSecond, -24)
+        XCTAssertEqual(speexConfiguration.maxGainDecibels, 40)
+        XCTAssertTrue(speexConfiguration.denoiseEnabled)
+        XCTAssertEqual(speexConfiguration.maxNoiseSuppressionDecibels, -35)
+        XCTAssertTrue(speexConfiguration.echoCancellationEnabled)
+        XCTAssertEqual(speexConfiguration.echoSuppressionDecibels, -42)
+        XCTAssertEqual(speexConfiguration.echoSuppressionActiveDecibels, -18)
+        XCTAssertEqual(speexConfiguration.cValue.gainLevel, 9_000)
+        XCTAssertTrue(speexConfiguration.cValue.echoCancellationEnabled)
+
+        var rawTeamTalk = TeamTalkAudioPreprocessor.makeTTAudioPreprocessor()
+        rawTeamTalk.gainLevel = 1_500
+        rawTeamTalk.muteLeftSpeaker = true
+        rawTeamTalk.muteRightSpeaker = false
+
+        let teamTalkConfiguration = TeamTalkTTAudioPreprocessorConfiguration(rawTeamTalk)
+        XCTAssertEqual(teamTalkConfiguration.gainLevel, 1_500)
+        XCTAssertTrue(teamTalkConfiguration.muteLeftSpeaker)
+        XCTAssertFalse(teamTalkConfiguration.muteRightSpeaker)
+        XCTAssertTrue(teamTalkConfiguration.cValue.muteLeftSpeaker)
+
+        var rawWebRTC = TeamTalkAudioPreprocessor.makeWebRTCAudioPreprocessor()
+        rawWebRTC.preamplifierEnabled = true
+        rawWebRTC.preamplifierFixedGainFactor = 1.75
+        rawWebRTC.echoCancellerEnabled = true
+        rawWebRTC.noiseSuppressionEnabled = true
+        rawWebRTC.noiseSuppressionLevel = .veryHigh
+        rawWebRTC.gainController2Enabled = true
+        rawWebRTC.fixedDigitalGainDecibels = 20
+        rawWebRTC.adaptiveDigitalGainEnabled = true
+        rawWebRTC.adaptiveHeadRoomDecibels = 6
+        rawWebRTC.adaptiveMaxGainDecibels = 55
+        rawWebRTC.adaptiveInitialGainDecibels = 14
+        rawWebRTC.adaptiveMaxGainChangeDecibelsPerSecond = 5
+        rawWebRTC.adaptiveMaxOutputNoiseLevelDecibelsFS = -48
+
+        let webRTCConfiguration = TeamTalkWebRTCAudioPreprocessorConfiguration(rawWebRTC)
+        XCTAssertTrue(webRTCConfiguration.preamplifierEnabled)
+        XCTAssertEqual(webRTCConfiguration.preamplifierFixedGainFactor, 1.75, accuracy: 0.0001)
+        XCTAssertTrue(webRTCConfiguration.echoCancellerEnabled)
+        XCTAssertTrue(webRTCConfiguration.noiseSuppressionEnabled)
+        XCTAssertEqual(webRTCConfiguration.noiseSuppressionLevel, .veryHigh)
+        XCTAssertTrue(webRTCConfiguration.gainController2Enabled)
+        XCTAssertEqual(webRTCConfiguration.fixedDigitalGainDecibels, 20, accuracy: 0.0001)
+        XCTAssertTrue(webRTCConfiguration.adaptiveDigitalGainEnabled)
+        XCTAssertEqual(webRTCConfiguration.adaptiveHeadRoomDecibels, 6, accuracy: 0.0001)
+        XCTAssertEqual(webRTCConfiguration.adaptiveMaxGainDecibels, 55, accuracy: 0.0001)
+        XCTAssertEqual(webRTCConfiguration.adaptiveInitialGainDecibels, 14, accuracy: 0.0001)
+        XCTAssertEqual(webRTCConfiguration.adaptiveMaxGainChangeDecibelsPerSecond, 5, accuracy: 0.0001)
+        XCTAssertEqual(webRTCConfiguration.adaptiveMaxOutputNoiseLevelDecibelsFS, -48, accuracy: 0.0001)
+        XCTAssertEqual(webRTCConfiguration.cValue.noiseSuppressionLevel, .veryHigh)
+        XCTAssertTrue(webRTCConfiguration.cValue.echoCancellerEnabled)
+
+        let teamTalkPreprocessor = TeamTalkAudioPreprocessorConfiguration.teamTalk(teamTalkConfiguration)
+        XCTAssertEqual(teamTalkPreprocessor.type, .teamTalk)
+        XCTAssertEqual(teamTalkPreprocessor.cValue.type, .teamTalk)
+
+        let webRTCPreprocessor = TeamTalkAudioPreprocessorConfiguration.webRTC(webRTCConfiguration)
+        XCTAssertEqual(webRTCPreprocessor.type, .webRTC)
+        XCTAssertEqual(webRTCPreprocessor.cValue.type, .webRTC)
+        XCTAssertEqual(webRTCPreprocessor.cValue.webRTCAudioPreprocessor.noiseSuppressionLevel, .veryHigh)
+
+        let restoredPreprocessor = TeamTalkAudioPreprocessorConfiguration(webRTCPreprocessor.cValue)
+        guard case .webRTC(let restoredWebRTCConfiguration) = restoredPreprocessor else {
+            XCTFail("Expected WebRTC audio preprocessor configuration")
+            return
+        }
+        XCTAssertEqual(restoredWebRTCConfiguration, webRTCConfiguration)
+
+        XCTAssertEqual(TeamTalkAudioPreprocessorConfiguration(type: .none).type, .none)
+        XCTAssertEqual(TeamTalkAudioPreprocessorConfiguration(type: .obsoleteWebRTC).type, .obsoleteWebRTC)
+
+        var playbackConfiguration = TeamTalkMediaFilePlaybackConfiguration()
+        playbackConfiguration.audioPreprocessorConfiguration = .speexDSP(speexConfiguration)
+        XCTAssertEqual(playbackConfiguration.audioPreprocessor.type, .speexDSP)
+        XCTAssertEqual(playbackConfiguration.audioPreprocessorConfiguration, .speexDSP(speexConfiguration))
+    }
+
     func testUserMediaStorageConfigurationHelpers() {
         let defaults = TeamTalkUserMediaStorageConfiguration()
         XCTAssertNil(defaults.directoryURL)
@@ -703,19 +885,33 @@ final class TeamTalkModelsTests: XCTestCase {
     }
 
     func testBanConfigurationRoundTrip() {
-        let configuration = TeamTalkBanConfiguration(
+        var configuration = TeamTalkBanConfiguration(
             ipAddress: "192.168.1.*",
-            channelPath: "/Lobby",
+            channelPathValue: TeamTalkChannelPath("/Lobby"),
             username: "guest",
             types: [.ipAddress, .username, .channel]
         )
 
+        XCTAssertEqual(configuration.channelPath, "/Lobby")
+        XCTAssertEqual(configuration.channelPathValue, TeamTalkChannelPath("/Lobby"))
+        XCTAssertTrue(configuration.isChannelBan)
+        XCTAssertFalse(configuration.isLoginBan)
+        XCTAssertTrue(configuration.isIPAddressBan)
+        XCTAssertTrue(configuration.isUsernameBan)
+
+        configuration.channelPathValue = "/Lobby/Sub"
+
         let bannedUser = TeamTalkBannedUser(configuration.cValue)
 
         XCTAssertEqual(bannedUser.ipAddress, "192.168.1.*")
-        XCTAssertEqual(bannedUser.channelPath, "/Lobby")
+        XCTAssertEqual(bannedUser.channelPath, "/Lobby/Sub")
+        XCTAssertEqual(bannedUser.channelPathValue, TeamTalkChannelPath("/Lobby/Sub"))
         XCTAssertEqual(bannedUser.username, "guest")
         XCTAssertEqual(bannedUser.types, [.ipAddress, .username, .channel])
+        XCTAssertTrue(bannedUser.isChannelBan)
+        XCTAssertFalse(bannedUser.isLoginBan)
+        XCTAssertTrue(bannedUser.isIPAddressBan)
+        XCTAssertTrue(bannedUser.isUsernameBan)
         XCTAssertTrue(bannedUser.hasBanType(.username))
     }
 

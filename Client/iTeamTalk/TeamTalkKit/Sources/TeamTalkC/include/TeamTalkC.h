@@ -95,6 +95,11 @@ const TTCHAR* TTKitGetRemoteFileString(TTKitRemoteFileStringProperty property, c
 const TTCHAR* TTKitGetFileTransferString(TTKitFileTransferStringProperty property, const FileTransfer* fileTransfer);
 
 void TTKitSetChannelString(TTKitChannelStringProperty property, Channel* channel, const TTCHAR* string);
+INT32 TTKitGetChannelTransmitUserID(const Channel* channel, INT32 index);
+StreamTypes TTKitGetChannelTransmitUserStreamTypes(const Channel* channel, INT32 index);
+void TTKitSetChannelTransmitUser(Channel* channel, INT32 index, INT32 userID, StreamTypes streamTypes);
+INT32 TTKitGetChannelTransmitQueueUserID(const Channel* channel, INT32 index);
+void TTKitSetChannelTransmitQueueUser(Channel* channel, INT32 index, INT32 userID);
 void TTKitSetServerPropertiesString(TTKitServerStringProperty property, ServerProperties* serverProperties, const TTCHAR* string);
 void TTKitSetUserAccountString(TTKitUserAccountStringProperty property, UserAccount* userAccount, const TTCHAR* string);
 void TTKitSetUserAccountAutoOperatorChannels(UserAccount* userAccount, const INT32* channelIDs, INT32 count);

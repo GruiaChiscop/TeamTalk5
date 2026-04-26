@@ -31,12 +31,12 @@ Swift SDK.
 - Hotkey registration wrappers (Windows-only).
 - [x] Local recording wrappers.
 - [x] Audio block APIs.
-- Advanced audio preprocessors wrappers.
-- Complete channel transmission list helpers for `transmitUsers` and
+- [x] Advanced audio preprocessors wrappers.
+- [x] Complete channel transmission list helpers for `transmitUsers` and
   `transmitUsersQueue`.
-- Channel path helpers and typed path components.
-- More complete server abuse-prevention helpers.
-- More complete server logging/admin helpers where the SDK has additional
+- [x] Channel path helpers and typed path components.
+- [x] More complete server abuse-prevention helpers.
+- [x] More complete server logging/admin helpers where the SDK has additional
   commands not yet exposed by the Swift layer.
 
 ## API Design Follow-Ups

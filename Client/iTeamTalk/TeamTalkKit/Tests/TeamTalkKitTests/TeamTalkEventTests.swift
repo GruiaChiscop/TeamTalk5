@@ -101,4 +101,74 @@ final class TeamTalkEventTests: XCTestCase {
             XCTFail("Expected bannedUser event")
         }
     }
+
+    func testUserAndChannelIdentifierEventsDecodeTypedWrappers() {
+        var loginMessage = TTMessage()
+        loginMessage.event = .myselfLoggedIn
+        loginMessage.nSource = 42
+        loginMessage.payloadType = .userAccount
+
+        var account = UserAccount()
+        TeamTalkString.setUserAccount(.username, on: &account, to: "alice")
+        loginMessage.useraccount = account
+
+        switch TeamTalkEvent(loginMessage).kind {
+        case .myselfLoggedIn(let userID, let account):
+            XCTAssertEqual(userID, TeamTalkUserID(42))
+            XCTAssertEqual(account.username, "alice")
+        default:
+            XCTFail("Expected myselfLoggedIn event")
+        }
+
+        var kickedMessage = TTMessage()
+        kickedMessage.event = .myselfKicked
+        kickedMessage.nSource = 7
+
+        switch TeamTalkEvent(kickedMessage).kind {
+        case .myselfKicked(let channelID, let by):
+            XCTAssertEqual(channelID, TeamTalkChannelID(7))
+            XCTAssertNil(by)
+        default:
+            XCTFail("Expected myselfKicked event")
+        }
+
+        var desktopMessage = TTMessage()
+        desktopMessage.event = .userDesktopWindow
+        desktopMessage.nSource = 19
+        desktopMessage.nStreamID = 88
+
+        switch TeamTalkEvent(desktopMessage).kind {
+        case .userDesktopWindow(let userID, let streamID):
+            XCTAssertEqual(userID, TeamTalkUserID(19))
+            XCTAssertEqual(streamID, TeamTalkMediaStreamID(88))
+        default:
+            XCTFail("Expected userDesktopWindow event")
+        }
+    }
+
+    func testSessionIdentifierEventsDecodeTypedWrappers() {
+        var desktopTransferMessage = TTMessage()
+        desktopTransferMessage.event = .desktopWindowTransfer
+        desktopTransferMessage.nSource = 15
+        desktopTransferMessage.nBytesRemain = 2_048
+
+        switch TeamTalkEvent(desktopTransferMessage).kind {
+        case .desktopWindowTransfer(let sessionID, let bytesRemaining):
+            XCTAssertEqual(sessionID, TeamTalkDesktopSessionID(15))
+            XCTAssertEqual(bytesRemaining, 2_048)
+        default:
+            XCTFail("Expected desktopWindowTransfer event")
+        }
+
+        var playbackMessage = TTMessage()
+        playbackMessage.event = .localMediaFile
+        playbackMessage.nSource = 23
+
+        switch TeamTalkEvent(playbackMessage).kind {
+        case .localMediaFile(let sessionID):
+            XCTAssertEqual(sessionID, TeamTalkPlaybackSessionID(23))
+        default:
+            XCTFail("Expected localMediaFile event")
+        }
+    }
 }

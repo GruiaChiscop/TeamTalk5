@@ -288,6 +288,42 @@ void TTKitSetChannelString(TTKitChannelStringProperty property, Channel* channel
     }
 }
 
+INT32 TTKitGetChannelTransmitUserID(const Channel* channel, INT32 index) {
+    if (!channel || index < 0 || index >= TT_TRANSMITUSERS_MAX) {
+        return 0;
+    }
+    return channel->transmitUsers[index][0];
+}
+
+StreamTypes TTKitGetChannelTransmitUserStreamTypes(const Channel* channel, INT32 index) {
+    if (!channel || index < 0 || index >= TT_TRANSMITUSERS_MAX) {
+        return STREAMTYPE_NONE;
+    }
+    return (StreamTypes) channel->transmitUsers[index][1];
+}
+
+void TTKitSetChannelTransmitUser(Channel* channel, INT32 index, INT32 userID, StreamTypes streamTypes) {
+    if (!channel || index < 0 || index >= TT_TRANSMITUSERS_MAX) {
+        return;
+    }
+    channel->transmitUsers[index][0] = userID;
+    channel->transmitUsers[index][1] = (INT32) streamTypes;
+}
+
+INT32 TTKitGetChannelTransmitQueueUserID(const Channel* channel, INT32 index) {
+    if (!channel || index < 0 || index >= TT_TRANSMITQUEUE_MAX) {
+        return 0;
+    }
+    return channel->transmitUsersQueue[index];
+}
+
+void TTKitSetChannelTransmitQueueUser(Channel* channel, INT32 index, INT32 userID) {
+    if (!channel || index < 0 || index >= TT_TRANSMITQUEUE_MAX) {
+        return;
+    }
+    channel->transmitUsersQueue[index] = userID;
+}
+
 void TTKitSetServerPropertiesString(TTKitServerStringProperty property, ServerProperties* serverProperties, const TTCHAR* string) {
     switch (property) {
     case TTKitServerStringName:

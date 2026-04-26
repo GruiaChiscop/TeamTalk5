@@ -36,6 +36,16 @@ final class TeamTalkTypesTests: XCTestCase {
         XCTAssertFalse(TeamTalkPlaybackSessionID.none.isValid)
         XCTAssertEqual(TeamTalkPlaybackSessionID.invalid.description, "-1")
 
+        XCTAssertEqual(TeamTalkDesktopSessionID(10).cValue, 10)
+        XCTAssertTrue(TeamTalkDesktopSessionID(10).isValid)
+        XCTAssertFalse(TeamTalkDesktopSessionID.none.isValid)
+        XCTAssertEqual(TeamTalkDesktopSessionID.invalid.description, "-1")
+
+        XCTAssertEqual(TeamTalkMediaStreamID(11).cValue, 11)
+        XCTAssertTrue(TeamTalkMediaStreamID(11).isValid)
+        XCTAssertFalse(TeamTalkMediaStreamID.none.isValid)
+        XCTAssertEqual(TeamTalkMediaStreamID.invalid.description, "-1")
+
         XCTAssertEqual(TeamTalkAudioBlockSourceID.localUser.cValue, TT_LOCAL_USERID)
         XCTAssertEqual(TeamTalkAudioBlockSourceID.localTransmission.cValue, TT_LOCAL_TX_USERID)
         XCTAssertEqual(TeamTalkAudioBlockSourceID.muxed.cValue, TT_MUXED_USERID)
@@ -45,9 +55,42 @@ final class TeamTalkTypesTests: XCTestCase {
         XCTAssertFalse(TeamTalkAudioBlockSourceID(userID: TeamTalkUserID(10)).isSpecialSource)
         XCTAssertEqual(TeamTalkAudioBlockSourceID(userID: TeamTalkUserID(10)).description, "10")
         XCTAssertEqual(
-            TeamTalkAudioBlockSourceID(playbackSessionID: TeamTalkPlaybackSessionID(11)).cValue,
-            11
+            TeamTalkAudioBlockSourceID(playbackSessionID: TeamTalkPlaybackSessionID(12)).cValue,
+            12
         )
+    }
+
+    func testChannelPathNormalizesAndExposesComponents() {
+        let empty = TeamTalkChannelPath.empty
+        XCTAssertTrue(empty.isEmpty)
+        XCTAssertFalse(empty.isRoot)
+        XCTAssertEqual(empty.components, [])
+        XCTAssertNil(empty.parent)
+
+        let root = TeamTalkChannelPath.root
+        XCTAssertFalse(root.isEmpty)
+        XCTAssertTrue(root.isRoot)
+        XCTAssertEqual(root.rawValue, "/")
+        XCTAssertEqual(root.components, [])
+        XCTAssertNil(root.parent)
+
+        let path = TeamTalkChannelPath(rawValue: "///Lobby//Music///Rock/")
+        XCTAssertEqual(path.rawValue, "/Lobby/Music/Rock")
+        XCTAssertEqual(path.components.map(\.rawValue), ["Lobby", "Music", "Rock"])
+        XCTAssertEqual(path.depth, 3)
+        XCTAssertEqual(path.lastComponent?.rawValue, "Rock")
+        XCTAssertEqual(path.parent?.rawValue, "/Lobby/Music")
+        XCTAssertEqual(path.description, "/Lobby/Music/Rock")
+
+        let rebuilt = TeamTalkChannelPath(components: ["Lobby", "Music", "Rock"])
+        XCTAssertEqual(rebuilt, path)
+        XCTAssertEqual(root.appending(component: "Lobby").rawValue, "/Lobby")
+        XCTAssertEqual(path.appending("Live").rawValue, "/Lobby/Music/Rock/Live")
+
+        let component: TeamTalkChannelPathComponent = "Mu/sic"
+        XCTAssertEqual(component.rawValue, "Music")
+        XCTAssertFalse(component.isEmpty)
+        XCTAssertEqual(component.description, "Music")
     }
 
     func testSoundSystemWrapperPreservesCValues() {
@@ -472,6 +515,15 @@ final class TeamTalkTypesTests: XCTestCase {
         XCTAssertEqual(TeamTalkDesktopKeyCode.middleMouseButton.rawValue, UInt32(TT_DESKTOPINPUT_KEYCODE_MMOUSEBTN))
         XCTAssertTrue(TeamTalkDesktopKeyCode.leftMouseButton.isMouseButton)
         XCTAssertEqual(TeamTalkDesktopKeyCode(42).description, "42")
+    }
+
+    func testWebRTCNoiseSuppressionLevelPreservesRawValues() {
+        assertInt32Mappings([
+            (.low, 0),
+            (.moderate, 1),
+            (.high, 2),
+            (.veryHigh, 3)
+        ] as [(TeamTalkWebRTCNoiseSuppressionLevel, Int32)])
     }
 
     func testClientEventWrapperPreservesCValues() {

@@ -4,8 +4,20 @@ import TeamTalkC
 public enum TeamTalkAudioPreprocessor {
     public static let channelAudioConfigMax = Int32(32000)
 
+    public static func makeSpeexDSP() -> SpeexDSP {
+        makeAudioPreprocessor(SPEEXDSP_AUDIOPREPROCESSOR).speexdsp
+    }
+
+    public static func makeTTAudioPreprocessor() -> TTAudioPreprocessor {
+        makeAudioPreprocessor(TEAMTALK_AUDIOPREPROCESSOR).ttpreprocessor
+    }
+
     public static func makeTeamTalkPreprocessor() -> AudioPreprocessor {
         makeAudioPreprocessor(TEAMTALK_AUDIOPREPROCESSOR)
+    }
+
+    public static func makeWebRTCAudioPreprocessor() -> WebRTCAudioPreprocessor {
+        makeAudioPreprocessor(WEBRTC_AUDIOPREPROCESSOR).webrtc
     }
 
     public static func makeWebRTCPreprocessor() -> AudioPreprocessor {

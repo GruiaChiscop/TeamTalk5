@@ -22,14 +22,14 @@ public extension TeamTalkEvent {
         case commandProcessing(commandID: TeamTalkCommandID, isActive: Bool)
         case commandError(commandID: TeamTalkCommandID, error: TeamTalkClientError)
         case commandSucceeded(commandID: TeamTalkCommandID)
-        case myselfLoggedIn(userID: Int32, account: TeamTalkUserAccount)
+        case myselfLoggedIn(userID: TeamTalkUserID, account: TeamTalkUserAccount)
         case myselfLoggedOut
-        case myselfKicked(channelID: Int32, by: TeamTalkUser?)
+        case myselfKicked(channelID: TeamTalkChannelID, by: TeamTalkUser?)
         case userLoggedIn(TeamTalkUser)
         case userLoggedOut(TeamTalkUser)
         case userUpdated(TeamTalkUser)
         case userJoined(TeamTalkUser)
-        case userLeft(previousChannelID: Int32, user: TeamTalkUser)
+        case userLeft(previousChannelID: TeamTalkChannelID, user: TeamTalkUser)
         case textMessage(TeamTalkTextMessage)
         case channelCreated(TeamTalkChannel)
         case channelUpdated(TeamTalkChannel)
@@ -43,23 +43,23 @@ public extension TeamTalkEvent {
         case userAccountRemoved(TeamTalkUserAccount)
         case bannedUser(TeamTalkBannedUser)
         case userStateChanged(TeamTalkUser)
-        case userVideoCapture(userID: Int32, streamID: Int32)
-        case userMediaFileVideo(userID: Int32, streamID: Int32)
-        case userDesktopWindow(userID: Int32, streamID: Int32)
-        case userDesktopCursor(userID: Int32)
-        case userDesktopInput(userID: Int32)
-        case userRecordMediaFile(userID: Int32)
-        case userAudioBlock(userID: Int32, streamType: TeamTalkStreamTypes)
+        case userVideoCapture(userID: TeamTalkUserID, streamID: TeamTalkMediaStreamID)
+        case userMediaFileVideo(userID: TeamTalkUserID, streamID: TeamTalkMediaStreamID)
+        case userDesktopWindow(userID: TeamTalkUserID, streamID: TeamTalkMediaStreamID)
+        case userDesktopCursor(userID: TeamTalkUserID)
+        case userDesktopInput(userID: TeamTalkUserID)
+        case userRecordMediaFile(userID: TeamTalkUserID)
+        case userAudioBlock(userID: TeamTalkUserID, streamType: TeamTalkStreamTypes)
         case internalError(TeamTalkClientError)
         case voiceActivation(isActive: Bool)
         case hotkey(id: Int32, isActive: Bool)
         case hotkeyTest(keyCode: Int32, isActive: Bool)
         case fileTransfer(TeamTalkFileTransfer)
-        case desktopWindowTransfer(sessionID: Int32, bytesRemaining: Int32)
+        case desktopWindowTransfer(sessionID: TeamTalkDesktopSessionID, bytesRemaining: Int32)
         case streamMediaFile
-        case localMediaFile(sessionID: Int32)
-        case audioInput(streamID: Int32)
-        case userFirstVoiceStreamPacket(streamID: Int32, user: TeamTalkUser)
+        case localMediaFile(sessionID: TeamTalkPlaybackSessionID)
+        case audioInput(streamID: TeamTalkMediaStreamID)
+        case userFirstVoiceStreamPacket(streamID: TeamTalkMediaStreamID, user: TeamTalkUser)
         case soundDeviceAdded
         case soundDeviceRemoved
         case soundDeviceUnplugged
@@ -97,14 +97,14 @@ private extension TeamTalkEvent.Kind {
             self = .commandSucceeded(commandID: TeamTalkCommandID(message.source))
         case .myselfLoggedIn:
             self = .myselfLoggedIn(
-                userID: message.source,
+                userID: TeamTalkUserID(message.source),
                 account: TeamTalkUserAccount(TeamTalkMessagePayload.userAccount(from: message))
             )
         case .myselfLoggedOut:
             self = .myselfLoggedOut
         case .myselfKicked:
             let user = message.payloadType == .user ? TeamTalkUser(TeamTalkMessagePayload.user(from: message)) : nil
-            self = .myselfKicked(channelID: message.source, by: user)
+            self = .myselfKicked(channelID: TeamTalkChannelID(message.source), by: user)
         case .userLoggedIn:
             self = .userLoggedIn(TeamTalkUser(TeamTalkMessagePayload.user(from: message)))
         case .userLoggedOut:
@@ -115,7 +115,7 @@ private extension TeamTalkEvent.Kind {
             self = .userJoined(TeamTalkUser(TeamTalkMessagePayload.user(from: message)))
         case .userLeft:
             self = .userLeft(
-                previousChannelID: message.source,
+                previousChannelID: TeamTalkChannelID(message.source),
                 user: TeamTalkUser(TeamTalkMessagePayload.user(from: message))
             )
         case .userTextMessage:
@@ -145,19 +145,28 @@ private extension TeamTalkEvent.Kind {
         case .userStateChanged:
             self = .userStateChanged(TeamTalkUser(TeamTalkMessagePayload.user(from: message)))
         case .userVideoCapture:
-            self = .userVideoCapture(userID: message.source, streamID: message.nStreamID)
+            self = .userVideoCapture(
+                userID: TeamTalkUserID(message.source),
+                streamID: TeamTalkMediaStreamID(message.nStreamID)
+            )
         case .userMediaFileVideo:
-            self = .userMediaFileVideo(userID: message.source, streamID: message.nStreamID)
+            self = .userMediaFileVideo(
+                userID: TeamTalkUserID(message.source),
+                streamID: TeamTalkMediaStreamID(message.nStreamID)
+            )
         case .userDesktopWindow:
-            self = .userDesktopWindow(userID: message.source, streamID: message.nStreamID)
+            self = .userDesktopWindow(
+                userID: TeamTalkUserID(message.source),
+                streamID: TeamTalkMediaStreamID(message.nStreamID)
+            )
         case .userDesktopCursor:
-            self = .userDesktopCursor(userID: message.source)
+            self = .userDesktopCursor(userID: TeamTalkUserID(message.source))
         case .userDesktopInput:
-            self = .userDesktopInput(userID: message.source)
+            self = .userDesktopInput(userID: TeamTalkUserID(message.source))
         case .userRecordMediaFile:
-            self = .userRecordMediaFile(userID: message.source)
+            self = .userRecordMediaFile(userID: TeamTalkUserID(message.source))
         case .userAudioBlock:
-            self = .userAudioBlock(userID: message.source, streamType: message.streamType)
+            self = .userAudioBlock(userID: TeamTalkUserID(message.source), streamType: message.streamType)
         case .internalError:
             self = .internalError(TeamTalkClientError(TeamTalkMessagePayload.clientError(from: message)))
         case .voiceActivation:
@@ -169,16 +178,19 @@ private extension TeamTalkEvent.Kind {
         case .fileTransfer:
             self = .fileTransfer(TeamTalkFileTransfer(TeamTalkMessagePayload.fileTransfer(from: message)))
         case .desktopWindowTransfer:
-            self = .desktopWindowTransfer(sessionID: message.source, bytesRemaining: message.nBytesRemain)
+            self = .desktopWindowTransfer(
+                sessionID: TeamTalkDesktopSessionID(message.source),
+                bytesRemaining: message.nBytesRemain
+            )
         case .streamMediaFile:
             self = .streamMediaFile
         case .localMediaFile:
-            self = .localMediaFile(sessionID: message.source)
+            self = .localMediaFile(sessionID: TeamTalkPlaybackSessionID(message.source))
         case .audioInput:
-            self = .audioInput(streamID: message.source)
+            self = .audioInput(streamID: TeamTalkMediaStreamID(message.source))
         case .userFirstVoiceStreamPacket:
             self = .userFirstVoiceStreamPacket(
-                streamID: message.source,
+                streamID: TeamTalkMediaStreamID(message.source),
                 user: TeamTalkUser(TeamTalkMessagePayload.user(from: message))
             )
         case .soundDeviceAdded:
