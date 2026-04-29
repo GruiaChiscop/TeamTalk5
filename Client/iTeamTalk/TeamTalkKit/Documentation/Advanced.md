@@ -87,8 +87,15 @@ compatibility. They also expose typed companions such as `user.userID`,
 
 ## Command Tracking
 
-TeamTalk commands return an ID. The old API returned `Int32`; the new API returns
-`TeamTalkCommandID`.
+Most app code should prefer the async helpers:
+
+```swift
+try await client.joinChannel(withID: channelID)
+try await client.sendTextMessage(.user(to: userID, content: "Hi"))
+```
+
+TeamTalk command IDs are still available for advanced flows. The old API
+returned `Int32`; the modern command API returns `TeamTalkCommandID`.
 
 ```swift
 let commandID = client.joinChannel(withID: channelID)

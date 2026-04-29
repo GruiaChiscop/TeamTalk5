@@ -35,7 +35,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     let preferencesModel: PreferencesModel
 
     var server: Server
-    var cmdid: INT32 = 0
 
     @Published var alertMessage: String?
     @Published var fatalAlertMessage: String?   // dismisses the view when OK tapped
@@ -284,11 +283,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         case CLIENTEVENT_VOICE_ACTIVATION:
             playSound(TeamTalkMessagePayload.isActive(m) ? .voxtriggered_ON : .voxtriggered_OFF)
 
-        case CLIENTEVENT_CMD_PROCESSING:
-            if !TeamTalkMessagePayload.isActive(m) {
-                commandComplete(m.nSource)
-            }
-
         case CLIENTEVENT_CMD_MYSELF_LOGGEDIN:
             let account = TeamTalkMessagePayload.userAccount(from: m)
             let initchan = TeamTalkString.userAccount(.initialChannel, from: account)
@@ -310,11 +304,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
             }
             if m.nSource == 0 { playSound(.srv_LOST) }
             alertMessage = msg
-
-        case CLIENTEVENT_CMD_ERROR:
-            if m.nSource == cmdid {
-                alertMessage = TeamTalkString.clientError(TeamTalkMessagePayload.clientError(from: m))
-            }
 
         case CLIENTEVENT_CMD_USER_LOGGEDIN:
             let subs = getDefaultSubscriptions()
@@ -359,52 +348,43 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         }
     }
 
-    private func commandComplete(_ active_cmdid: INT32) {
-        let cmd = channelListModel.activeCommands[active_cmdid]
-        guard let cmd else { return }
-
-        switch cmd {
-        case .loginCmd:
-            if !server.channel.isEmpty {
-                var tokens = server.channel.components(separatedBy: "/")
-                let chanid = TeamTalkClient.shared.channelID(fromPath: server.channel)
-                if chanid > 0 {
-                    channelListModel.rejoinchannel.nChannelID = chanid
-                    TeamTalkString.setChannel(.password, on: &channelListModel.rejoinchannel, to: server.chanpasswd)
-                } else if tokens.count > 0 {
-                    let channame = tokens.removeLast()
-                    let chanpath = tokens.map { "/" + $0 }.joined()
-                    let parentid = TeamTalkClient.shared.channelID(fromPath: chanpath)
-                    if parentid > 0 {
-                        channelListModel.rejoinchannel.nParentID = parentid
-                        TeamTalkString.setChannel(.name, on: &channelListModel.rejoinchannel, to: channame)
-                        TeamTalkString.setChannel(.password, on: &channelListModel.rejoinchannel, to: server.chanpasswd)
-                        channelListModel.rejoinchannel.audiocodec = newAudioCodec(DEFAULT_AUDIOCODEC)
-                    }
-                }
-                server.channel.removeAll()
-                server.chanpasswd.removeAll()
-            }
-            let settings = UserDefaults.standard
-            if settings.integer(forKey: PREF_GENERAL_GENDER) != 0 {
-                TeamTalkClient.shared.changeStatus(mode: INT32(StatusMode.STATUSMODE_FEMALE.rawValue))
-            }
-        default:
-            break
-        }
-    }
-
     private func login() {
         let nickname = server.nickname.isEmpty
             ? (UserDefaults.standard.string(forKey: PREF_GENERAL_NICKNAME) ?? "")
             : server.nickname
-        cmdid = TeamTalkClient.shared.login(
-            nickname: nickname,
-            username: server.username,
-            password: server.password,
-            clientName: AppInfo.getAppName()
-        )
-        channelListModel.activeCommands[cmdid] = .loginCmd
         reconnecttimer?.invalidate()
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await TeamTalkClient.shared.logIn(
+                    nickname: nickname,
+                    username: server.username,
+                    password: server.password,
+                    clientName: AppInfo.getAppName()
+                )
+
+                await MainActor.run {
+                    self.channelListModel.configureInitialJoin(
+                        channelPath: self.server.channel,
+                        password: self.server.chanpasswd
+                    )
+                    self.server.channel.removeAll()
+                    self.server.chanpasswd.removeAll()
+
+                    let settings = UserDefaults.standard
+                    if settings.integer(forKey: PREF_GENERAL_GENDER) != 0 {
+                        TeamTalkClient.shared.changeStatus(mode: INT32(StatusMode.STATUSMODE_FEMALE.rawValue))
+                    }
+                }
+
+                try await self.channelListModel.joinInitialChannelIfNeeded()
+            } catch {
+                await MainActor.run {
+                    self.alertMessage = error.localizedDescription
+                }
+            }
+        }
     }
 }

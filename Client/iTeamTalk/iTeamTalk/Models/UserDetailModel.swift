@@ -28,19 +28,18 @@ final class UserDetailModel: ObservableObject {
 
     struct SubscriptionRow: Identifiable {
         let title: String
-        let type: Subscription
+        let type: TeamTalkSubscriptions
 
-        var id: Subscription.RawValue {
+        var id: TeamTalkSubscriptions.RawValue {
             type.rawValue
         }
     }
 
-    let userid: INT32
+    let userID: TeamTalkUserID
     let displayName: String
     let subscriptionRows: [SubscriptionRow]
 
-    private var kick_cmdid: INT32 = 0
-    private var kickban_cmdid: INT32 = 0
+    private let initialUser: TeamTalkUser
 
     @Published var errorMessage: String?
     @Published var usernameText: String
@@ -48,89 +47,108 @@ final class UserDetailModel: ObservableObject {
     @Published var mediaVolume: Double
     @Published var isVoiceMuted: Bool
     @Published var isMediaMuted: Bool
-    @Published private var subscriptions: Subscriptions
+    @Published private var subscriptions: TeamTalkSubscriptions
 
-    init(user: User) {
-        userid = user.nUserID
-        displayName = getDisplayName(user)
-        usernameText = TeamTalkString.user(.username, from: user)
-        voiceVolume = Double(refVolumeToPercent(Int(user.nVolumeVoice)))
-        mediaVolume = Double(refVolumeToPercent(Int(user.nVolumeMediaFile)))
-        isVoiceMuted = (user.uUserState & USERSTATE_MUTE_VOICE.rawValue) != 0
-        isMediaMuted = (user.uUserState & USERSTATE_MUTE_MEDIAFILE.rawValue) != 0
-        subscriptions = user.uLocalSubscriptions
+    convenience init(user: User) {
+        self.init(user: TeamTalkUser(user))
+    }
+
+    init(user: TeamTalkUser) {
+        initialUser = user
+        userID = user.userID
+        displayName = getDisplayName(user.rawValue)
+        usernameText = user.username
+        voiceVolume = Double(refVolumeToPercent(Int(user.rawValue.nVolumeVoice)))
+        mediaVolume = Double(refVolumeToPercent(Int(user.rawValue.nVolumeMediaFile)))
+        isVoiceMuted = user.states.contains(.voiceMuted)
+        isMediaMuted = user.states.contains(.mediaFileMuted)
+        subscriptions = user.localSubscriptions
         subscriptionRows = [
-            SubscriptionRow(title: String(localized: "User Messages", comment: "user detail"), type: SUBSCRIBE_USER_MSG),
-            SubscriptionRow(title: String(localized: "Channel Messages", comment: "user detail"), type: SUBSCRIBE_CHANNEL_MSG),
-            SubscriptionRow(title: String(localized: "Broadcast Messages", comment: "user detail"), type: SUBSCRIBE_BROADCAST_MSG),
-            SubscriptionRow(title: String(localized: "Voice", comment: "user detail"), type: SUBSCRIBE_VOICE),
-            SubscriptionRow(title: String(localized: "WebCam", comment: "user detail"), type: SUBSCRIBE_VIDEOCAPTURE),
-            SubscriptionRow(title: String(localized: "Media File", comment: "user detail"), type: SUBSCRIBE_MEDIAFILE),
-            SubscriptionRow(title: String(localized: "Desktop", comment: "user detail"), type: SUBSCRIBE_DESKTOP)
+            SubscriptionRow(title: String(localized: "User Messages", comment: "user detail"), type: .userMessages),
+            SubscriptionRow(title: String(localized: "Channel Messages", comment: "user detail"), type: .channelMessages),
+            SubscriptionRow(title: String(localized: "Broadcast Messages", comment: "user detail"), type: .broadcastMessages),
+            SubscriptionRow(title: String(localized: "Voice", comment: "user detail"), type: .voice),
+            SubscriptionRow(title: String(localized: "WebCam", comment: "user detail"), type: .videoCapture),
+            SubscriptionRow(title: String(localized: "Media File", comment: "user detail"), type: .mediaFile),
+            SubscriptionRow(title: String(localized: "Desktop", comment: "user detail"), type: .desktop)
         ]
     }
 
-    func isSubscribed(to subscription: Subscription) -> Bool {
-        (subscriptions & subscription.rawValue) != 0
+    var userid: INT32 {
+        userID.cValue
+    }
+
+    private var currentUser: TeamTalkUser {
+        TeamTalkClient.shared.user(id: userID) ?? initialUser
+    }
+
+    func isSubscribed(to subscription: TeamTalkSubscriptions) -> Bool {
+        subscriptions.contains(subscription)
     }
 
     func voiceVolumeChanged(_ value: Double) {
         voiceVolume = value
-        TeamTalkClient.shared.setUserVolume(userID: userid, stream: STREAMTYPE_VOICE, volume: INT32(refVolume(value)))
-        TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: userid)
+        TeamTalkClient.shared.setUserVolume(user: currentUser, stream: .voice, volume: INT32(refVolume(value)))
+        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func mediaVolumeChanged(_ value: Double) {
         mediaVolume = value
-        TeamTalkClient.shared.setUserVolume(userID: userid, stream: STREAMTYPE_MEDIAFILE_AUDIO, volume: INT32(refVolume(value)))
-        TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: userid)
+        TeamTalkClient.shared.setUserVolume(user: currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(value)))
+        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func muteVoice(_ muted: Bool) {
         isVoiceMuted = muted
-        TeamTalkClient.shared.setUserMute(userID: userid, stream: STREAMTYPE_VOICE, muted: muted)
-        TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: userid)
+        TeamTalkClient.shared.setUserMute(user: currentUser, stream: .voice, muted: muted)
+        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func muteMediaStream(_ muted: Bool) {
         isMediaMuted = muted
-        TeamTalkClient.shared.setUserMute(userID: userid, stream: STREAMTYPE_MEDIAFILE_AUDIO, muted: muted)
-        TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: userid)
+        TeamTalkClient.shared.setUserMute(user: currentUser, stream: .mediaFileAudio, muted: muted)
+        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
-    func setSubscription(_ subscription: Subscription, enabled: Bool) {
+    func setSubscription(_ subscription: TeamTalkSubscriptions, enabled: Bool) {
         if enabled {
-            subscriptions |= subscription.rawValue
-            TeamTalkClient.shared.subscribe(userID: userid, subscriptions: subscription.rawValue)
+            subscriptions.insert(subscription)
+            TeamTalkClient.shared.subscribe(user: currentUser, subscriptions: subscription)
         } else {
-            subscriptions &= ~subscription.rawValue
-            TeamTalkClient.shared.unsubscribe(userID: userid, subscriptions: subscription.rawValue)
+            subscriptions.remove(subscription)
+            TeamTalkClient.shared.unsubscribe(user: currentUser, subscriptions: subscription)
         }
     }
 
     func kickUser() {
-        let channelID = TeamTalkClient.shared.withUser(id: userid) { $0.nChannelID }
-        kick_cmdid = TeamTalkClient.shared.kickUser(id: userid, fromChannelID: channelID)
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                let user = currentUser
+                let channel = TeamTalkClient.shared.channel(id: user.channelIdentifier)
+                try await TeamTalkClient.shared.kickUser(user, fromChannel: channel)
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     func kickAndBanUser() {
-        kickban_cmdid = TeamTalkClient.shared.kickUser(id: userid, fromChannelID: 0)
-    }
-}
+        Task { [weak self] in
+            guard let self else { return }
 
-extension UserDetailModel: TeamTalkEvent {
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
-        case CLIENTEVENT_CMD_SUCCESS:
-            if m.nSource == kickban_cmdid {
-                TeamTalkClient.shared.banUser(id: userid, fromChannelID: 0)
+            do {
+                let user = currentUser
+                try await TeamTalkClient.shared.kickUser(user)
+                try await TeamTalkClient.shared.banUser(user)
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
             }
-        case CLIENTEVENT_CMD_ERROR:
-            if m.nSource == kick_cmdid || m.nSource == kickban_cmdid {
-                errorMessage = TeamTalkString.clientError(TeamTalkMessagePayload.clientError(from: m))
-            }
-        default:
-            break
         }
     }
 }

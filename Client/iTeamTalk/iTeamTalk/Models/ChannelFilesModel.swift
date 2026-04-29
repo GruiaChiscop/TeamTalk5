@@ -26,34 +26,34 @@ import TeamTalkKit
 import UIKit
 
 struct ChannelFileRow: Identifiable, Hashable {
-    let file: RemoteFile
+    let file: TeamTalkRemoteFile
 
     var id: String {
-        "\(file.nChannelID)-\(file.nFileID)"
+        "\(file.channelIdentifier)-\(file.fileID)"
     }
 
-    var channelID: Int32 {
-        file.nChannelID
+    var channelID: TeamTalkChannelID {
+        file.channelIdentifier
     }
 
-    var fileID: Int32 {
-        file.nFileID
+    var fileID: TeamTalkFileID {
+        file.fileID
     }
 
     var name: String {
-        TeamTalkString.remoteFile(.fileName, from: file)
+        file.name
     }
 
     var username: String {
-        TeamTalkString.remoteFile(.username, from: file)
+        file.username
     }
 
     var uploadTime: String {
-        TeamTalkString.remoteFile(.uploadTime, from: file)
+        file.uploadTime
     }
 
     var formattedSize: String {
-        ByteCountFormatter.string(fromByteCount: file.nFileSize, countStyle: .file)
+        ByteCountFormatter.string(fromByteCount: file.size, countStyle: .file)
     }
 
     static func == (lhs: ChannelFileRow, rhs: ChannelFileRow) -> Bool {
@@ -66,22 +66,22 @@ struct ChannelFileRow: Identifiable, Hashable {
 }
 
 struct FileTransferRow: Identifiable {
-    let transfer: FileTransfer
+    let transfer: TeamTalkFileTransfer
 
-    var id: Int32 {
-        transfer.nTransferID
+    var id: TeamTalkTransferID {
+        transfer.transferID
     }
 
     var isDownload: Bool {
-        transfer.bInbound != 0
+        transfer.isDownload
     }
 
     var remoteFileName: String {
-        TeamTalkString.fileTransfer(.remoteFileName, from: transfer)
+        transfer.remoteFileName
     }
 
     var localFilePath: String {
-        TeamTalkString.fileTransfer(.localFilePath, from: transfer)
+        transfer.localFilePath
     }
 
     var localURL: URL? {
@@ -100,8 +100,7 @@ struct FileTransferRow: Identifiable {
     }
 
     var progress: Double {
-        guard transfer.nFileSize > 0 else { return 0 }
-        return min(1, max(0, Double(transfer.nTransferred) / Double(transfer.nFileSize)))
+        transfer.progress
     }
 
     var progressText: String {
@@ -109,8 +108,8 @@ struct FileTransferRow: Identifiable {
     }
 
     var transferredText: String {
-        let transferred = ByteCountFormatter.string(fromByteCount: transfer.nTransferred, countStyle: .file)
-        let total = ByteCountFormatter.string(fromByteCount: transfer.nFileSize, countStyle: .file)
+        let transferred = ByteCountFormatter.string(fromByteCount: transfer.transferredBytes, countStyle: .file)
+        let total = ByteCountFormatter.string(fromByteCount: transfer.fileSize, countStyle: .file)
         return "\(transferred) / \(total)"
     }
 
@@ -133,12 +132,6 @@ struct DownloadedFileRow: Identifiable {
     }
 }
 
-private enum ChannelFilesCommand {
-    case upload(URL)
-    case download(URL)
-    case delete(ChannelFileRow)
-}
-
 final class ChannelFilesModel: ObservableObject {
     @Published var files = [ChannelFileRow]()
     @Published var transfers = [FileTransferRow]()
@@ -148,9 +141,8 @@ final class ChannelFilesModel: ObservableObject {
     @Published var filePendingDownload: ChannelFileRow?
     @Published var filePendingDeletion: ChannelFileRow?
 
-    private var channelID: Int32 = 0
-    private var activeCommands = [Int32: ChannelFilesCommand]()
-    private var announcedDownloadProgress = [Int32: Set<Int>]()
+    private var channelID: TeamTalkChannelID = .none
+    private var announcedDownloadProgress = [TeamTalkTransferID: Set<Int>]()
     private var downloadSecurityScopes = [String: URL]()
     private let fileManager = FileManager.default
 
@@ -159,30 +151,28 @@ final class ChannelFilesModel: ObservableObject {
     }
 
     var canUploadFiles: Bool {
-        channelID > 0 &&
-            (TeamTalkClient.shared.myUserRights & USERRIGHT_UPLOAD_FILES.rawValue) != 0
+        channelID.isValid && TeamTalkClient.shared.hasUserRight(.canUploadFiles)
     }
 
     var canDownloadFiles: Bool {
-        channelID > 0 &&
-            (TeamTalkClient.shared.myUserRights & USERRIGHT_DOWNLOAD_FILES.rawValue) != 0
+        channelID.isValid && TeamTalkClient.shared.hasUserRight(.canDownloadFiles)
     }
 
     var hasCurrentChannel: Bool {
-        channelID > 0
+        channelID.isValid
     }
 
     func refresh() {
-        channelID = TeamTalkClient.shared.myChannelID
+        channelID = TeamTalkClient.shared.myChannelIdentifier
         updateChannelTitle()
 
-        guard channelID > 0 else {
+        guard channelID.isValid else {
             files = []
             transfers = []
             return
         }
 
-        files = TeamTalkClient.shared.channelFiles(in: channelID)
+        files = TeamTalkClient.shared.remoteFiles(in: channelID)
             .map(ChannelFileRow.init)
             .sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
@@ -197,13 +187,18 @@ final class ChannelFilesModel: ObservableObject {
 
         do {
             let localURL = try prepareUploadFile(from: url)
-            let cmdid = TeamTalkClient.shared.uploadFile(at: localURL, toChannelID: channelID)
-            guard cmdid > 0 else {
-                try? fileManager.removeItem(at: localURL)
-                errorMessage = String(format: String(localized: "Failed to upload file %@", comment: "files"), localURL.lastPathComponent)
-                return
+            let targetChannelID = channelID
+
+            Task { [weak self] in
+                do {
+                    try await TeamTalkClient.shared.uploadFile(at: localURL, toChannelID: targetChannelID)
+                } catch {
+                    try? self?.fileManager.removeItem(at: localURL)
+                    await MainActor.run {
+                        self?.errorMessage = error.localizedDescription
+                    }
+                }
             }
-            activeCommands[cmdid] = .upload(localURL)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -246,22 +241,21 @@ final class ChannelFilesModel: ObservableObject {
 
         do {
             let localURL = try uniqueFileURL(in: directoryURL, filename: file.name)
-            let cmdid = TeamTalkClient.shared.downloadFile(
-                channelID: file.channelID,
-                fileID: file.fileID,
-                to: localURL
-            )
-            guard cmdid > 0 else {
-                if didAccess {
-                    directoryURL.stopAccessingSecurityScopedResource()
-                }
-                errorMessage = String(format: String(localized: "Failed to download file %@", comment: "files"), file.name)
-                return
-            }
             if didAccess {
                 downloadSecurityScopes[localURL.path] = directoryURL
             }
-            activeCommands[cmdid] = .download(localURL)
+
+            Task { [weak self] in
+                do {
+                    try await TeamTalkClient.shared.downloadFile(file.file, to: localURL)
+                } catch {
+                    try? self?.fileManager.removeItem(at: localURL)
+                    self?.releaseDownloadSecurityScope(for: localURL)
+                    await MainActor.run {
+                        self?.errorMessage = error.localizedDescription
+                    }
+                }
+            }
         } catch {
             if didAccess {
                 directoryURL.stopAccessingSecurityScopedResource()
@@ -275,13 +269,17 @@ final class ChannelFilesModel: ObservableObject {
     }
 
     func confirmDelete(_ file: ChannelFileRow) {
-        let cmdid = TeamTalkClient.shared.deleteFile(channelID: file.channelID, fileID: file.fileID)
-        guard cmdid > 0 else {
-            errorMessage = String(format: String(localized: "Failed to delete file %@", comment: "files"), file.name)
-            return
-        }
-        activeCommands[cmdid] = .delete(file)
         filePendingDeletion = nil
+
+        Task { [weak self] in
+            do {
+                try await TeamTalkClient.shared.deleteFile(file.file)
+            } catch {
+                await MainActor.run {
+                    self?.errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     func cancelTransfer(_ transfer: FileTransferRow) {
@@ -296,7 +294,7 @@ final class ChannelFilesModel: ObservableObject {
     }
 
     private func updateChannelTitle() {
-        guard channelID > 0 else {
+        guard channelID.isValid else {
             channelTitle = String(localized: "Files", comment: "files")
             return
         }
@@ -354,18 +352,18 @@ final class ChannelFilesModel: ObservableObject {
         return candidate
     }
 
-    private func updateTransfer(_ transfer: FileTransfer) {
+    private func updateTransfer(_ transfer: TeamTalkFileTransfer) {
         let row = FileTransferRow(transfer: transfer)
 
-        switch transfer.nStatus {
-        case FILETRANSFER_ACTIVE:
+        switch transfer.status {
+        case .active:
             if let index = transfers.firstIndex(where: { $0.id == row.id }) {
                 transfers[index] = row
             } else {
                 transfers.append(row)
             }
             announceDownloadProgressIfNeeded(for: row)
-        case FILETRANSFER_FINISHED:
+        case .finished:
             removeTransfer(id: row.id)
             if row.isDownload, let localURL = row.localURL {
                 downloadedFiles.insert(DownloadedFileRow(url: localURL), at: 0)
@@ -375,11 +373,11 @@ final class ChannelFilesModel: ObservableObject {
                 cleanupUploadCopy(for: row)
                 refresh()
             }
-        case FILETRANSFER_ERROR:
+        case .error:
             removeTransfer(id: row.id)
             cleanupTransferFile(for: row)
             errorMessage = String(format: String(localized: "File transfer failed: %@", comment: "files"), row.remoteFileName)
-        case FILETRANSFER_CLOSED:
+        case .closed:
             removeTransfer(id: row.id)
             cleanupTransferFile(for: row)
         default:
@@ -404,7 +402,7 @@ final class ChannelFilesModel: ObservableObject {
         try? fileManager.removeItem(at: localURL)
     }
 
-    private func removeTransfer(id: Int32) {
+    private func removeTransfer(id: TeamTalkTransferID) {
         transfers.removeAll { $0.id == id }
     }
 
@@ -415,7 +413,7 @@ final class ChannelFilesModel: ObservableObject {
 
     private func announceDownloadProgressIfNeeded(for transfer: FileTransferRow) {
         guard transfer.isDownload else { return }
-        guard transfer.transfer.nFileSize > 0 else { return }
+        guard transfer.transfer.fileSize > 0 else { return }
 
         let percent = Int(transfer.progress * 100)
         let thresholds = [25, 50, 75]
@@ -467,44 +465,21 @@ final class ChannelFilesModel: ObservableObject {
         return error.domain == NSCocoaErrorDomain && error.code == NSUserCancelledError
     }
 
-    private func commandFailed(_ command: ChannelFilesCommand) {
-        switch command {
-        case .upload(let url):
-            try? fileManager.removeItem(at: url)
-        case .download(let url):
-            try? fileManager.removeItem(at: url)
-            releaseDownloadSecurityScope(for: url)
-        case .delete:
-            break
-        }
-    }
 }
 
 extension ChannelFilesModel: TeamTalkEvent {
     func handleTTMessage(_ m: TTMessage) {
         switch m.nClientEvent {
         case CLIENTEVENT_CON_LOST:
-            channelID = 0
+            channelID = .none
             files = []
             cleanupActiveTransfers()
             downloadedFiles = []
             filePendingDownload = nil
             filePendingDeletion = nil
-            activeCommands.removeAll()
             announcedDownloadProgress.removeAll()
             releaseAllDownloadSecurityScopes()
             updateChannelTitle()
-
-        case CLIENTEVENT_CMD_PROCESSING:
-            if !TeamTalkMessagePayload.isActive(m) {
-                activeCommands.removeValue(forKey: m.nSource)
-            }
-
-        case CLIENTEVENT_CMD_ERROR:
-            if let command = activeCommands.removeValue(forKey: m.nSource) {
-                commandFailed(command)
-                errorMessage = TeamTalkString.clientError(TeamTalkMessagePayload.clientError(from: m))
-            }
 
         case CLIENTEVENT_CMD_USER_JOINED:
             let user = TeamTalkMessagePayload.user(from: m)
@@ -515,7 +490,7 @@ extension ChannelFilesModel: TeamTalkEvent {
         case CLIENTEVENT_CMD_USER_LEFT:
             let user = TeamTalkMessagePayload.user(from: m)
             if user.nUserID == TeamTalkClient.shared.myUserID {
-                channelID = 0
+                channelID = .none
                 files = []
                 cleanupActiveTransfers()
                 filePendingDownload = nil
@@ -525,20 +500,20 @@ extension ChannelFilesModel: TeamTalkEvent {
 
         case CLIENTEVENT_CMD_CHANNEL_UPDATE:
             let channel = TeamTalkMessagePayload.channel(from: m)
-            if channel.nChannelID == channelID {
+            if channel.channelID == channelID {
                 updateChannelTitle()
             }
 
         case CLIENTEVENT_CMD_FILE_NEW, CLIENTEVENT_CMD_FILE_REMOVE:
             playSound(.file_UPDATE)
-            let file = TeamTalkMessagePayload.remoteFile(from: m)
-            if file.nChannelID == channelID {
+            let file = TeamTalkRemoteFile(TeamTalkMessagePayload.remoteFile(from: m))
+            if file.channelIdentifier == channelID {
                 refresh()
             }
 
         case CLIENTEVENT_FILETRANSFER:
             playSound(.file_COMPLETE)
-            updateTransfer(TeamTalkMessagePayload.fileTransfer(from: m))
+            updateTransfer(TeamTalkFileTransfer(TeamTalkMessagePayload.fileTransfer(from: m)))
 
         default:
             break

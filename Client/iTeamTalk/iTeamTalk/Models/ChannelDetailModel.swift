@@ -28,8 +28,6 @@ final class ChannelDetailModel: ObservableObject {
     var channel: Channel
     let isExistingChannel: Bool
 
-    private var cmdid: INT32 = 0
-
     @Published var nameText: String
     @Published var passwordText: String
     @Published var topicText: String
@@ -79,10 +77,26 @@ final class ChannelDetailModel: ObservableObject {
 
     func createOrUpdate() {
         apply()
-        if channel.nChannelID == 0 {
-            cmdid = TeamTalkClient.shared.join(channel: &channel)
-        } else {
-            cmdid = TeamTalkClient.shared.update(channel: &channel)
+        let channelSnapshot = TeamTalkChannel(channel)
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                if channel.nChannelID == 0 {
+                    try await TeamTalkClient.shared.join(channelSnapshot)
+                } else {
+                    try await TeamTalkClient.shared.updateChannel(channelSnapshot)
+                }
+
+                await MainActor.run {
+                    self.shouldDismiss = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
 
@@ -91,16 +105,62 @@ final class ChannelDetailModel: ObservableObject {
             joinPassword = passwordText
             showingJoinAlert = true
         } else {
-            cmdid = TeamTalkClient.shared.joinChannel(id: channel.nChannelID)
+            let channelID = TeamTalkChannel(channel).channelID
+
+            Task { [weak self] in
+                guard let self else { return }
+
+                do {
+                    try await TeamTalkClient.shared.joinChannel(withID: channelID)
+                    await MainActor.run {
+                        self.shouldDismiss = true
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                    }
+                }
+            }
         }
     }
 
     func joinWithPassword() {
-        cmdid = TeamTalkClient.shared.joinChannel(id: channel.nChannelID, password: joinPassword)
+        let channelID = TeamTalkChannel(channel).channelID
+        let password = joinPassword
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await TeamTalkClient.shared.joinChannel(withID: channelID, password: password)
+                await MainActor.run {
+                    self.shouldDismiss = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     func deleteChannel() {
-        cmdid = TeamTalkClient.shared.removeChannel(id: channel.nChannelID)
+        let channelSnapshot = TeamTalkChannel(channel)
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await TeamTalkClient.shared.removeChannel(channelSnapshot)
+                await MainActor.run {
+                    self.shouldDismiss = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     func makeAudioCodecModel() -> AudioCodecModel {
@@ -206,25 +266,4 @@ final class ChannelDetailModel: ObservableObject {
 
 extension ChannelDetailModel: Identifiable {
     var id: ObjectIdentifier { ObjectIdentifier(self) }
-}
-
-extension ChannelDetailModel: TeamTalkEvent {
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
-        case CLIENTEVENT_CMD_SUCCESS:
-            if m.nSource == cmdid {
-                shouldDismiss = true
-            }
-        case CLIENTEVENT_CMD_ERROR:
-            if m.nSource == cmdid {
-                errorMessage = TeamTalkString.clientError(TeamTalkMessagePayload.clientError(from: m))
-            }
-        case CLIENTEVENT_CMD_PROCESSING:
-            if !TeamTalkMessagePayload.isActive(m) && cmdid == m.nSource {
-                cmdid = 0
-            }
-        default:
-            break
-        }
-    }
 }

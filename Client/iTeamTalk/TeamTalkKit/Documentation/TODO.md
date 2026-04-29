@@ -16,6 +16,8 @@ Swift SDK.
   copied through `TeamTalkC`.
 - [x] Cover initial `TeamTalkEvent.Kind` decoding for common event payloads.
 - [x] Vendor TeamTalk native SDK artifacts inside the Swift package.
+- [x] Add initial async command helpers so app code can use
+  `try await` instead of manually tracking command IDs.
 - [ ] Apply the compatibility/deprecation plan from
   `Documentation/APIAudit.md` once the app migration is further along.
 - [ ] Add documentation comments to the public Swift API once the names settle.
@@ -45,8 +47,8 @@ Swift SDK.
   IDs to lightweight ID wrappers where it improves clarity.
 - Consider a dedicated `TeamTalkSession` type instead of exposing only
   `TeamTalkClient.shared`.
-- Consider async command helpers which wait for matching success/error events:
-  `try await client.joinChannel(...)`.
+- Continue expanding async command helper coverage and decide which command-ID
+  returning APIs should remain first-class for advanced workflows.
 - Consider typed event streams filtered by command ID or event kind.
 - Consider model builders for `Channel`, `UserAccount`, `ServerProperties` and
   `BannedUser` once the configuration structs grow.
@@ -76,8 +78,9 @@ Swift SDK.
 
 - Migrate iTeamTalk from raw `Channel`, `User`, `RemoteFile` and `FileTransfer`
   usage to Swift models where it improves clarity.
-- Move command tracking in the app from raw `Int32` to `TeamTalkCommandID`.
-- Migrate file tab code to `TeamTalkRemoteFile` and `TeamTalkFileTransfer`.
+- [x] Remove explicit command tracking from migrated app models by using
+  `TeamTalkKit` async helpers where practical.
+- [x] Migrate file tab code to `TeamTalkRemoteFile` and `TeamTalkFileTransfer`.
 - Migrate user rights/subscriptions checks to the Swift option sets.
 - Keep raw C escape hatches only where a TeamTalk feature has not been wrapped
   yet.
@@ -86,5 +89,5 @@ Swift SDK.
 
 - Add examples for account administration once the app has an admin UI.
 - Add examples for file browsing once the Files tab is migrated to the new API.
-- Add examples for async command helpers if they are implemented.
+- Add examples for async command helpers and model-first operations.
 - Add a generated symbol reference later, after the public API stabilizes.

@@ -8,8 +8,11 @@ ongoing migration away from the raw C API.
 
 Application code should prefer:
 
-- `TeamTalkClient` methods returning `TeamTalkCommandID` from
-  `TeamTalkClientCommands.swift`
+- `TeamTalkClient` async command helpers from
+  `TeamTalkClientAsyncCommands.swift` when the caller wants
+  `try await` semantics without manual command tracking
+- typed `TeamTalkClient` command methods from `TeamTalkClientCommands.swift`
+  when a caller explicitly needs the underlying `TeamTalkCommandID`
 - typed snapshot models such as `TeamTalkUser`, `TeamTalkChannel`,
   `TeamTalkRemoteFile`, `TeamTalkFileTransfer`, `TeamTalkTextMessage`,
   `TeamTalkServerProperties` and `TeamTalkUserAccount`
@@ -35,6 +38,8 @@ The following should remain public until the app no longer depends on them:
   `TTMessage`, `AudioCodec`, `AudioPreprocessor` and related types
 - `Int32`-based overloads in modern `TeamTalkClient` files where they support
   mixed migration and simplify bridging from older code
+- command-ID-returning overloads in `TeamTalkClientCommands.swift` for
+  workflows that still need low-level SDK-style command orchestration
 
 These APIs are still useful escape hatches, especially when an SDK feature is
 only partially wrapped or when the app still holds raw TeamTalk C values.
@@ -59,7 +64,7 @@ candidates for deprecation are:
 The deprecation pass should be additive and gentle:
 
 1. keep the raw API public
-2. add deprecation messages steering callers toward the typed overloads
+2. add deprecation messages steering callers toward the typed or async overloads
 3. only consider removal after at least one release cycle of app migration
 
 ## APIs That Should Not Be Deprecated Soon

@@ -124,11 +124,6 @@ func getXMLPath(elementStack : [String]) -> String {
 // messages received but no read (blinking)
 var unreadmessages = Set<INT32>()
 
-// types of responses
-enum Command {
-    case loginCmd, joinCmd, moveCmd, kickCmd, banCmd
-}
-
 let MAX_TEXTMESSAGES = 100
 let DEFAULT_SOUND_VU_MAX = 20 // real max is SOUND_VU_MAX
 let VOICEACT_DISABLED = 21 //DEFAULT_SOUND_VU_MAX + 1

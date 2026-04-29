@@ -200,6 +200,10 @@ public func setUserMute(user: User, stream: TeamTalkStreamTypes, muted: Bool) {
     setUserMute(userID: user.userID, stream: stream, muted: muted)
 }
 
+public func setUserMute(user: TeamTalkUser, stream: TeamTalkStreamTypes, muted: Bool) {
+    setUserMute(userID: user.userID, stream: stream, muted: muted)
+}
+
 public func setUserVolume(userID: Int32, stream: StreamType, volume: Int32) {
     TT_SetUserVolume(instance, userID, stream, volume)
 }
@@ -213,6 +217,10 @@ public func setUserVolume(userID: TeamTalkUserID, stream: TeamTalkStreamTypes, v
 }
 
 public func setUserVolume(user: User, stream: TeamTalkStreamTypes, volume: Int32) {
+    setUserVolume(userID: user.userID, stream: stream, volume: volume)
+}
+
+public func setUserVolume(user: TeamTalkUser, stream: TeamTalkStreamTypes, volume: Int32) {
     setUserVolume(userID: user.userID, stream: stream, volume: volume)
 }
 
@@ -262,6 +270,20 @@ public func setUserStereo(
     )
 }
 
+public func setUserStereo(
+    user: TeamTalkUser,
+    stream: TeamTalkStreamTypes,
+    leftSpeaker: Bool,
+    rightSpeaker: Bool
+) {
+    setUserStereo(
+        userID: user.userID,
+        stream: stream,
+        leftSpeaker: leftSpeaker,
+        rightSpeaker: rightSpeaker
+    )
+}
+
 @discardableResult
 public func subscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
     TT_DoSubscribe(instance, userID, subscriptions)
@@ -279,6 +301,11 @@ public func subscribe(userID: TeamTalkUserID, subscriptions: TeamTalkSubscriptio
 
 @discardableResult
 public func subscribe(user: User, subscriptions: TeamTalkSubscriptions) -> Int32 {
+    subscribe(userID: user.userID, subscriptions: subscriptions)
+}
+
+@discardableResult
+public func subscribe(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) -> Int32 {
     subscribe(userID: user.userID, subscriptions: subscriptions)
 }
 
@@ -302,11 +329,32 @@ public func unsubscribe(user: User, subscriptions: TeamTalkSubscriptions) -> Int
     unsubscribe(userID: user.userID, subscriptions: subscriptions)
 }
 
+@discardableResult
+public func unsubscribe(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) -> Int32 {
+    unsubscribe(userID: user.userID, subscriptions: subscriptions)
+}
+
 public func pump(_ event: ClientEvent, source: Int32) {
     TT_PumpMessage(instance, event, source)
 }
 
 public func pump(_ event: TeamTalkClientEvent, source: Int32) {
     pump(event.cValue, source: source)
+}
+
+public func pump(_ event: TeamTalkClientEvent, source: TeamTalkUserID) {
+    pump(event, source: source.cValue)
+}
+
+public func pump(_ event: TeamTalkClientEvent, source: TeamTalkChannelID) {
+    pump(event, source: source.cValue)
+}
+
+public func pump(_ event: TeamTalkClientEvent, source user: TeamTalkUser) {
+    pump(event, source: user.userID)
+}
+
+public func pump(_ event: TeamTalkClientEvent, source channel: TeamTalkChannel) {
+    pump(event, source: channel.channelID)
 }
 }

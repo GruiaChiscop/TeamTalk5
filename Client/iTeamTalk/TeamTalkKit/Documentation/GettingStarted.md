@@ -52,19 +52,22 @@ guard didStartConnection else {
 }
 ```
 
-After receiving `.connectionSucceeded`, log in:
+After receiving `.connectionSucceeded`, log in. New code should usually prefer
+the async helper:
 
 ```swift
-let loginCommandID = client.logIn(
-    nickname: "Alice",
-    username: "alice",
-    password: "secret",
-    clientName: "iTeamTalk"
-)
+Task {
+    try await client.logIn(
+        nickname: "Alice",
+        username: "alice",
+        password: "secret",
+        clientName: "iTeamTalk"
+    )
+}
 ```
 
-`loginCommandID` is a `TeamTalkCommandID`, not a raw `Int32`. It can be compared
-against command events.
+The lower-level command-returning overloads still exist when you explicitly want
+to compare `TeamTalkCommandID` values against command events.
 
 ## Poll Events
 
@@ -155,7 +158,7 @@ if let channel = client.channel(id: client.myChannelID) {
 Join by ID:
 
 ```swift
-let commandID = client.joinChannel(withID: channel.id, password: "")
+try await client.joinChannel(withID: channel.id, password: "")
 ```
 
 Create or join with a channel configuration:
@@ -169,7 +172,7 @@ let configuration = TeamTalkChannelConfiguration(
     maxUsers: 25
 )
 
-let commandID = client.join(configuration)
+try await client.join(configuration)
 ```
 
 ## Send Text Messages
@@ -178,7 +181,7 @@ Use `TeamTalkOutgoingTextMessage`. Long messages are split into multiple
 TeamTalk text-message packets automatically.
 
 ```swift
-let commandIDs = client.sendTextMessage(
+try await client.sendTextMessage(
     .channel(client.myChannelID, content: "Hello")
 )
 ```
@@ -186,7 +189,7 @@ let commandIDs = client.sendTextMessage(
 For private messages:
 
 ```swift
-client.sendTextMessage(.user(to: user.id, content: "Hi"))
+try await client.sendTextMessage(.user(to: user.id, content: "Hi"))
 ```
 
 ## Files
@@ -200,13 +203,13 @@ let files = client.remoteFiles(in: channel.id)
 Download:
 
 ```swift
-let commandID = client.downloadFile(file, to: destinationURL)
+try await client.downloadFile(file, to: destinationURL)
 ```
 
 Upload:
 
 ```swift
-let commandID = client.uploadFile(at: localURL, to: channel)
+try await client.uploadFile(at: localURL, to: channel)
 ```
 
 Track progress through `.fileTransfer` events:

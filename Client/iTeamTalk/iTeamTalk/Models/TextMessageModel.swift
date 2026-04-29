@@ -71,25 +71,40 @@ final class TextMessageModel: ObservableObject {
         let content = composedText
         guard !content.isEmpty else { return }
 
-        var msg = TextMessage()
-        msg.nFromUserID = TeamTalkClient.shared.myUserID
+        let message: TeamTalkOutgoingTextMessage
 
         if userid == 0 {
-            msg.nMsgType = MSGTYPE_CHANNEL
-            msg.nChannelID = TeamTalkClient.shared.myChannelID
+            message = .channel(TeamTalkClient.shared.myChannelIdentifier, content: content)
         } else {
-            msg.nMsgType = MSGTYPE_USER
-            msg.nToUserID = userid
+            message = .user(to: TeamTalkUserID(userid), content: content)
 
-            let user = TeamTalkClient.shared.withUser(id: msg.nFromUserID) { $0 }
+            let user = TeamTalkClient.shared.withUser(id: TeamTalkClient.shared.myUserID) { $0 }
             let name = getDisplayName(user)
-            let mymsg = MyTextMessage(fromuserid: msg.nFromUserID, nickname: name, msgtype: .PRIV_IM_MYSELF, content: content)
+            let mymsg = MyTextMessage(
+                fromuserid: TeamTalkClient.shared.myUserID,
+                nickname: name,
+                msgtype: .PRIV_IM_MYSELF,
+                content: content
+            )
             appendEventMessage(mymsg)
             delegate?.appendTextMessage(userid, txtmsg: mymsg)
         }
 
-        if TeamTalkClient.shared.sendTextMessage(msg, content: content) {
-            composedText = ""
+        Task { [weak self] in
+            do {
+                try await TeamTalkClient.shared.sendTextMessage(message)
+                await MainActor.run {
+                    self?.composedText = ""
+                }
+            } catch {
+                let text = String(
+                    format: String(localized: "Command failed: %@", comment: "log entry"),
+                    error.localizedDescription
+                )
+                await MainActor.run {
+                    self?.appendEventMessage(MyTextMessage(logmsg: text))
+                }
+            }
         }
     }
 
