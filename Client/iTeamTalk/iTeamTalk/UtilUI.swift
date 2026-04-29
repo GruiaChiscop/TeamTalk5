@@ -23,6 +23,7 @@
 
 import TeamTalkKit
 import UIKit
+import SwiftUI
 
 enum ChanSort : Int {
     case ASCENDING = 0
@@ -96,6 +97,15 @@ func limitText(_ s: String) -> String {
     return s
 }
 
+func announceForAccessibility(_ message: String) {
+    guard UIAccessibility.isVoiceOverRunning,
+          UIApplication.shared.applicationState == .active else {
+        return
+    }
+
+    UIAccessibility.post(notification: .announcement, argument: message)
+}
+
 func getDisplayName(_ user: User) -> String {
     let settings = UserDefaults.standard
     if settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME) {
@@ -108,4 +118,50 @@ func getDisplayName(_ user: User) -> String {
     }
     
     return limitText(nickname)
+}
+
+
+func formTextField(
+    _ title: LocalizedStringKey,
+    text: Binding<String>,
+    keyboardType: UIKeyboardType = .default,
+    disabled: Bool=false
+) -> some View {
+    LabeledContent {
+        TextField("", text: text)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .multilineTextAlignment(.trailing)
+            .autocorrectionDisabled()
+            .textInputAutocapitalization(.never)
+            .keyboardType(keyboardType)
+            .disabled(disabled)
+            .accessibilityLabel(Text(title))
+    } label: {
+        Text(title)
+            .accessibilityHidden(true)
+    }
+}
+
+func formPasswordField(
+    _ title: LocalizedStringKey,
+    text: Binding<String>,
+    isRevealed: Bool=false
+) -> some View {
+    LabeledContent {
+        Group {
+            if isRevealed {
+                TextField("", text: text)
+                    .autocorrectionDisabled()
+            } else {
+                SecureField("", text: text)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .multilineTextAlignment(.trailing)
+        .textInputAutocapitalization(.never)
+        .accessibilityLabel(Text(title))
+    } label: {
+        Text(title)
+            .accessibilityHidden(true)
+    }
 }

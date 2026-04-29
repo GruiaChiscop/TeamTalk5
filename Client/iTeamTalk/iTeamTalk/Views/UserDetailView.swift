@@ -29,12 +29,22 @@ struct UserDetailView: View {
     var body: some View {
         Form {
             Section("General") {
-                TextField("Username", text: $model.usernameText)
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .textInputAutocapitalization(.never)
-                    .disabled(true)
-            }
+                VStack(alignment: .leading) {
+                Text("Username")
+                    Text(model.usernameText)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Username")
+                .accessibilityValue(model.usernameText)
+                VStack(alignment: .leading) {
+                    Text("User ID")
+                    Text(String(model.userid))
+                }
+                .accessibilityLabel("User ID")
+                .accessibilityValue(String(model.userid))
+                .accessibilityElement(children: .combine)
+                //todo: add TeamTalk client version
+                            }
 
             Section("Volume Controls") {
                 VStack(alignment: .leading, spacing: 8) {
