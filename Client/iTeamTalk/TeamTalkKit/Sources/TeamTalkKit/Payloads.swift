@@ -46,12 +46,24 @@ public enum TeamTalkChannelStringProperty {
 
 public enum TeamTalkServerStringProperty {
     case name
+    case messageOfTheDay
+    case rawMessageOfTheDay
+    case version
+    case protocolVersion
     case accessToken
 
     var cValue: TTKitServerStringProperty {
         switch self {
         case .name:
             return TTKitServerStringName
+        case .messageOfTheDay:
+            return TTKitServerStringMessageOfTheDay
+        case .rawMessageOfTheDay:
+            return TTKitServerStringRawMessageOfTheDay
+        case .version:
+            return TTKitServerStringVersion
+        case .protocolVersion:
+            return TTKitServerStringProtocolVersion
         case .accessToken:
             return TTKitServerStringAccessToken
         }
@@ -59,12 +71,53 @@ public enum TeamTalkServerStringProperty {
 }
 
 public enum TeamTalkUserAccountStringProperty {
+    case username
+    case password
     case initialChannel
+    case note
+    case lastModified
+    case lastLoginTime
 
     var cValue: TTKitUserAccountStringProperty {
         switch self {
+        case .username:
+            return TTKitUserAccountStringUsername
+        case .password:
+            return TTKitUserAccountStringPassword
         case .initialChannel:
             return TTKitUserAccountStringInitialChannel
+        case .note:
+            return TTKitUserAccountStringNote
+        case .lastModified:
+            return TTKitUserAccountStringLastModified
+        case .lastLoginTime:
+            return TTKitUserAccountStringLastLoginTime
+        }
+    }
+}
+
+public enum TeamTalkBannedUserStringProperty {
+    case ipAddress
+    case channelPath
+    case banTime
+    case nickname
+    case username
+    case owner
+
+    var cValue: TTKitBannedUserStringProperty {
+        switch self {
+        case .ipAddress:
+            return TTKitBannedUserStringIPAddress
+        case .channelPath:
+            return TTKitBannedUserStringChannelPath
+        case .banTime:
+            return TTKitBannedUserStringBanTime
+        case .nickname:
+            return TTKitBannedUserStringNickname
+        case .username:
+            return TTKitBannedUserStringUsername
+        case .owner:
+            return TTKitBannedUserStringOwner
         }
     }
 }
@@ -133,9 +186,19 @@ public enum TeamTalkMessagePayload {
         return TTKitMessageServerProperties(&message)
     }
 
+    public static func serverStatistics(from message: TTMessage) -> ServerStatistics {
+        var message = message
+        return TTKitMessageServerStatistics(&message)
+    }
+
     public static func userAccount(from message: TTMessage) -> UserAccount {
         var message = message
         return TTKitMessageUserAccount(&message)
+    }
+
+    public static func bannedUser(from message: TTMessage) -> BannedUser {
+        var message = message
+        return TTKitMessageBannedUser(&message)
     }
 
     public static func clientError(from message: TTMessage) -> ClientErrorMsg {
@@ -199,6 +262,11 @@ public enum TeamTalkString {
         return String(cString: TTKitGetUserAccountString(property.cValue, &userAccount))
     }
 
+    public static func bannedUser(_ property: TeamTalkBannedUserStringProperty, from bannedUser: BannedUser) -> String {
+        var bannedUser = bannedUser
+        return String(cString: TTKitGetBannedUserString(property.cValue, &bannedUser))
+    }
+
     public static func remoteFile(_ property: TeamTalkRemoteFileStringProperty, from remoteFile: RemoteFile) -> String {
         var remoteFile = remoteFile
         return String(cString: TTKitGetRemoteFileString(property.cValue, &remoteFile))
@@ -211,6 +279,18 @@ public enum TeamTalkString {
 
     public static func setChannel(_ property: TeamTalkChannelStringProperty, on channel: inout Channel, to string: String) {
         TTKitSetChannelString(property.cValue, &channel, string)
+    }
+
+    public static func setServerProperties(_ property: TeamTalkServerStringProperty, on serverProperties: inout ServerProperties, to string: String) {
+        TTKitSetServerPropertiesString(property.cValue, &serverProperties, string)
+    }
+
+    public static func setUserAccount(_ property: TeamTalkUserAccountStringProperty, on userAccount: inout UserAccount, to string: String) {
+        TTKitSetUserAccountString(property.cValue, &userAccount, string)
+    }
+
+    public static func setBannedUser(_ property: TeamTalkBannedUserStringProperty, on bannedUser: inout BannedUser, to string: String) {
+        TTKitSetBannedUserString(property.cValue, &bannedUser, string)
     }
 
     public static func setTextMessage(_ message: inout TextMessage, to string: String) {
