@@ -45,6 +45,11 @@ public func joinChannel(_ channel: Channel, password: String = "") -> TeamTalkCo
 }
 
 @discardableResult
+public func joinChannel(_ channel: TeamTalkChannel, password: String = "") -> TeamTalkCommandID {
+    joinChannel(withID: channel.channelID, password: password)
+}
+
+@discardableResult
 public func leaveChannel() -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoLeaveChannel(instance))
 }
@@ -83,6 +88,11 @@ public func removeChannel(_ channel: Channel) -> TeamTalkCommandID {
 }
 
 @discardableResult
+public func removeChannel(_ channel: TeamTalkChannel) -> TeamTalkCommandID {
+    removeChannel(withID: channel.channelID)
+}
+
+@discardableResult
 public func setNickname(_ nickname: String) -> TeamTalkCommandID {
     TeamTalkCommandID(changeNickname(nickname))
 }
@@ -112,6 +122,11 @@ public func setChannelOperator(userID: TeamTalkUserID, channelID: TeamTalkChanne
 
 @discardableResult
 public func setChannelOperator(user: User, channel: Channel, enabled: Bool) -> TeamTalkCommandID {
+    setChannelOperator(userID: user.userID, channelID: channel.channelID, enabled: enabled)
+}
+
+@discardableResult
+public func setChannelOperator(user: TeamTalkUser, channel: TeamTalkChannel, enabled: Bool) -> TeamTalkCommandID {
     setChannelOperator(userID: user.userID, channelID: channel.channelID, enabled: enabled)
 }
 
@@ -151,6 +166,21 @@ public func setChannelOperator(
 }
 
 @discardableResult
+public func setChannelOperator(
+    user: TeamTalkUser,
+    channel: TeamTalkChannel,
+    operatorPassword: String,
+    enabled: Bool
+) -> TeamTalkCommandID {
+    setChannelOperator(
+        userID: user.userID,
+        channelID: channel.channelID,
+        operatorPassword: operatorPassword,
+        enabled: enabled
+    )
+}
+
+@discardableResult
 public func kickUser(withID userID: Int32, fromChannelID channelID: Int32 = 0) -> TeamTalkCommandID {
     TeamTalkCommandID(kickUser(id: userID, fromChannelID: channelID))
 }
@@ -162,6 +192,11 @@ public func kickUser(withID userID: TeamTalkUserID, fromChannelID channelID: Tea
 
 @discardableResult
 public func kickUser(_ user: User, fromChannel channel: Channel? = nil) -> TeamTalkCommandID {
+    kickUser(withID: user.userID, fromChannelID: channel?.channelID ?? .none)
+}
+
+@discardableResult
+public func kickUser(_ user: TeamTalkUser, fromChannel channel: TeamTalkChannel? = nil) -> TeamTalkCommandID {
     kickUser(withID: user.userID, fromChannelID: channel?.channelID ?? .none)
 }
 
@@ -181,6 +216,11 @@ public func banUser(_ user: User, fromChannel channel: Channel? = nil) -> TeamTa
 }
 
 @discardableResult
+public func banUser(_ user: TeamTalkUser, fromChannel channel: TeamTalkChannel? = nil) -> TeamTalkCommandID {
+    banUser(withID: user.userID, fromChannelID: channel?.channelID ?? .none)
+}
+
+@discardableResult
 public func banUser(withID userID: Int32, types: TeamTalkBanTypes) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoBanUserEx(instance, userID, types.cValue))
 }
@@ -192,6 +232,11 @@ public func banUser(withID userID: TeamTalkUserID, types: TeamTalkBanTypes) -> T
 
 @discardableResult
 public func banUser(_ user: User, types: TeamTalkBanTypes) -> TeamTalkCommandID {
+    banUser(withID: user.userID, types: types)
+}
+
+@discardableResult
+public func banUser(_ user: TeamTalkUser, types: TeamTalkBanTypes) -> TeamTalkCommandID {
     banUser(withID: user.userID, types: types)
 }
 
@@ -253,6 +298,11 @@ public func moveUser(_ user: User, to channel: Channel) -> TeamTalkCommandID {
 }
 
 @discardableResult
+public func moveUser(_ user: TeamTalkUser, to channel: TeamTalkChannel) -> TeamTalkCommandID {
+    moveUser(withID: user.userID, toChannelID: channel.channelID)
+}
+
+@discardableResult
 public func uploadFileCommand(at localURL: URL, toChannelID channelID: Int32) -> TeamTalkCommandID {
     TeamTalkCommandID(uploadFile(at: localURL, toChannelID: channelID))
 }
@@ -293,6 +343,11 @@ public func downloadFile(_ file: TeamTalkRemoteFile, to localURL: URL) -> TeamTa
 }
 
 @discardableResult
+public func downloadFileCommand(_ file: TeamTalkRemoteFile, to localURL: URL) -> TeamTalkCommandID {
+    downloadFileCommand(channelID: file.channelIdentifier, fileID: file.fileID, to: localURL)
+}
+
+@discardableResult
 public func deleteFileCommand(channelID: Int32, fileID: Int32) -> TeamTalkCommandID {
     TeamTalkCommandID(deleteFile(channelID: channelID, fileID: fileID))
 }
@@ -313,6 +368,11 @@ public func deleteFile(_ file: TeamTalkRemoteFile) -> TeamTalkCommandID {
 }
 
 @discardableResult
+public func deleteFileCommand(_ file: TeamTalkRemoteFile) -> TeamTalkCommandID {
+    deleteFileCommand(channelID: file.channelIdentifier, fileID: file.fileID)
+}
+
+@discardableResult
 public func subscribeCommand(userID: Int32, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoSubscribe(instance, userID, subscriptions.cValue))
 }
@@ -328,6 +388,11 @@ public func subscribeCommand(user: User, subscriptions: TeamTalkSubscriptions) -
 }
 
 @discardableResult
+public func subscribeCommand(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
+    subscribeCommand(userID: user.userID, subscriptions: subscriptions)
+}
+
+@discardableResult
 public func unsubscribeCommand(userID: Int32, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoUnsubscribe(instance, userID, subscriptions.cValue))
 }
@@ -339,6 +404,11 @@ public func unsubscribeCommand(userID: TeamTalkUserID, subscriptions: TeamTalkSu
 
 @discardableResult
 public func unsubscribeCommand(user: User, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
+    unsubscribeCommand(userID: user.userID, subscriptions: subscriptions)
+}
+
+@discardableResult
+public func unsubscribeCommand(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) -> TeamTalkCommandID {
     unsubscribeCommand(userID: user.userID, subscriptions: subscriptions)
 }
 

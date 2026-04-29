@@ -19,6 +19,20 @@ final class TeamTalkEventTests: XCTestCase {
         }
     }
 
+    func testConnectionMaxPayloadUpdatedUsesPayloadSize() {
+        var message = TTMessage()
+        message.event = .connectionMaxPayloadUpdated
+        message.nSource = 999
+        message.nPayloadSize = 1_472
+
+        switch TeamTalkEvent(message).kind {
+        case .connectionMaxPayloadUpdated(let maxPayloadSize):
+            XCTAssertEqual(maxPayloadSize, 1_472)
+        default:
+            XCTFail("Expected connectionMaxPayloadUpdated event")
+        }
+    }
+
     func testCommandErrorEventDecoding() {
         var message = TTMessage()
         message.event = .commandError
@@ -169,6 +183,21 @@ final class TeamTalkEventTests: XCTestCase {
             XCTAssertEqual(sessionID, TeamTalkPlaybackSessionID(23))
         default:
             XCTFail("Expected localMediaFile event")
+        }
+    }
+
+    func testHotkeyEventsUseClearLabels() {
+        var hotkeyMessage = TTMessage()
+        hotkeyMessage.event = .hotkey
+        hotkeyMessage.nSource = 17
+        hotkeyMessage.bActive = 1
+
+        switch TeamTalkEvent(hotkeyMessage).kind {
+        case .hotkey(let hotkeyID, let isActive):
+            XCTAssertEqual(hotkeyID, 17)
+            XCTAssertTrue(isActive)
+        default:
+            XCTFail("Expected hotkey event")
         }
     }
 }

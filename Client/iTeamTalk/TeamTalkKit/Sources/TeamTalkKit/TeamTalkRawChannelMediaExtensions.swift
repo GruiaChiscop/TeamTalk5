@@ -481,6 +481,10 @@ public extension TTMessage {
         nSource
     }
 
+    var payloadSize: Int32 {
+        nPayloadSize
+    }
+
     var event: TeamTalkClientEvent {
         get { TeamTalkClientEvent(cValue: nClientEvent) }
         set { nClientEvent = newValue.cValue }

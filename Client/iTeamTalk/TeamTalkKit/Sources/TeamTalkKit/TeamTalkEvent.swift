@@ -18,7 +18,7 @@ public extension TeamTalkEvent {
         case connectionEncryptionError(TeamTalkClientError)
         case connectionFailed
         case connectionLost
-        case connectionMaxPayloadUpdated(source: Int32)
+        case connectionMaxPayloadUpdated(maxPayloadSize: Int32)
         case commandProcessing(commandID: TeamTalkCommandID, isActive: Bool)
         case commandError(commandID: TeamTalkCommandID, error: TeamTalkClientError)
         case commandSucceeded(commandID: TeamTalkCommandID)
@@ -52,7 +52,7 @@ public extension TeamTalkEvent {
         case userAudioBlock(userID: TeamTalkUserID, streamType: TeamTalkStreamTypes)
         case internalError(TeamTalkClientError)
         case voiceActivation(isActive: Bool)
-        case hotkey(id: Int32, isActive: Bool)
+        case hotkey(hotkeyID: Int32, isActive: Bool)
         case hotkeyTest(keyCode: Int32, isActive: Bool)
         case fileTransfer(TeamTalkFileTransfer)
         case desktopWindowTransfer(sessionID: TeamTalkDesktopSessionID, bytesRemaining: Int32)
@@ -85,7 +85,7 @@ private extension TeamTalkEvent.Kind {
         case .connectionLost:
             self = .connectionLost
         case .connectionMaxPayloadUpdated:
-            self = .connectionMaxPayloadUpdated(source: message.source)
+            self = .connectionMaxPayloadUpdated(maxPayloadSize: message.payloadSize)
         case .commandProcessing:
             self = .commandProcessing(commandID: TeamTalkCommandID(message.source), isActive: message.isActive)
         case .commandError:
@@ -172,7 +172,7 @@ private extension TeamTalkEvent.Kind {
         case .voiceActivation:
             self = .voiceActivation(isActive: message.isActive)
         case .hotkey:
-            self = .hotkey(id: message.source, isActive: message.isActive)
+            self = .hotkey(hotkeyID: message.source, isActive: message.isActive)
         case .hotkeyTest:
             self = .hotkeyTest(keyCode: message.source, isActive: message.isActive)
         case .fileTransfer:

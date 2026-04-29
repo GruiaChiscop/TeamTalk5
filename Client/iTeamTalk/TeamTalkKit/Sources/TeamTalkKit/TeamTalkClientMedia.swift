@@ -83,6 +83,14 @@ public func setUserMediaStorage(
 }
 
 @discardableResult
+public func setUserMediaStorage(
+    user: TeamTalkUser,
+    configuration: TeamTalkUserMediaStorageConfiguration
+) -> Bool {
+    setUserMediaStorage(userID: user.userID, configuration: configuration)
+}
+
+@discardableResult
 public func disableUserMediaStorage(userID: Int32) -> Bool {
     setUserMediaStorage(userID: userID, directoryURL: nil, audioFileFormat: .none)
 }
@@ -94,6 +102,11 @@ public func disableUserMediaStorage(userID: TeamTalkUserID) -> Bool {
 
 @discardableResult
 public func disableUserMediaStorage(user: User) -> Bool {
+    disableUserMediaStorage(userID: user.userID)
+}
+
+@discardableResult
+public func disableUserMediaStorage(user: TeamTalkUser) -> Bool {
     disableUserMediaStorage(userID: user.userID)
 }
 
@@ -136,6 +149,15 @@ public func startRecordingMuxedAudioFile(
 @discardableResult
 public func startRecordingMuxedAudioFile(
     in channel: Channel,
+    to fileURL: URL,
+    audioFileFormat: TeamTalkAudioFileFormat
+) -> Bool {
+    startRecordingMuxedAudioFile(channelID: channel.channelID, to: fileURL, audioFileFormat: audioFileFormat)
+}
+
+@discardableResult
+public func startRecordingMuxedAudioFile(
+    in channel: TeamTalkChannel,
     to fileURL: URL,
     audioFileFormat: TeamTalkAudioFileFormat
 ) -> Bool {
@@ -188,6 +210,11 @@ public func stopRecordingMuxedAudioFile(channelID: TeamTalkChannelID) -> Bool {
 
 @discardableResult
 public func stopRecordingMuxedAudioFile(in channel: Channel) -> Bool {
+    stopRecordingMuxedAudioFile(channelID: channel.channelID)
+}
+
+@discardableResult
+public func stopRecordingMuxedAudioFile(in channel: TeamTalkChannel) -> Bool {
     stopRecordingMuxedAudioFile(channelID: channel.channelID)
 }
 

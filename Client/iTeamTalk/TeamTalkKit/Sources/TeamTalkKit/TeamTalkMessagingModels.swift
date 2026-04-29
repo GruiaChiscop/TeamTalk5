@@ -131,12 +131,28 @@ public struct TeamTalkOutgoingTextMessage {
         user(to: userID.cValue, content: content)
     }
 
+    public static func user(to user: User, content: String) -> TeamTalkOutgoingTextMessage {
+        TeamTalkOutgoingTextMessage.user(to: user.userID, content: content)
+    }
+
+    public static func user(to user: TeamTalkUser, content: String) -> TeamTalkOutgoingTextMessage {
+        TeamTalkOutgoingTextMessage.user(to: user.userID, content: content)
+    }
+
     public static func channel(_ channelID: Int32, content: String) -> TeamTalkOutgoingTextMessage {
         TeamTalkOutgoingTextMessage(type: .channel, channelID: channelID, content: content)
     }
 
     public static func channel(_ channelID: TeamTalkChannelID, content: String) -> TeamTalkOutgoingTextMessage {
         channel(channelID.cValue, content: content)
+    }
+
+    public static func channel(_ channel: Channel, content: String) -> TeamTalkOutgoingTextMessage {
+        TeamTalkOutgoingTextMessage.channel(channel.channelID, content: content)
+    }
+
+    public static func channel(_ channel: TeamTalkChannel, content: String) -> TeamTalkOutgoingTextMessage {
+        TeamTalkOutgoingTextMessage.channel(channel.channelID, content: content)
     }
 
     public static func broadcast(content: String) -> TeamTalkOutgoingTextMessage {

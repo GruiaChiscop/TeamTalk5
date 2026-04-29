@@ -82,6 +82,10 @@ public func channelPath(for channel: Channel) -> TeamTalkChannelPath? {
     channelPath(id: channel.channelID)
 }
 
+public func channelPath(for channel: TeamTalkChannel) -> TeamTalkChannelPath? {
+    channelPath(id: channel.channelID)
+}
+
 public func isChannelOperator(userID: Int32? = nil, channelID: Int32) -> Bool {
     TT_IsChannelOperator(instance, userID ?? myUserID, channelID) != 0
 }
@@ -91,6 +95,10 @@ public func isChannelOperator(userID: TeamTalkUserID? = nil, channelID: TeamTalk
 }
 
 public func isChannelOperator(user: User? = nil, channel: Channel) -> Bool {
+    isChannelOperator(userID: user?.userID, channelID: channel.channelID)
+}
+
+public func isChannelOperator(user: TeamTalkUser? = nil, channel: TeamTalkChannel) -> Bool {
     isChannelOperator(userID: user?.userID, channelID: channel.channelID)
 }
 
@@ -110,6 +118,10 @@ public func withChannel<T>(id channelID: TeamTalkChannelID, _ body: (inout Chann
     withChannel(id: channelID.cValue, body)
 }
 
+public func withChannel<T>(_ channel: TeamTalkChannel, _ body: (inout Channel) -> T) -> T {
+    withChannel(id: channel.channelID, body)
+}
+
 public func withUser<T>(id userID: Int32, _ body: (inout User) -> T) -> T {
     var user = User()
     TT_GetUser(instance, userID, &user)
@@ -118,6 +130,10 @@ public func withUser<T>(id userID: Int32, _ body: (inout User) -> T) -> T {
 
 public func withUser<T>(id userID: TeamTalkUserID, _ body: (inout User) -> T) -> T {
     withUser(id: userID.cValue, body)
+}
+
+public func withUser<T>(_ user: TeamTalkUser, _ body: (inout User) -> T) -> T {
+    withUser(id: user.userID, body)
 }
 
 public func serverProperties() -> TeamTalkServerProperties? {
@@ -213,12 +229,28 @@ public func userStatisticsInfo(id userID: TeamTalkUserID) -> UserStatistics? {
     userStatisticsInfo(id: userID.cValue)
 }
 
+public func userStatisticsInfo(for user: User) -> UserStatistics? {
+    userStatisticsInfo(id: user.userID)
+}
+
+public func userStatisticsInfo(for user: TeamTalkUser) -> UserStatistics? {
+    userStatisticsInfo(id: user.userID)
+}
+
 public func userStatistics(id userID: Int32) -> TeamTalkUserStatistics? {
     userStatisticsInfo(id: userID).map(TeamTalkUserStatistics.init)
 }
 
 public func userStatistics(id userID: TeamTalkUserID) -> TeamTalkUserStatistics? {
     userStatistics(id: userID.cValue)
+}
+
+public func userStatistics(for user: User) -> TeamTalkUserStatistics? {
+    userStatistics(id: user.userID)
+}
+
+public func userStatistics(for user: TeamTalkUser) -> TeamTalkUserStatistics? {
+    userStatistics(id: user.userID)
 }
 
 public func serverUsers() -> [TeamTalkUser] {
@@ -292,6 +324,10 @@ public func users(inChannelID channelID: TeamTalkChannelID) -> [TeamTalkUser] {
 }
 
 public func users(in channel: Channel) -> [TeamTalkUser] {
+    users(inChannelID: channel.channelID)
+}
+
+public func users(in channel: TeamTalkChannel) -> [TeamTalkUser] {
     users(inChannelID: channel.channelID)
 }
 
@@ -373,6 +409,10 @@ public func channelFiles(in channel: Channel) -> [RemoteFile] {
     channelFiles(in: channel.channelID)
 }
 
+public func channelFiles(in channel: TeamTalkChannel) -> [RemoteFile] {
+    channelFiles(in: channel.channelID)
+}
+
 public func channelFile(channelID: Int32, fileID: Int32) -> RemoteFile? {
     guard let instance else {
         return nil
@@ -393,6 +433,10 @@ public func channelFile(in channel: Channel, fileID: TeamTalkFileID) -> RemoteFi
     channelFile(channelID: channel.channelID, fileID: fileID)
 }
 
+public func channelFile(in channel: TeamTalkChannel, fileID: TeamTalkFileID) -> RemoteFile? {
+    channelFile(channelID: channel.channelID, fileID: fileID)
+}
+
 public func remoteFiles(in channelID: Int32) -> [TeamTalkRemoteFile] {
     channelFiles(in: channelID).map(TeamTalkRemoteFile.init)
 }
@@ -405,6 +449,10 @@ public func remoteFiles(in channel: Channel) -> [TeamTalkRemoteFile] {
     remoteFiles(in: channel.channelID)
 }
 
+public func remoteFiles(in channel: TeamTalkChannel) -> [TeamTalkRemoteFile] {
+    remoteFiles(in: channel.channelID)
+}
+
 public func remoteFile(channelID: Int32, fileID: Int32) -> TeamTalkRemoteFile? {
     channelFile(channelID: channelID, fileID: fileID).map(TeamTalkRemoteFile.init)
 }
@@ -414,6 +462,10 @@ public func remoteFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> 
 }
 
 public func remoteFile(in channel: Channel, fileID: TeamTalkFileID) -> TeamTalkRemoteFile? {
+    remoteFile(channelID: channel.channelID, fileID: fileID)
+}
+
+public func remoteFile(in channel: TeamTalkChannel, fileID: TeamTalkFileID) -> TeamTalkRemoteFile? {
     remoteFile(channelID: channel.channelID, fileID: fileID)
 }
 

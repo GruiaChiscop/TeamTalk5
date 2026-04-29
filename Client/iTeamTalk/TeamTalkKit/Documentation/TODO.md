@@ -16,8 +16,8 @@ Swift SDK.
   copied through `TeamTalkC`.
 - [x] Cover initial `TeamTalkEvent.Kind` decoding for common event payloads.
 - [x] Vendor TeamTalk native SDK artifacts inside the Swift package.
-- [ ] Decide which APIs should be public compatibility APIs and which should be
-  deprecated once the app migrates to the Swift model layer.
+- [ ] Apply the compatibility/deprecation plan from
+  `Documentation/APIAudit.md` once the app migration is further along.
 - [ ] Add documentation comments to the public Swift API once the names settle.
 
 ## Wrapper Coverage Still Missing

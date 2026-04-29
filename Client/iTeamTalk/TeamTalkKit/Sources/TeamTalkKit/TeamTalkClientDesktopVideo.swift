@@ -86,6 +86,16 @@ public func sendDesktopInput(user: User, inputs: [TeamTalkDesktopInput]) -> Bool
     sendDesktopInput(userID: user.userID, inputs: inputs)
 }
 
+@discardableResult
+public func sendDesktopInput(user: TeamTalkUser, inputs: [DesktopInput]) -> Bool {
+    sendDesktopInput(userID: user.userID, inputs: inputs)
+}
+
+@discardableResult
+public func sendDesktopInput(user: TeamTalkUser, inputs: [TeamTalkDesktopInput]) -> Bool {
+    sendDesktopInput(userID: user.userID, inputs: inputs)
+}
+
 public func withAcquiredDesktopWindow<Result>(
     userID: Int32,
     _ body: (DesktopWindow) throws -> Result
@@ -109,6 +119,13 @@ public func withAcquiredDesktopWindow<Result>(
 
 public func withAcquiredDesktopWindow<Result>(
     user: User,
+    _ body: (DesktopWindow) throws -> Result
+) rethrows -> Result? {
+    try withAcquiredDesktopWindow(userID: user.userID, body)
+}
+
+public func withAcquiredDesktopWindow<Result>(
+    user: TeamTalkUser,
     _ body: (DesktopWindow) throws -> Result
 ) rethrows -> Result? {
     try withAcquiredDesktopWindow(userID: user.userID, body)
@@ -145,6 +162,14 @@ public func withAcquiredDesktopWindow<Result>(
     try withAcquiredDesktopWindow(userID: user.userID, convertTo: bitmapFormat, body)
 }
 
+public func withAcquiredDesktopWindow<Result>(
+    user: TeamTalkUser,
+    convertTo bitmapFormat: TeamTalkBitmapFormat,
+    _ body: (DesktopWindow) throws -> Result
+) rethrows -> Result? {
+    try withAcquiredDesktopWindow(userID: user.userID, convertTo: bitmapFormat, body)
+}
+
 public func acquireDesktopWindow(userID: Int32) -> TeamTalkDesktopWindow? {
     withAcquiredDesktopWindow(userID: userID) { TeamTalkDesktopWindow($0) }
 }
@@ -154,6 +179,10 @@ public func acquireDesktopWindow(userID: TeamTalkUserID) -> TeamTalkDesktopWindo
 }
 
 public func acquireDesktopWindow(user: User) -> TeamTalkDesktopWindow? {
+    acquireDesktopWindow(userID: user.userID)
+}
+
+public func acquireDesktopWindow(user: TeamTalkUser) -> TeamTalkDesktopWindow? {
     acquireDesktopWindow(userID: user.userID)
 }
 
@@ -173,6 +202,13 @@ public func acquireDesktopWindow(
 
 public func acquireDesktopWindow(
     user: User,
+    convertTo bitmapFormat: TeamTalkBitmapFormat
+) -> TeamTalkDesktopWindow? {
+    acquireDesktopWindow(userID: user.userID, convertTo: bitmapFormat)
+}
+
+public func acquireDesktopWindow(
+    user: TeamTalkUser,
     convertTo bitmapFormat: TeamTalkBitmapFormat
 ) -> TeamTalkDesktopWindow? {
     acquireDesktopWindow(userID: user.userID, convertTo: bitmapFormat)

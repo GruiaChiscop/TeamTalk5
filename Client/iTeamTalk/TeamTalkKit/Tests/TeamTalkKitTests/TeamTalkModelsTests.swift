@@ -929,6 +929,22 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(typedOutgoing.toUserIdentifier, TeamTalkUserID(9))
         typedOutgoing.channelIdentifier = TeamTalkChannelID(12)
         XCTAssertEqual(typedOutgoing.channelID, 12)
+
+        var rawUser = User()
+        rawUser.nUserID = 21
+        let typedUser = TeamTalkUser(rawUser)
+        let outgoingToRawUser = TeamTalkOutgoingTextMessage.user(to: rawUser, content: "Raw user")
+        let outgoingToTypedUser = TeamTalkOutgoingTextMessage.user(to: typedUser, content: "Typed user")
+        XCTAssertEqual(outgoingToRawUser.toUserIdentifier, TeamTalkUserID(21))
+        XCTAssertEqual(outgoingToTypedUser.toUserIdentifier, TeamTalkUserID(21))
+
+        var rawChannel = Channel()
+        rawChannel.nChannelID = 34
+        let typedChannel = TeamTalkChannel(rawChannel)
+        let outgoingToRawChannel = TeamTalkOutgoingTextMessage.channel(rawChannel, content: "Raw channel")
+        let outgoingToTypedChannel = TeamTalkOutgoingTextMessage.channel(typedChannel, content: "Typed channel")
+        XCTAssertEqual(outgoingToRawChannel.channelIdentifier, TeamTalkChannelID(34))
+        XCTAssertEqual(outgoingToTypedChannel.channelIdentifier, TeamTalkChannelID(34))
     }
 
     func testTextMessageFactorySplitsLongContent() {

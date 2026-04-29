@@ -34,6 +34,7 @@ Silicon simulator hosts.
 
 - [Getting Started](Documentation/GettingStarted.md)
 - [Advanced Usage](Documentation/Advanced.md)
+- [API Audit](Documentation/APIAudit.md)
 - [TODO](Documentation/TODO.md)
 
 ## Current API Shape
