@@ -140,6 +140,10 @@ func userCacheID(user: User) -> String {
     return ""
 }
 
+func userCacheID(user: TeamTalkUser) -> String {
+    userCacheID(user: user.rawValue)
+}
+
 class UserCached {
     var subscriptions : UINT32
     var voiceMute : Bool
@@ -185,11 +189,19 @@ func syncFromUserCache(user: User) {
     }
 }
 
+func syncFromUserCache(user: TeamTalkUser) {
+    syncFromUserCache(user: user.rawValue)
+}
+
 func syncToUserCache(user: User) {
     let cacheid = userCacheID(user: user)
     if cacheid.isEmpty == false {
         userCache[cacheid] = UserCached(user: user)
     }
+}
+
+func syncToUserCache(user: TeamTalkUser) {
+    syncToUserCache(user: user.rawValue)
 }
 
 var userCache = [String : UserCached]()

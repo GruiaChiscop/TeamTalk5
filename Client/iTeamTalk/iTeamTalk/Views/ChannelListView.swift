@@ -98,7 +98,7 @@ struct ChannelListView: View {
 
             case .user(let user):
                 let details = model.userDetails(user)
-                let isMoveSelected = model.isMoveUserSelected(userid: user.nUserID)
+                let isMoveSelected = model.isMoveUserSelected(userID: user.userID)
                 HStack(spacing: 10) {
                     Image(details.iconName)
                         .resizable()
@@ -125,7 +125,7 @@ struct ChannelListView: View {
                     }
 
                     Button {
-                        model.showTextMessages(userid: user.nUserID)
+                        model.showTextMessages(userid: user.userID.cValue)
                     } label: {
                         Image(details.messageIconName)
                             .resizable()
@@ -143,19 +143,19 @@ struct ChannelListView: View {
                     model.selectRow(.user(user))
                 }
                 .accessibilityAction(named: "Message this user") {
-                    model.showTextMessages(userid: user.nUserID)
+                    model.showTextMessages(userid: user.userID.cValue)
                 }
                 .accessibilityAction(named: "Mute") {
-                    model.muteUser(userid: user.nUserID)
+                    model.muteUser(userID: user.userID)
                 }
-                .accessibilityAction(named: model.moveUserActionTitle(userid: user.nUserID)) {
-                    model.moveUser(userid: user.nUserID)
+                .accessibilityAction(named: model.moveUserActionTitle(userID: user.userID)) {
+                    model.moveUser(userID: user.userID)
                 }
                 .accessibilityAction(named: "Kick user") {
-                    model.kickUser(userid: user.nUserID)
+                    model.kickUser(userID: user.userID)
                 }
                 .accessibilityAction(named: "Ban user") {
-                    model.banUser(userid: user.nUserID)
+                    model.banUser(userID: user.userID)
                 }
 
             case .channel(let channel):
@@ -182,7 +182,7 @@ struct ChannelListView: View {
                     Spacer(minLength: 12)
 
                     Button(details.actionTitle) {
-                        model.showChannelDetail(channelID: channel.nChannelID)
+                        model.showChannelDetail(channel)
                     }
                     .buttonStyle(.borderless)
                 }
@@ -196,10 +196,10 @@ struct ChannelListView: View {
                     model.selectRow(.channel(channel))
                 }
                 .accessibilityAction(named: "Move users here") {
-                    model.moveIntoChannel(channelID: channel.nChannelID)
+                    model.moveIntoChannel(channelID: channel.channelID)
                 }
                 .accessibilityAction(named: "Join channel") {
-                    model.joinChannelFromAccessibility(channelID: channel.nChannelID)
+                    model.joinChannelFromAccessibility(channelID: channel.channelID)
                 }
             }
         }

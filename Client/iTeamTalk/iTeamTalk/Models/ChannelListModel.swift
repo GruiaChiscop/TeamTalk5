@@ -51,14 +51,14 @@ enum ChannelListDestination: Hashable {
 
 enum ChannelListRow: Identifiable {
     case join
-    case user(User)
-    case channel(Channel)
+    case user(TeamTalkUser)
+    case channel(TeamTalkChannel)
 
     var id: String {
         switch self {
         case .join: return "join"
-        case .user(let user): return "user-\(user.nUserID)"
-        case .channel(let channel): return "channel-\(channel.nChannelID)"
+        case .user(let user): return "user-\(user.userID)"
+        case .channel(let channel): return "channel-\(channel.channelID)"
         }
     }
 }
@@ -83,24 +83,24 @@ final class ChannelListModel: ObservableObject {
     @Published var errorMessage: String?
 
     // MARK: Server / channel state
-    var channels = [INT32: Channel]()
-    var chanpasswds = [INT32: String]()
-    var curchannel = Channel()
-    var mychannel = Channel()
-    var rejoinchannel = Channel()
-    var users = [INT32: User]()
-    var moveusers = Set<INT32>()
-    var currentCmdId: INT32 = 0
+    var channels = [TeamTalkChannelID: TeamTalkChannel]()
+    var chanpasswds = [TeamTalkChannelID: String]()
+    var curchannel = TeamTalkChannel(Channel())
+    var mychannel = TeamTalkChannel(Channel())
+    var rejoinchannel: TeamTalkChannelConfiguration?
+    var users = [TeamTalkUserID: TeamTalkUser]()
+    var moveusers = Set<TeamTalkUserID>()
+    var isProcessingCommand = false
     var srvprop = ServerProperties()
     var myuseraccount = UserAccount()
     var textmessages = [INT32: [MyTextMessage]]()
     var unreadTimer: Timer?
-    var displayUsers = [User]()
-    var displayChans = [Channel]()
+    var displayUsers = [TeamTalkUser]()
+    var displayChans = [TeamTalkChannel]()
     var pttLockTimeout = Date()
 
     // MARK: Private state
-    private var joiningChannel: Channel?
+    private var joiningChannel: TeamTalkChannel?
     private weak var currentTextMessageModel: TextMessageModel?
 
     // MARK: Deinit
@@ -113,8 +113,8 @@ final class ChannelListModel: ObservableObject {
     // MARK: - Display helpers
 
     func updateDisplayItems() {
-        let subchans: [Channel] = channels.values.filter { $0.nParentID == curchannel.nChannelID }
-        let chanusers: [User] = users.values.filter { $0.nChannelID == curchannel.nChannelID }
+        let subchans: [TeamTalkChannel] = channels.values.filter { $0.parentChannelID == curchannel.channelID }
+        let chanusers: [TeamTalkUser] = users.values.filter { $0.channelIdentifier == curchannel.channelID }
 
         let settings = UserDefaults.standard
         let chansort = settings.object(forKey: PREF_DISPLAY_SORTCHANNELS) == nil
@@ -124,23 +124,23 @@ final class ChannelListModel: ObservableObject {
         switch chansort {
         case ChanSort.POPULARITY.rawValue:
             displayChans = subchans.sorted { lhs, rhs in
-                let au = users.values.filter { $0.nChannelID == lhs.nChannelID }
-                let bu = users.values.filter { $0.nChannelID == rhs.nChannelID }
-                let aname = TeamTalkString.channel(.name, from: lhs)
-                let bname = TeamTalkString.channel(.name, from: rhs)
+                let au = users.values.filter { $0.channelIdentifier == lhs.channelID }
+                let bu = users.values.filter { $0.channelIdentifier == rhs.channelID }
+                let aname = lhs.name
+                let bname = rhs.name
                 return au.count == bu.count
                     ? aname.caseInsensitiveCompare(bname) == .orderedAscending
                     : au.count > bu.count
             }
         default:
             displayChans = subchans.sorted {
-                let aname = TeamTalkString.channel(.name, from: $0)
-                let bname = TeamTalkString.channel(.name, from: $1)
+                let aname = $0.name
+                let bname = $1.name
                 return aname.caseInsensitiveCompare(bname) == .orderedAscending
             }
         }
         displayUsers = chanusers.sorted {
-            getDisplayName($0).caseInsensitiveCompare(getDisplayName($1)) == .orderedAscending
+            getDisplayName($0.rawValue).caseInsensitiveCompare(getDisplayName($1.rawValue)) == .orderedAscending
         }
     }
 
@@ -151,11 +151,11 @@ final class ChannelListModel: ObservableObject {
     }
 
     private func displayRows() -> [ChannelListRow] {
-        let showJoin = curchannel.nChannelID != mychannel.nChannelID && curchannel.nChannelID > 0
+        let showJoin = curchannel.channelID != mychannel.channelID && curchannel.channelID.isValid
         var result = [ChannelListRow]()
         if showJoin { result.append(.join) }
         for user in displayUsers { result.append(.user(user)) }
-        if curchannel.nParentID != 0, let parent = channels[curchannel.nParentID] {
+        if curchannel.parentChannelID.isValid, let parent = channels[curchannel.parentChannelID] {
             result.append(.channel(parent))
         }
         for channel in displayChans { result.append(.channel(channel)) }
@@ -163,52 +163,52 @@ final class ChannelListModel: ObservableObject {
     }
 
     func updateTitle() {
-        if curchannel.nParentID == 0 {
+        if !curchannel.parentChannelID.isValid {
             navigationTitle = TeamTalkString.serverProperties(.name, from: srvprop)
         } else {
-            navigationTitle = TeamTalkString.channel(.name, from: curchannel)
+            navigationTitle = curchannel.name
         }
     }
 
     // MARK: - User / channel detail providers
 
-    func userDetails(_ user: User) -> ChannelUserDetails {
-        let female = (UInt(user.nStatusMode) & StatusMode.STATUSMODE_FEMALE.rawValue) != 0
-        let isTalking = user.uUserState & USERSTATE_VOICE.rawValue != 0 ||
-            (TeamTalkClient.shared.myUserID == user.nUserID && TeamTalkClient.shared.isVoiceTransmitting)
+    func userDetails(_ user: TeamTalkUser) -> ChannelUserDetails {
+        let female = (UInt(user.rawValue.nStatusMode) & StatusMode.STATUSMODE_FEMALE.rawValue) != 0
+        let isTalking = user.states.contains(.voice) ||
+            (TeamTalkClient.shared.myUserIdentifier == user.userID && TeamTalkClient.shared.isVoiceTransmitting)
         let iconName = isTalking
             ? (female ? "woman_green.png" : "man_green.png")
             : (female ? "woman_blue.png" : "man_blue.png")
         let iconAccessibilityLabel = isTalking
             ? String(localized: "Talking", comment: "channel list")
             : String(localized: "Silent", comment: "channel list")
-        let messageIcon = unreadmessages.contains(user.nUserID) && Int(Date().timeIntervalSince1970) % 2 == 0
+        let messageIcon = unreadmessages.contains(user.userID.cValue) && Int(Date().timeIntervalSince1970) % 2 == 0
             ? "message_red"
             : "message_blue"
         return ChannelUserDetails(
-            title: getDisplayName(user),
-            subtitle: TeamTalkString.user(.statusMessage, from: user),
+            title: getDisplayName(user.rawValue),
+            subtitle: user.statusMessage,
             iconName: iconName,
             iconAccessibilityLabel: iconAccessibilityLabel,
             messageIconName: messageIcon
         )
     }
 
-    func channelDetails(_ channel: Channel) -> ChannelDisplayDetails {
-        let op = TeamTalkClient.shared.isChannelOperator(channelID: channel.nChannelID)
+    func channelDetails(_ channel: TeamTalkChannel) -> ChannelDisplayDetails {
+        let op = TeamTalkClient.shared.isChannelOperator(channelID: channel.channelID.cValue)
         let canEdit = (myuseraccount.uUserRights & USERRIGHT_MODIFY_CHANNELS.rawValue) != 0 || op
         let actionTitle = canEdit
             ? String(localized: "Edit", comment: "channel list")
             : String(localized: "View", comment: "channel list")
 
-        if curchannel.nChannelID == 0 {
-            let iconName = channel.bPassword != 0 ? "channel_pink.png" : "channel_orange.png"
-            let iconLabel = channel.bPassword != 0
+        if !curchannel.channelID.isValid {
+            let iconName = channel.isPasswordProtected ? "channel_pink.png" : "channel_orange.png"
+            let iconLabel = channel.isPasswordProtected
                 ? String(localized: "Password protected", comment: "channel list")
                 : String(localized: "No password", comment: "channel list")
             return ChannelDisplayDetails(
                 title: TeamTalkString.serverProperties(.name, from: srvprop),
-                subtitle: TeamTalkString.channel(.topic, from: channel),
+                subtitle: channel.topic,
                 iconName: iconName,
                 iconAccessibilityLabel: iconLabel,
                 actionTitle: actionTitle,
@@ -216,10 +216,10 @@ final class ChannelListModel: ObservableObject {
             )
         }
 
-        if channel.nChannelID == curchannel.nParentID {
-            let subtitle = channel.nParentID == 0
+        if channel.channelID == curchannel.parentChannelID {
+            let subtitle = !channel.parentChannelID.isValid
                 ? TeamTalkString.serverProperties(.name, from: srvprop)
-                : TeamTalkString.channel(.name, from: channel)
+                : channel.name
             return ChannelDisplayDetails(
                 title: String(localized: "Parent channel", comment: "channel list"),
                 subtitle: subtitle,
@@ -230,12 +230,12 @@ final class ChannelListModel: ObservableObject {
             )
         }
 
-        let userCount = getUsersCount(channel.nChannelID)
-        let iconName = channel.bPassword != 0 ? "channel_pink.png" : "channel_orange.png"
+        let userCount = getUsersCount(channel.channelID)
+        let iconName = channel.isPasswordProtected ? "channel_pink.png" : "channel_orange.png"
         let iconLabel = String(format: String(localized: "Channel. %d users", comment: "channel list"), userCount)
         return ChannelDisplayDetails(
-            title: TeamTalkString.channel(.name, from: channel) + " (\(userCount))",
-            subtitle: TeamTalkString.channel(.topic, from: channel),
+            title: channel.name + " (\(userCount))",
+            subtitle: channel.topic,
             iconName: iconName,
             iconAccessibilityLabel: iconLabel,
             actionTitle: actionTitle,
@@ -243,10 +243,10 @@ final class ChannelListModel: ObservableObject {
         )
     }
 
-    func getUsersCount(_ chanid: INT32) -> Int {
-        var count = users.values.filter { $0.nChannelID == chanid }.count
-        for c in channels.values.filter({ $0.nParentID == chanid }) {
-            count += getUsersCount(c.nChannelID)
+    func getUsersCount(_ channelID: TeamTalkChannelID) -> Int {
+        var count = users.values.filter { $0.channelIdentifier == channelID }.count
+        for channel in channels.values.filter({ $0.parentChannelID == channelID }) {
+            count += getUsersCount(channel.channelID)
         }
         return count
     }
@@ -258,7 +258,7 @@ final class ChannelListModel: ObservableObject {
         case .join:
             joinCurrentChannel()
         case .user(let user):
-            showUserDetail(userid: user.nUserID)
+            showUserDetail(user)
         case .channel(let channel):
             curchannel = channel
             refreshChannelList()
@@ -272,10 +272,10 @@ final class ChannelListModel: ObservableObject {
 
     // MARK: - Channel joining
 
-    func joinNewChannel(_ channel: Channel) {
-        if channel.bPassword == TRUE {
+    func joinNewChannel(_ channel: TeamTalkChannel) {
+        if channel.isPasswordProtected {
             joiningChannel = channel
-            joinPassword = TeamTalkString.channel(.password, from: channel)
+            joinPassword = channel.password
             showingJoinPasswordAlert = true
         } else {
             Task { [weak self] in
@@ -292,7 +292,7 @@ final class ChannelListModel: ObservableObject {
 
     func confirmJoinWithPassword() {
         guard let channel = joiningChannel else { return }
-        chanpasswds[channel.nChannelID] = joinPassword
+        chanpasswds[channel.channelID] = joinPassword
         let password = joinPassword
         joiningChannel = nil
 
@@ -307,7 +307,7 @@ final class ChannelListModel: ObservableObject {
         }
     }
 
-    func joinChannelFromAccessibility(channelID: INT32) {
+    func joinChannelFromAccessibility(channelID: TeamTalkChannelID) {
         if let channel = channels[channelID] {
             joinNewChannel(channel)
         }
@@ -315,29 +315,29 @@ final class ChannelListModel: ObservableObject {
 
     // MARK: - Accessibility actions
 
-    func muteUser(userid: INT32) {
-        guard let user = users[userid] else { return }
+    func muteUser(userID: TeamTalkUserID) {
+        guard let user = users[userID] else { return }
         TeamTalkClient.shared.setUserMute(
-            userID: userid,
+            userID: userID,
             stream: STREAMTYPE_MEDIAFILE_AUDIO,
-            muted: (user.uUserState & USERSTATE_MUTE_MEDIAFILE.rawValue) == 0
+            muted: !user.states.contains(.mediaFileMuted)
         )
         TeamTalkClient.shared.setUserMute(
-            userID: userid,
+            userID: userID,
             stream: STREAMTYPE_VOICE,
-            muted: (user.uUserState & USERSTATE_MUTE_VOICE.rawValue) == 0
+            muted: !user.states.contains(.voiceMuted)
         )
-        TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: userid)
+        TeamTalkClient.shared.pump(.userStateChanged, source: user)
     }
 
-    func moveUser(userid: INT32) {
-        guard let user = users[userid] else { return }
+    func moveUser(userID: TeamTalkUserID) {
+        guard let user = users[userID] else { return }
 
-        let isSelected = moveusers.contains(userid)
+        let isSelected = moveusers.contains(userID)
         if isSelected {
-            moveusers.remove(userid)
+            moveusers.remove(userID)
         } else {
-            moveusers.insert(userid)
+            moveusers.insert(userID)
         }
 
         refreshChannelList()
@@ -346,16 +346,16 @@ final class ChannelListModel: ObservableObject {
                 format: isSelected
                     ? String(localized: "%@ deselected", comment: "channel list")
                     : String(localized: "%@ selected", comment: "channel list"),
-                getDisplayName(user)
+                getDisplayName(user.rawValue)
             )
         )
     }
 
-    func kickUser(userid: INT32) {
-        let op = TeamTalkClient.shared.isChannelOperator(channelID: curchannel.nChannelID)
+    func kickUser(userID: TeamTalkUserID) {
+        let op = TeamTalkClient.shared.isChannelOperator(channelID: curchannel.channelID.cValue)
         guard (myuseraccount.uUserRights & USERRIGHT_KICK_USERS.rawValue) != 0 || op else { return }
-        guard let user = users[userid] else { return }
-        let channel = curchannel.nChannelID > 0 ? curchannel : nil
+        guard let user = users[userID] else { return }
+        let channel = curchannel.channelID.isValid ? curchannel : nil
 
         Task { [weak self] in
             do {
@@ -368,11 +368,11 @@ final class ChannelListModel: ObservableObject {
         }
     }
 
-    func banUser(userid: INT32) {
-        let op = TeamTalkClient.shared.isChannelOperator(channelID: curchannel.nChannelID)
+    func banUser(userID: TeamTalkUserID) {
+        let op = TeamTalkClient.shared.isChannelOperator(channelID: curchannel.channelID.cValue)
         guard (myuseraccount.uUserRights & USERRIGHT_BAN_USERS.rawValue) != 0 || op else { return }
-        guard let user = users[userid] else { return }
-        let channel = curchannel.nChannelID > 0 ? curchannel : nil
+        guard let user = users[userID] else { return }
+        let channel = curchannel.channelID.isValid ? curchannel : nil
 
         Task { [weak self] in
             do {
@@ -386,7 +386,7 @@ final class ChannelListModel: ObservableObject {
         }
     }
 
-    func moveIntoChannel(channelID: INT32) {
+    func moveIntoChannel(channelID: TeamTalkChannelID) {
         guard !moveusers.isEmpty else {
             announceForAccessibility(String(localized: "No users selected to move", comment: "channel list"))
             return
@@ -418,23 +418,16 @@ final class ChannelListModel: ObservableObject {
         }
     }
 
-    func isMoveUserSelected(userid: INT32) -> Bool {
-        moveusers.contains(userid)
+    func isMoveUserSelected(userID: TeamTalkUserID) -> Bool {
+        moveusers.contains(userID)
     }
 
-    func moveUserActionTitle(userid: INT32) -> String {
-        if isMoveUserSelected(userid: userid) {
+    func moveUserActionTitle(userID: TeamTalkUserID) -> String {
+        if isMoveUserSelected(userID: userID) {
             return String(localized: "Deselect user", comment: "channel list")
         }
         return String(localized: "Move user", comment: "channel list")
     }
-
-    /*func moveUserAccessibilityValue(userid: INT32) -> String {
-        if isMoveUserSelected(userid: userid) {
-            return String(localized: "Selected for moving", comment: "channel list")
-        }
-        return String(localized: "Not selected for moving", comment: "channel list")
-    }*/
 
     func moveDestinationAccessibilityHint() -> String {
         switch moveusers.count {
@@ -452,30 +445,29 @@ final class ChannelListModel: ObservableObject {
 
     // MARK: - Navigation
 
-    func showUserDetail(userid: INT32) {
-        let user = TeamTalkClient.shared.withUser(id: userid) { $0 }
+    func showUserDetail(_ user: TeamTalkUser) {
         let model = UserDetailModel(user: user)
         navigationPath.append(.userDetail(model))
     }
 
-    func showChannelDetail(channelID: INT32) {
-        guard var channel = channels[channelID] else { return }
-        if TeamTalkString.channel(.password, from: channel).isEmpty {
-            if let passwd = chanpasswds[channelID] {
-                TeamTalkString.setChannel(.password, on: &channel, to: passwd)
+    func showChannelDetail(_ channel: TeamTalkChannel) {
+        var rawChannel = channel.cValue
+        if TeamTalkString.channel(.password, from: rawChannel).isEmpty {
+            if let password = chanpasswds[channel.channelID] {
+                TeamTalkString.setChannel(.password, on: &rawChannel, to: password)
             }
         }
-        let model = ChannelDetailModel(channel: channel)
+        let model = ChannelDetailModel(channel: TeamTalkChannel(rawChannel))
         channelDetailModel = model
     }
 
     func showNewChannel() {
         var newChannel = Channel()
-        newChannel.nParentID = curchannel.nChannelID
+        newChannel.nParentID = curchannel.channelID.cValue
         if newChannel.nParentID == 0 {
-            let subchans = channels.values.filter { $0.nParentID == 0 }
+            let subchans = channels.values.filter { !$0.parentChannelID.isValid }
             if let root = subchans.first {
-                newChannel.nParentID = root.nChannelID
+                newChannel.nParentID = root.channelID.cValue
             }
         }
         let model = ChannelDetailModel(channel: newChannel)
@@ -555,14 +547,18 @@ final class ChannelListModel: ObservableObject {
     // MARK: - Login follow-up
 
     func configureInitialJoin(channelPath: String, password: String) {
-        rejoinchannel = Channel()
+        rejoinchannel = nil
 
         guard !channelPath.isEmpty else { return }
 
-        let channelID = TeamTalkClient.shared.channelID(fromPath: channelPath)
-        if channelID > 0 {
-            rejoinchannel.nChannelID = channelID
-            TeamTalkString.setChannel(.password, on: &rejoinchannel, to: password)
+        let channelID = TeamTalkClient.shared.channelIdentifier(from: TeamTalkChannelPath(channelPath))
+        if channelID.isValid {
+            rejoinchannel = TeamTalkChannelConfiguration(
+                channelID: channelID,
+                parentChannelID: .none,
+                name: "",
+                password: password
+            )
             return
         }
 
@@ -571,14 +567,16 @@ final class ChannelListModel: ObservableObject {
 
         let channelName = tokens.removeLast()
         let channelPath = tokens.map { "/" + $0 }.joined()
-        let parentID = TeamTalkClient.shared.channelID(fromPath: channelPath)
+        let parentID = TeamTalkClient.shared.channelIdentifier(from: TeamTalkChannelPath(channelPath))
 
-        guard parentID > 0 else { return }
+        guard parentID.isValid else { return }
 
-        rejoinchannel.nParentID = parentID
-        TeamTalkString.setChannel(.name, on: &rejoinchannel, to: channelName)
-        TeamTalkString.setChannel(.password, on: &rejoinchannel, to: password)
-        rejoinchannel.audiocodec = newAudioCodec(DEFAULT_AUDIOCODEC)
+        rejoinchannel = TeamTalkChannelConfiguration(
+            parentChannelID: parentID,
+            name: channelName,
+            password: password,
+            audioCodec: newAudioCodec(DEFAULT_AUDIOCODEC)
+        )
     }
 
     @MainActor
@@ -588,18 +586,17 @@ final class ChannelListModel: ObservableObject {
             return
         }
 
-        if rejoinchannel.nChannelID > 0 {
-            let password = chanpasswds[rejoinchannel.nChannelID]
-                ?? TeamTalkString.channel(.password, from: rejoinchannel)
-            if chanpasswds[rejoinchannel.nChannelID] == nil {
-                chanpasswds[rejoinchannel.nChannelID] = password
+        if let rejoinchannel {
+            if rejoinchannel.id > 0 {
+                let channelID = TeamTalkChannelID(rejoinchannel.id)
+                let password = chanpasswds[channelID] ?? rejoinchannel.password
+                if chanpasswds[channelID] == nil {
+                    chanpasswds[channelID] = password
+                }
+                try await TeamTalkClient.shared.joinChannel(withID: channelID, password: password)
+            } else if !rejoinchannel.name.isEmpty {
+                try await TeamTalkClient.shared.join(rejoinchannel)
             }
-            TeamTalkString.setChannel(.password, on: &rejoinchannel, to: password)
-            try await TeamTalkClient.shared.join(rejoinchannel)
-        } else if !TeamTalkString.channel(.name, from: rejoinchannel).isEmpty {
-            let password = TeamTalkString.channel(.password, from: rejoinchannel)
-            TeamTalkString.setChannel(.password, on: &rejoinchannel, to: password)
-            try await TeamTalkClient.shared.join(rejoinchannel)
         } else if UserDefaults.standard.object(forKey: PREF_JOINROOTCHANNEL) == nil
             || UserDefaults.standard.bool(forKey: PREF_JOINROOTCHANNEL) {
             try await TeamTalkClient.shared.joinChannel(withID: TeamTalkChannelID(TeamTalkClient.shared.rootChannelID))
@@ -611,10 +608,10 @@ final class ChannelListModel: ObservableObject {
     // MARK: - Audio config
 
     func updateAudioConfig() {
-        if mychannel.audiocfg.bEnableAGC == TRUE {
+        if mychannel.rawValue.audiocfg.bEnableAGC == TRUE {
             TeamTalkClient.shared.setSoundInputGainLevel(INT32(SOUND_GAIN_DEFAULT.rawValue))
             var ap = TeamTalkAudioPreprocessor.makeWebRTCPreprocessor()
-            let gain = Float(mychannel.audiocfg.nGainLevel) / Float(TeamTalkAudioPreprocessor.channelAudioConfigMax)
+            let gain = Float(mychannel.rawValue.audiocfg.nGainLevel) / Float(TeamTalkAudioPreprocessor.channelAudioConfigMax)
             ap.webrtc.gaincontroller2.fixeddigital.fGainDB = WEBRTC_GAINCONTROLLER2_FIXEDGAIN_MAX * gain
             ap.webrtc.gaincontroller2.bEnable = TRUE
             TeamTalkClient.shared.setSoundInputPreprocess(&ap)
@@ -650,16 +647,13 @@ extension ChannelListModel: TeamTalkEvent {
         case CLIENTEVENT_CON_LOST:
             channels.removeAll()
             users.removeAll()
-            curchannel = Channel()
-            mychannel = Channel()
+            curchannel = TeamTalkChannel(Channel())
+            mychannel = TeamTalkChannel(Channel())
+            rejoinchannel = nil
             refreshChannelList()
 
         case CLIENTEVENT_CMD_PROCESSING:
-            if TeamTalkMessagePayload.isActive(m) {
-                currentCmdId = m.nSource
-            } else {
-                currentCmdId = 0
-            }
+            isProcessingCommand = TeamTalkMessagePayload.isActive(m)
 
         case CLIENTEVENT_CMD_SERVER_UPDATE:
             srvprop = TeamTalkMessagePayload.serverProperties(from: m)
@@ -671,113 +665,114 @@ extension ChannelListModel: TeamTalkEvent {
             }
 
         case CLIENTEVENT_CMD_CHANNEL_NEW:
-            let channel = TeamTalkMessagePayload.channel(from: m)
-            channels[channel.nChannelID] = channel
-            if channel.nParentID == 0 { updateTitle() }
-            if currentCmdId == 0 { refreshChannelList() }
+            let channel = TeamTalkChannel(TeamTalkMessagePayload.channel(from: m))
+            channels[channel.channelID] = channel
+            if !channel.parentChannelID.isValid { updateTitle() }
+            if !isProcessingCommand { refreshChannelList() }
 
         case CLIENTEVENT_CMD_CHANNEL_UPDATE:
-            let channel = TeamTalkMessagePayload.channel(from: m)
-            channels[channel.nChannelID] = channel
-            if mychannel.nChannelID == channel.nChannelID {
-                let myuserid = TeamTalkClient.shared.myUserID
-                if channel.transmitUsersQueue.0 == myuserid && mychannel.transmitUsersQueue.0 != myuserid {
+            let channel = TeamTalkChannel(TeamTalkMessagePayload.channel(from: m))
+            channels[channel.channelID] = channel
+            if mychannel.channelID == channel.channelID {
+                let myUserID = TeamTalkClient.shared.myUserIdentifier
+                if channel.transmitUsersQueue.first == myUserID && mychannel.transmitUsersQueue.first != myUserID {
                     playSound(.transmit_ON)
                 }
-                if mychannel.transmitUsersQueue.0 == myuserid && channel.transmitUsersQueue.0 != myuserid {
+                if mychannel.transmitUsersQueue.first == myUserID && channel.transmitUsersQueue.first != myUserID {
                     playSound(.transmit_OFF)
                 }
                 mychannel = channel
                 updateAudioConfig()
             }
-            if currentCmdId == 0 { refreshChannelList() }
+            if !isProcessingCommand { refreshChannelList() }
 
         case CLIENTEVENT_CMD_CHANNEL_REMOVE:
-            let channel = TeamTalkMessagePayload.channel(from: m)
-            channels.removeValue(forKey: channel.nChannelID)
-            if currentCmdId == 0 { refreshChannelList() }
+            let channel = TeamTalkChannel(TeamTalkMessagePayload.channel(from: m))
+            channels.removeValue(forKey: channel.channelID)
+            if !isProcessingCommand { refreshChannelList() }
 
         case CLIENTEVENT_CMD_USER_LOGGEDIN:
             playSound(.logged_IN)
-            let user = TeamTalkMessagePayload.user(from: m)
-            users[user.nUserID] = user
-            if currentCmdId == 0 {
-                if user.nChannelID == curchannel.nChannelID { refreshChannelList() }
-                if TeamTalkClient.shared.myUserID != user.nUserID {
+            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+            users[user.userID] = user
+            if !isProcessingCommand {
+                if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
+                if TeamTalkClient.shared.myUserIdentifier != user.userID {
                     let defaults = UserDefaults.standard
                     if defaults.object(forKey: PREF_TTSEVENT_USERLOGIN) != nil && defaults.bool(forKey: PREF_TTSEVENT_USERLOGIN) {
-                        newUtterance(getDisplayName(user) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
+                        newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
                     }
                 }
             }
 
         case CLIENTEVENT_CMD_USER_LOGGEDOUT:
             playSound(.logged_OUT)
-            let user = TeamTalkMessagePayload.user(from: m)
-            users.removeValue(forKey: user.nUserID)
-            if currentCmdId == 0 {
-                if user.nChannelID == curchannel.nChannelID { refreshChannelList() }
-                if TeamTalkClient.shared.myUserID != user.nUserID {
+            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+            users.removeValue(forKey: user.userID)
+            if !isProcessingCommand {
+                if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
+                if TeamTalkClient.shared.myUserIdentifier != user.userID {
                     let defaults = UserDefaults.standard
                     if defaults.object(forKey: PREF_TTSEVENT_USERLOGOUT) != nil && defaults.bool(forKey: PREF_TTSEVENT_USERLOGOUT) {
-                        newUtterance(getDisplayName(user) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
+                        newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
                     }
                 }
             }
 
         case CLIENTEVENT_CMD_USER_JOINED:
-            let user = TeamTalkMessagePayload.user(from: m)
-            users[user.nUserID] = user
-            if user.nUserID == TeamTalkClient.shared.myUserID, let joinedChannel = channels[user.nChannelID] {
+            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+            users[user.userID] = user
+            if user.userID == TeamTalkClient.shared.myUserIdentifier, let joinedChannel = channels[user.channelIdentifier] {
                 curchannel = joinedChannel
                 mychannel = joinedChannel
-                if rejoinchannel.nChannelID == 0 && chanpasswds[user.nChannelID] == nil {
-                    chanpasswds[user.nChannelID] = TeamTalkString.channel(.password, from: rejoinchannel)
+                if rejoinchannel?.id == 0 && chanpasswds[user.channelIdentifier] == nil {
+                    chanpasswds[user.channelIdentifier] = rejoinchannel?.password ?? ""
                 }
-                rejoinchannel = joinedChannel
+                rejoinchannel = TeamTalkChannelConfiguration(joinedChannel)
                 updateTitle()
                 updateAudioConfig()
             }
-            if user.nChannelID == mychannel.nChannelID && mychannel.nChannelID > 0 {
+            if user.channelIdentifier == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.joined_CHAN)
                 let defaults = UserDefaults.standard
                 if defaults.object(forKey: PREF_TTSEVENT_JOINEDCHAN) == nil || defaults.bool(forKey: PREF_TTSEVENT_JOINEDCHAN) {
-                    newUtterance(getDisplayName(user) + " " + String(localized: "has joined the channel", comment: "TTS EVENT"))
+                    newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has joined the channel", comment: "TTS EVENT"))
                 }
             }
-            if currentCmdId == 0 { refreshChannelList() }
+            if !isProcessingCommand { refreshChannelList() }
 
         case CLIENTEVENT_CMD_USER_UPDATE:
-            let user = TeamTalkMessagePayload.user(from: m)
-            users[user.nUserID] = user
-            if currentCmdId == 0 { refreshChannelList() }
+            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+            users[user.userID] = user
+            if !isProcessingCommand { refreshChannelList() }
 
         case CLIENTEVENT_CMD_USER_LEFT:
-            let user = TeamTalkMessagePayload.user(from: m)
+            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
             if myuseraccount.uUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue == 0 {
-                users.removeValue(forKey: user.nUserID)
+                users.removeValue(forKey: user.userID)
             } else {
-                users[user.nUserID] = user
+                users[user.userID] = user
             }
-            if user.nUserID == TeamTalkClient.shared.myUserID {
-                mychannel = Channel()
-                rejoinchannel = Channel()
+            if user.userID == TeamTalkClient.shared.myUserIdentifier {
+                mychannel = TeamTalkChannel(Channel())
+                rejoinchannel = nil
             }
-            if m.nSource == mychannel.nChannelID && mychannel.nChannelID > 0 {
+            if TeamTalkChannelID(m.nSource) == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.left_CHAN)
                 let defaults = UserDefaults.standard
                 if defaults.object(forKey: PREF_TTSEVENT_LEFTCHAN) == nil || defaults.bool(forKey: PREF_TTSEVENT_LEFTCHAN) {
-                    newUtterance(getDisplayName(user) + " " + String(localized: "has left the channel", comment: "TTS EVENT"))
+                    newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has left the channel", comment: "TTS EVENT"))
                 }
             }
-            if currentCmdId == 0 { refreshChannelList() }
+            if !isProcessingCommand { refreshChannelList() }
 
         case CLIENTEVENT_CMD_USER_TEXTMSG:
             let txtmsg = TeamTalkMessagePayload.textMessage(from: m)
             if txtmsg.nMsgType == MSGTYPE_USER {
                 let settings = UserDefaults.standard
-                if let user = users[txtmsg.nFromUserID] {
-                    let name = getDisplayName(user)
+                let fromUserID = TeamTalkUserID(txtmsg.nFromUserID)
+                if let user = users[fromUserID] {
+                    let name = getDisplayName(user.rawValue)
                     let newmsg = MyTextMessage(
                         m: txtmsg,
                         nickname: name,
@@ -808,8 +803,8 @@ extension ChannelListModel: TeamTalkEvent {
             }
 
         case CLIENTEVENT_USER_STATECHANGE:
-            let user = TeamTalkMessagePayload.user(from: m)
-            users[user.nUserID] = user
+            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+            users[user.userID] = user
             refreshChannelList()
 
         case CLIENTEVENT_VOICE_ACTIVATION:
