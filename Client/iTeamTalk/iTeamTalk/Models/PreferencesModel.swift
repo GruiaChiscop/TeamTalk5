@@ -43,8 +43,7 @@ struct Preferences: Codable {
         static var showPublicServers = true
         static var showUnofficialServers = false
         static var popUpTextMesage = true
-        static var 
-    }
+            }
     struct Sound: Codable {
         struct Events: Codable {
             
