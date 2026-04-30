@@ -3,7 +3,7 @@ import TeamTalkC
 
 extension TeamTalkClient {
 @discardableResult
-public func setUserMediaStorage(
+internal func setUserMediaStorage(
     userID: Int32,
     directoryURL: URL?,
     fileNamePattern: String = "",
@@ -37,14 +37,14 @@ public func setUserMediaStorage(
 
 @discardableResult
 public func setUserMediaStorage(
-    userID: TeamTalkUserID,
+    for user: TeamTalkUser,
     directoryURL: URL?,
     fileNamePattern: String = "",
     audioFileFormat: TeamTalkAudioFileFormat,
     stopRecordingExtraDelayMilliseconds: Int32? = nil
 ) -> Bool {
     setUserMediaStorage(
-        userID: userID.cValue,
+        userID: user.userID.cValue,
         directoryURL: directoryURL,
         fileNamePattern: fileNamePattern,
         audioFileFormat: audioFileFormat,
@@ -54,11 +54,11 @@ public func setUserMediaStorage(
 
 @discardableResult
 public func setUserMediaStorage(
-    userID: Int32,
+    for user: TeamTalkUser,
     configuration: TeamTalkUserMediaStorageConfiguration
 ) -> Bool {
     setUserMediaStorage(
-        userID: userID,
+        userID: user.userID.cValue,
         directoryURL: configuration.directoryURL,
         fileNamePattern: configuration.fileNamePattern,
         audioFileFormat: configuration.audioFileFormat,
@@ -67,47 +67,8 @@ public func setUserMediaStorage(
 }
 
 @discardableResult
-public func setUserMediaStorage(
-    userID: TeamTalkUserID,
-    configuration: TeamTalkUserMediaStorageConfiguration
-) -> Bool {
-    setUserMediaStorage(userID: userID.cValue, configuration: configuration)
-}
-
-@discardableResult
-public func setUserMediaStorage(
-    user: User,
-    configuration: TeamTalkUserMediaStorageConfiguration
-) -> Bool {
-    setUserMediaStorage(userID: user.userID, configuration: configuration)
-}
-
-@discardableResult
-public func setUserMediaStorage(
-    user: TeamTalkUser,
-    configuration: TeamTalkUserMediaStorageConfiguration
-) -> Bool {
-    setUserMediaStorage(userID: user.userID, configuration: configuration)
-}
-
-@discardableResult
-public func disableUserMediaStorage(userID: Int32) -> Bool {
-    setUserMediaStorage(userID: userID, directoryURL: nil, audioFileFormat: .none)
-}
-
-@discardableResult
-public func disableUserMediaStorage(userID: TeamTalkUserID) -> Bool {
-    disableUserMediaStorage(userID: userID.cValue)
-}
-
-@discardableResult
-public func disableUserMediaStorage(user: User) -> Bool {
-    disableUserMediaStorage(userID: user.userID)
-}
-
-@discardableResult
-public func disableUserMediaStorage(user: TeamTalkUser) -> Bool {
-    disableUserMediaStorage(userID: user.userID)
+public func disableUserMediaStorage(for user: TeamTalkUser) -> Bool {
+    setUserMediaStorage(userID: user.userID.cValue, directoryURL: nil, audioFileFormat: .none)
 }
 
 @discardableResult

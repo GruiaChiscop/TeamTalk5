@@ -202,161 +202,55 @@ public func setSoundInputPreprocess(_ preprocessor: inout AudioPreprocessor) -> 
     TT_SetSoundInputPreprocessEx(instance, &preprocessor) != 0
 }
 
-public func setUserMute(userID: Int32, stream: StreamType, muted: Bool) {
+internal func setUserMute(userID: Int32, stream: StreamType, muted: Bool) {
     TT_SetUserMute(instance, userID, stream, muted ? 1 : 0)
     emitUserStateChanged(for: userID)
 }
 
-public func setUserMute(userID: Int32, stream: TeamTalkStreamTypes, muted: Bool) {
-    setUserMute(userID: userID, stream: stream.cValue, muted: muted)
+public func setUserMute(_ user: TeamTalkUser, stream: TeamTalkStreamTypes, muted: Bool) {
+    setUserMute(userID: user.userID.cValue, stream: stream.cValue, muted: muted)
 }
 
-public func setUserMute(userID: TeamTalkUserID, stream: TeamTalkStreamTypes, muted: Bool) {
-    setUserMute(userID: userID.cValue, stream: stream, muted: muted)
-}
-
-public func setUserMute(user: User, stream: TeamTalkStreamTypes, muted: Bool) {
-    setUserMute(userID: user.userID, stream: stream, muted: muted)
-}
-
-public func setUserMute(user: TeamTalkUser, stream: TeamTalkStreamTypes, muted: Bool) {
-    setUserMute(userID: user.userID, stream: stream, muted: muted)
-}
-
-public func setUserVolume(userID: Int32, stream: StreamType, volume: Int32) {
+internal func setUserVolume(userID: Int32, stream: StreamType, volume: Int32) {
     TT_SetUserVolume(instance, userID, stream, volume)
     emitUserStateChanged(for: userID)
 }
 
-public func setUserVolume(userID: Int32, stream: TeamTalkStreamTypes, volume: Int32) {
-    setUserVolume(userID: userID, stream: stream.cValue, volume: volume)
+public func setUserVolume(_ user: TeamTalkUser, stream: TeamTalkStreamTypes, volume: Int32) {
+    setUserVolume(userID: user.userID.cValue, stream: stream.cValue, volume: volume)
 }
 
-public func setUserVolume(userID: TeamTalkUserID, stream: TeamTalkStreamTypes, volume: Int32) {
-    setUserVolume(userID: userID.cValue, stream: stream, volume: volume)
-}
-
-public func setUserVolume(user: User, stream: TeamTalkStreamTypes, volume: Int32) {
-    setUserVolume(userID: user.userID, stream: stream, volume: volume)
-}
-
-public func setUserVolume(user: TeamTalkUser, stream: TeamTalkStreamTypes, volume: Int32) {
-    setUserVolume(userID: user.userID, stream: stream, volume: volume)
-}
-
-public func setUserStereo(userID: Int32, stream: StreamType, leftSpeaker: TTBOOL, rightSpeaker: TTBOOL) {
+internal func setUserStereo(userID: Int32, stream: StreamType, leftSpeaker: TTBOOL, rightSpeaker: TTBOOL) {
     TT_SetUserStereo(instance, userID, stream, leftSpeaker, rightSpeaker)
     emitUserStateChanged(for: userID)
 }
 
 public func setUserStereo(
-    userID: Int32,
+    _ user: TeamTalkUser,
     stream: TeamTalkStreamTypes,
     leftSpeaker: Bool,
     rightSpeaker: Bool
 ) {
     setUserStereo(
-        userID: userID,
+        userID: user.userID.cValue,
         stream: stream.cValue,
         leftSpeaker: leftSpeaker ? 1 : 0,
         rightSpeaker: rightSpeaker ? 1 : 0
     )
 }
 
-public func setUserStereo(
-    userID: TeamTalkUserID,
-    stream: TeamTalkStreamTypes,
-    leftSpeaker: Bool,
-    rightSpeaker: Bool
-) {
-    setUserStereo(
-        userID: userID.cValue,
-        stream: stream,
-        leftSpeaker: leftSpeaker,
-        rightSpeaker: rightSpeaker
-    )
-}
-
-public func setUserStereo(
-    user: User,
-    stream: TeamTalkStreamTypes,
-    leftSpeaker: Bool,
-    rightSpeaker: Bool
-) {
-    setUserStereo(
-        userID: user.userID,
-        stream: stream,
-        leftSpeaker: leftSpeaker,
-        rightSpeaker: rightSpeaker
-    )
-}
-
-public func setUserStereo(
-    user: TeamTalkUser,
-    stream: TeamTalkStreamTypes,
-    leftSpeaker: Bool,
-    rightSpeaker: Bool
-) {
-    setUserStereo(
-        userID: user.userID,
-        stream: stream,
-        leftSpeaker: leftSpeaker,
-        rightSpeaker: rightSpeaker
-    )
-}
-
 @discardableResult
-public func subscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
+internal func subscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
     let commandID = TT_DoSubscribe(instance, userID, subscriptions)
     emitUserStateChanged(for: userID)
     return commandID
 }
 
 @discardableResult
-public func subscribe(userID: Int32, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    subscribe(userID: userID, subscriptions: subscriptions.cValue)
-}
-
-@discardableResult
-public func subscribe(userID: TeamTalkUserID, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    subscribe(userID: userID.cValue, subscriptions: subscriptions)
-}
-
-@discardableResult
-public func subscribe(user: User, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    subscribe(userID: user.userID, subscriptions: subscriptions)
-}
-
-@discardableResult
-public func subscribe(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    subscribe(userID: user.userID, subscriptions: subscriptions)
-}
-
-@discardableResult
-public func unsubscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
+internal func unsubscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
     let commandID = TT_DoUnsubscribe(instance, userID, subscriptions)
     emitUserStateChanged(for: userID)
     return commandID
-}
-
-@discardableResult
-public func unsubscribe(userID: Int32, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    unsubscribe(userID: userID, subscriptions: subscriptions.cValue)
-}
-
-@discardableResult
-public func unsubscribe(userID: TeamTalkUserID, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    unsubscribe(userID: userID.cValue, subscriptions: subscriptions)
-}
-
-@discardableResult
-public func unsubscribe(user: User, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    unsubscribe(userID: user.userID, subscriptions: subscriptions)
-}
-
-@discardableResult
-public func unsubscribe(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) -> Int32 {
-    unsubscribe(userID: user.userID, subscriptions: subscriptions)
 }
 
 @available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")

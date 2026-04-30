@@ -33,15 +33,15 @@ public func disconnect() {
 }
 
 @discardableResult
-public func login(nickname: String, username: String, password: String, clientName: String) -> Int32 {
+internal func login(nickname: String, username: String, password: String, clientName: String) -> Int32 {
     TT_DoLoginEx(instance, nickname, username, password, clientName)
 }
 
-public func channelID(fromPath path: String) -> Int32 {
+internal func channelID(fromPath path: String) -> Int32 {
     TT_GetChannelIDFromPath(instance, path)
 }
 
-public func channelID(from path: TeamTalkChannelPath) -> Int32 {
+internal func channelID(from path: TeamTalkChannelPath) -> Int32 {
     channelID(fromPath: path.rawValue)
 }
 
@@ -53,7 +53,7 @@ public func channelIdentifier(from path: TeamTalkChannelPath) -> TeamTalkChannel
     TeamTalkChannelID(channelID(from: path))
 }
 
-public func channelPath(id channelID: Int32) -> String? {
+internal func channelPath(id channelID: Int32) -> String? {
     guard let instance else {
         return nil
     }
@@ -71,7 +71,7 @@ public func channelPath(id channelID: Int32) -> String? {
     return String(cString: channelPath)
 }
 
-public func channelPath(id channelID: TeamTalkChannelID) -> TeamTalkChannelPath? {
+internal func channelPath(id channelID: TeamTalkChannelID) -> TeamTalkChannelPath? {
     channelPath(id: channelID.cValue).map { TeamTalkChannelPath(rawValue: $0) }
 }
 
@@ -79,61 +79,49 @@ public func channel(path: TeamTalkChannelPath) -> TeamTalkChannel? {
     channel(id: channelIdentifier(from: path))
 }
 
-public func channelPath(for channel: Channel) -> TeamTalkChannelPath? {
-    channelPath(id: channel.channelID)
-}
-
 public func channelPath(for channel: TeamTalkChannel) -> TeamTalkChannelPath? {
     channelPath(id: channel.channelID)
 }
 
-public func isChannelOperator(userID: Int32? = nil, channelID: Int32) -> Bool {
+internal func isChannelOperator(userID: Int32? = nil, channelID: Int32) -> Bool {
     TT_IsChannelOperator(instance, userID ?? myUserID, channelID) != 0
 }
 
-public func isChannelOperator(userID: TeamTalkUserID? = nil, channelID: TeamTalkChannelID) -> Bool {
-    isChannelOperator(userID: userID?.cValue, channelID: channelID.cValue)
+public func isChannelOperator(_ user: TeamTalkUser? = nil, in channel: TeamTalkChannel) -> Bool {
+    isChannelOperator(userID: user?.userID.cValue, channelID: channel.channelID.cValue)
 }
 
-public func isChannelOperator(user: User? = nil, channel: Channel) -> Bool {
-    isChannelOperator(userID: user?.userID, channelID: channel.channelID)
-}
-
-public func isChannelOperator(user: TeamTalkUser? = nil, channel: TeamTalkChannel) -> Bool {
-    isChannelOperator(userID: user?.userID, channelID: channel.channelID)
-}
-
-public func withServerProperties<T>(_ body: (inout ServerProperties) -> T) -> T {
+internal func withServerProperties<T>(_ body: (inout ServerProperties) -> T) -> T {
     var properties = ServerProperties()
     TT_GetServerProperties(instance, &properties)
     return body(&properties)
 }
 
-public func withChannel<T>(id channelID: Int32, _ body: (inout Channel) -> T) -> T {
+internal func withChannel<T>(id channelID: Int32, _ body: (inout Channel) -> T) -> T {
     var channel = Channel()
     TT_GetChannel(instance, channelID, &channel)
     return body(&channel)
 }
 
-public func withChannel<T>(id channelID: TeamTalkChannelID, _ body: (inout Channel) -> T) -> T {
+internal func withChannel<T>(id channelID: TeamTalkChannelID, _ body: (inout Channel) -> T) -> T {
     withChannel(id: channelID.cValue, body)
 }
 
-public func withChannel<T>(_ channel: TeamTalkChannel, _ body: (inout Channel) -> T) -> T {
+internal func withChannel<T>(_ channel: TeamTalkChannel, _ body: (inout Channel) -> T) -> T {
     withChannel(id: channel.channelID, body)
 }
 
-public func withUser<T>(id userID: Int32, _ body: (inout User) -> T) -> T {
+internal func withUser<T>(id userID: Int32, _ body: (inout User) -> T) -> T {
     var user = User()
     TT_GetUser(instance, userID, &user)
     return body(&user)
 }
 
-public func withUser<T>(id userID: TeamTalkUserID, _ body: (inout User) -> T) -> T {
+internal func withUser<T>(id userID: TeamTalkUserID, _ body: (inout User) -> T) -> T {
     withUser(id: userID.cValue, body)
 }
 
-public func withUser<T>(_ user: TeamTalkUser, _ body: (inout User) -> T) -> T {
+internal func withUser<T>(_ user: TeamTalkUser, _ body: (inout User) -> T) -> T {
     withUser(id: user.userID, body)
 }
 
@@ -169,7 +157,7 @@ public func currentChannel() -> TeamTalkChannel? {
     channel(id: myChannelIdentifier)
 }
 
-public func clientStatisticsInfo() -> ClientStatistics? {
+internal func clientStatisticsInfo() -> ClientStatistics? {
     guard let instance else {
         return nil
     }
@@ -185,7 +173,7 @@ public func clientStatistics() -> TeamTalkClientStatistics? {
     clientStatisticsInfo().map(TeamTalkClientStatistics.init)
 }
 
-public func clientKeepAliveInfo() -> ClientKeepAlive? {
+internal func clientKeepAliveInfo() -> ClientKeepAlive? {
     guard let instance else {
         return nil
     }
@@ -202,7 +190,7 @@ public func clientKeepAlive() -> TeamTalkClientKeepAlive? {
 }
 
 @discardableResult
-public func setClientKeepAlive(_ keepAlive: inout ClientKeepAlive) -> Bool {
+internal func setClientKeepAlive(_ keepAlive: inout ClientKeepAlive) -> Bool {
     guard let instance else {
         return false
     }
@@ -222,7 +210,7 @@ public func setClientKeepAlive(_ keepAlive: TeamTalkClientKeepAlive) -> Bool {
     return setClientKeepAlive(&rawKeepAlive)
 }
 
-public func userStatisticsInfo(id userID: Int32) -> UserStatistics? {
+internal func userStatisticsInfo(id userID: Int32) -> UserStatistics? {
     guard let instance else {
         return nil
     }
@@ -234,32 +222,8 @@ public func userStatisticsInfo(id userID: Int32) -> UserStatistics? {
     return statistics
 }
 
-public func userStatisticsInfo(id userID: TeamTalkUserID) -> UserStatistics? {
-    userStatisticsInfo(id: userID.cValue)
-}
-
-public func userStatisticsInfo(for user: User) -> UserStatistics? {
-    userStatisticsInfo(id: user.userID)
-}
-
-public func userStatisticsInfo(for user: TeamTalkUser) -> UserStatistics? {
-    userStatisticsInfo(id: user.userID)
-}
-
-public func userStatistics(id userID: Int32) -> TeamTalkUserStatistics? {
-    userStatisticsInfo(id: userID).map(TeamTalkUserStatistics.init)
-}
-
-public func userStatistics(id userID: TeamTalkUserID) -> TeamTalkUserStatistics? {
-    userStatistics(id: userID.cValue)
-}
-
-public func userStatistics(for user: User) -> TeamTalkUserStatistics? {
-    userStatistics(id: user.userID)
-}
-
-public func userStatistics(for user: TeamTalkUser) -> TeamTalkUserStatistics? {
-    userStatistics(id: user.userID)
+public func userStatistics(_ user: TeamTalkUser) -> TeamTalkUserStatistics? {
+    userStatisticsInfo(id: user.userID.cValue).map(TeamTalkUserStatistics.init)
 }
 
 public func serverUsers() -> [TeamTalkUser] {
@@ -306,7 +270,7 @@ public func channels() -> [TeamTalkChannel] {
     return channels.prefix(Int(max(0, min(channelCount, count)))).map(TeamTalkChannel.init)
 }
 
-public func users(inChannelID channelID: Int32) -> [TeamTalkUser] {
+internal func users(inChannelID channelID: Int32) -> [TeamTalkUser] {
     guard let instance else {
         return []
     }
@@ -328,19 +292,11 @@ public func users(inChannelID channelID: Int32) -> [TeamTalkUser] {
     return users.prefix(Int(max(0, min(userCount, count)))).map(TeamTalkUser.init)
 }
 
-public func users(inChannelID channelID: TeamTalkChannelID) -> [TeamTalkUser] {
-    users(inChannelID: channelID.cValue)
-}
-
-public func users(in channel: Channel) -> [TeamTalkUser] {
-    users(inChannelID: channel.channelID)
-}
-
 public func users(in channel: TeamTalkChannel) -> [TeamTalkUser] {
-    users(inChannelID: channel.channelID)
+    users(inChannelID: channel.channelID.cValue)
 }
 
-public func channel(id channelID: Int32) -> TeamTalkChannel? {
+internal func channel(id channelID: Int32) -> TeamTalkChannel? {
     guard let instance else {
         return nil
     }
@@ -356,7 +312,7 @@ public func channel(id channelID: TeamTalkChannelID) -> TeamTalkChannel? {
     channel(id: channelID.cValue)
 }
 
-public func user(id userID: Int32) -> TeamTalkUser? {
+internal func user(id userID: Int32) -> TeamTalkUser? {
     guard let instance else {
         return nil
     }
@@ -384,7 +340,7 @@ public func user(username: String) -> TeamTalkUser? {
     return TeamTalkUser(user)
 }
 
-public func channelFiles(in channelID: Int32) -> [RemoteFile] {
+internal func channelFiles(in channelID: Int32) -> [RemoteFile] {
     guard let instance else {
         return []
     }
@@ -410,19 +366,7 @@ public func channelFiles(in channelID: Int32) -> [RemoteFile] {
     return files
 }
 
-public func channelFiles(in channelID: TeamTalkChannelID) -> [RemoteFile] {
-    channelFiles(in: channelID.cValue)
-}
-
-public func channelFiles(in channel: Channel) -> [RemoteFile] {
-    channelFiles(in: channel.channelID)
-}
-
-public func channelFiles(in channel: TeamTalkChannel) -> [RemoteFile] {
-    channelFiles(in: channel.channelID)
-}
-
-public func channelFile(channelID: Int32, fileID: Int32) -> RemoteFile? {
+internal func channelFile(channelID: Int32, fileID: Int32) -> RemoteFile? {
     guard let instance else {
         return nil
     }
@@ -434,48 +378,12 @@ public func channelFile(channelID: Int32, fileID: Int32) -> RemoteFile? {
     return file
 }
 
-public func channelFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> RemoteFile? {
-    channelFile(channelID: channelID.cValue, fileID: fileID.cValue)
-}
-
-public func channelFile(in channel: Channel, fileID: TeamTalkFileID) -> RemoteFile? {
-    channelFile(channelID: channel.channelID, fileID: fileID)
-}
-
-public func channelFile(in channel: TeamTalkChannel, fileID: TeamTalkFileID) -> RemoteFile? {
-    channelFile(channelID: channel.channelID, fileID: fileID)
-}
-
-public func remoteFiles(in channelID: Int32) -> [TeamTalkRemoteFile] {
-    channelFiles(in: channelID).map(TeamTalkRemoteFile.init)
-}
-
-public func remoteFiles(in channelID: TeamTalkChannelID) -> [TeamTalkRemoteFile] {
-    remoteFiles(in: channelID.cValue)
-}
-
-public func remoteFiles(in channel: Channel) -> [TeamTalkRemoteFile] {
-    remoteFiles(in: channel.channelID)
-}
-
 public func remoteFiles(in channel: TeamTalkChannel) -> [TeamTalkRemoteFile] {
-    remoteFiles(in: channel.channelID)
-}
-
-public func remoteFile(channelID: Int32, fileID: Int32) -> TeamTalkRemoteFile? {
-    channelFile(channelID: channelID, fileID: fileID).map(TeamTalkRemoteFile.init)
-}
-
-public func remoteFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) -> TeamTalkRemoteFile? {
-    remoteFile(channelID: channelID.cValue, fileID: fileID.cValue)
-}
-
-public func remoteFile(in channel: Channel, fileID: TeamTalkFileID) -> TeamTalkRemoteFile? {
-    remoteFile(channelID: channel.channelID, fileID: fileID)
+    channelFiles(in: channel.channelID.cValue).map(TeamTalkRemoteFile.init)
 }
 
 public func remoteFile(in channel: TeamTalkChannel, fileID: TeamTalkFileID) -> TeamTalkRemoteFile? {
-    remoteFile(channelID: channel.channelID, fileID: fileID)
+    channelFile(channelID: channel.channelID.cValue, fileID: fileID.cValue).map(TeamTalkRemoteFile.init)
 }
 
 }

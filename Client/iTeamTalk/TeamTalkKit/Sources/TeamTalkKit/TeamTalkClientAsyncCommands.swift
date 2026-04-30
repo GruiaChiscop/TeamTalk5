@@ -98,6 +98,53 @@ private extension TeamTalkClient {
 
         try await awaitCommandCompletions(validCommandIDs, in: eventStream)
     }
+
+    /// Awaits commandSucceeded for `commandID` AND a payload event matched by `extract`,
+    /// emitted in either order. Times out to avoid hangs when the SDK skips one event.
+    func performCommand<T: Sendable>(
+        timeoutSeconds: TimeInterval = 15,
+        _ start: () -> TeamTalkCommandID,
+        extract: @escaping @Sendable (TeamTalkEvent.Kind, TeamTalkCommandID) -> T?
+    ) async throws -> T {
+        let stream = events
+        let commandID = start()
+        guard commandID.isValid else {
+            throw TeamTalkCommandAsyncError.invalidCommand
+        }
+
+        return try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask {
+                var payload: T? = nil
+                var succeeded = false
+                for await event in stream {
+                    if let value = extract(event.kind, commandID) {
+                        payload = value
+                    }
+                    switch event.kind {
+                    case .commandError(let observedID, let err) where observedID == commandID:
+                        throw TeamTalkCommandAsyncError.commandFailed(commandID: observedID, error: err)
+                    case .commandSucceeded(let observedID) where observedID == commandID:
+                        succeeded = true
+                    case .commandProcessing(let observedID, let isActive) where observedID == commandID && !isActive:
+                        succeeded = true
+                    default:
+                        break
+                    }
+                    if succeeded, let p = payload {
+                        return p
+                    }
+                }
+                throw TeamTalkCommandAsyncError.eventStreamEnded(commandID: commandID)
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(timeoutSeconds * 1_000_000_000))
+                throw TeamTalkCommandAsyncError.eventStreamEnded(commandID: commandID)
+            }
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
 }
 
 extension TeamTalkClient {
@@ -110,55 +157,43 @@ extension TeamTalkClient {
         username: String,
         password: String,
         clientName: String = ""
-    ) async throws {
-        try await performCommand {
-            logIn(
-                nickname: nickname,
-                username: username,
-                password: password,
-                clientName: clientName
-            )
+    ) async throws -> TeamTalkUser {
+        let userID = try await performCommand({
+            logIn(nickname: nickname, username: username, password: password, clientName: clientName)
+        }) { kind, _ in
+            if case .myselfLoggedIn(let id, _) = kind { return id } else { return nil }
         }
+        guard let me = user(id: userID) else {
+            throw TeamTalkCommandAsyncError.invalidCommand
+        }
+        return me
     }
 
     public func logOut() async throws {
         try await performCommand { logOut() }
     }
 
-    public func join(_ channel: TeamTalkChannel) async throws {
-        try await performCommand { join(channel) }
-    }
-
-    public func join(_ channel: Channel) async throws {
-        try await join(TeamTalkChannel(channel))
-    }
-
-    public func join(_ configuration: TeamTalkChannelConfiguration) async throws {
-        try await performCommand { join(configuration) }
-    }
-
-    public func joinChannel(withID channelID: Int32, password: String = "") async throws {
-        try await performCommand { joinChannel(withID: channelID, password: password) }
-    }
-
-    public func joinChannel(withID channelID: TeamTalkChannelID, password: String = "") async throws {
-        try await performCommand { joinChannel(withID: channelID, password: password) }
-    }
-
     public func joinChannel(_ channel: TeamTalkChannel, password: String = "") async throws {
         try await performCommand { joinChannel(channel, password: password) }
     }
 
-    public func joinChannel(_ channel: Channel, password: String = "") async throws {
-        try await performCommand { joinChannel(channel, password: password) }
+    public func joinChannel(_ configuration: TeamTalkChannelConfiguration, password: String = "") async throws {
+        try await performCommand { joinChannel(configuration, password: password) }
     }
 
     public func leaveChannel() async throws {
         try await performCommand { leaveChannel() }
     }
 
-    public func createChannel(_ configuration: TeamTalkChannelConfiguration) async throws {
-        try await performCommand { createChannel(configuration) }
+    public func createChannel(_ configuration: TeamTalkChannelConfiguration) async throws -> TeamTalkChannel {
+        try await performCommand({ createChannel(configuration) }) { kind, _ in
+            if case .channelCreated(let ch) = kind,
+               ch.parentID == configuration.parentID,
+               ch.name == configuration.name {
+                return ch
+            }
+            return nil
+        }
     }
 
     public func updateChannel(_ channel: TeamTalkChannel) async throws {
@@ -169,100 +204,81 @@ extension TeamTalkClient {
         try await performCommand { updateChannel(configuration) }
     }
 
-    public func removeChannel(withID channelID: Int32) async throws {
-        try await performCommand { removeChannel(withID: channelID) }
-    }
-
-    public func removeChannel(withID channelID: TeamTalkChannelID) async throws {
-        try await performCommand { removeChannel(withID: channelID) }
-    }
-
     public func removeChannel(_ channel: TeamTalkChannel) async throws {
         try await performCommand { removeChannel(channel) }
     }
 
-    public func removeChannel(_ channel: Channel) async throws {
-        try await performCommand { removeChannel(channel) }
+    public func setNickname(_ nickname: String) async throws {
+        try await performCommand { setNickname(nickname) }
     }
 
-    public func kickUser(withID userID: Int32, fromChannelID channelID: Int32 = 0) async throws {
-        try await performCommand { kickUser(withID: userID, fromChannelID: channelID) }
+    public func setStatus(mode: TeamTalkStatusMode, message: String = "") async throws {
+        try await performCommand { setStatus(mode: mode, message: message) }
     }
 
-    public func kickUser(withID userID: TeamTalkUserID, fromChannelID channelID: TeamTalkChannelID = .none) async throws {
-        try await performCommand { kickUser(withID: userID, fromChannelID: channelID) }
+    public func kickUser(_ user: TeamTalkUser, from channel: TeamTalkChannel? = nil) async throws {
+        try await performCommand { kickUser(user, from: channel) }
     }
 
-    public func kickUser(_ user: TeamTalkUser, fromChannel channel: TeamTalkChannel? = nil) async throws {
-        try await performCommand { kickUser(user, fromChannel: channel) }
-    }
-
-    public func kickUser(_ user: User, fromChannel channel: Channel? = nil) async throws {
-        try await performCommand { kickUser(user, fromChannel: channel) }
-    }
-
-    public func banUser(withID userID: Int32, fromChannelID channelID: Int32 = 0) async throws {
-        try await performCommand { banUser(withID: userID, fromChannelID: channelID) }
-    }
-
-    public func banUser(withID userID: TeamTalkUserID, fromChannelID channelID: TeamTalkChannelID = .none) async throws {
-        try await performCommand { banUser(withID: userID, fromChannelID: channelID) }
-    }
-
-    public func banUser(_ user: TeamTalkUser, fromChannel channel: TeamTalkChannel? = nil) async throws {
-        try await performCommand { banUser(user, fromChannel: channel) }
-    }
-
-    public func banUser(_ user: User, fromChannel channel: Channel? = nil) async throws {
-        try await performCommand { banUser(user, fromChannel: channel) }
-    }
-
-    public func banUser(withID userID: Int32, types: TeamTalkBanTypes) async throws {
-        try await performCommand { banUser(withID: userID, types: types) }
-    }
-
-    public func banUser(withID userID: TeamTalkUserID, types: TeamTalkBanTypes) async throws {
-        try await performCommand { banUser(withID: userID, types: types) }
+    public func banUser(_ user: TeamTalkUser, from channel: TeamTalkChannel? = nil) async throws {
+        try await performCommand { banUser(user, from: channel) }
     }
 
     public func banUser(_ user: TeamTalkUser, types: TeamTalkBanTypes) async throws {
         try await performCommand { banUser(user, types: types) }
     }
 
-    public func banUser(_ user: User, types: TeamTalkBanTypes) async throws {
-        try await performCommand { banUser(user, types: types) }
+    public func ban(_ configuration: TeamTalkBanConfiguration) async throws {
+        try await performCommand { ban(configuration) }
     }
 
-    public func moveUser(withID userID: Int32, toChannelID channelID: Int32) async throws {
-        try await performCommand { moveUser(withID: userID, toChannelID: channelID) }
+    public func banIPAddress(_ ipAddress: String, in channel: TeamTalkChannel? = nil) async throws {
+        try await performCommand { banIPAddress(ipAddress, in: channel) }
     }
 
-    public func moveUser(withID userID: TeamTalkUserID, toChannelID channelID: TeamTalkChannelID) async throws {
-        try await performCommand { moveUser(withID: userID, toChannelID: channelID) }
+    public func unbanIPAddress(_ ipAddress: String, in channel: TeamTalkChannel? = nil) async throws {
+        try await performCommand { unbanIPAddress(ipAddress, in: channel) }
+    }
+
+    public func unban(_ configuration: TeamTalkBanConfiguration) async throws {
+        try await performCommand { unban(configuration) }
+    }
+
+    public func listBans(in channel: TeamTalkChannel? = nil, startingAt index: Int32 = 0, count: Int32 = 100) async throws {
+        try await performCommand { listBans(in: channel, startingAt: index, count: count) }
     }
 
     public func moveUser(_ user: TeamTalkUser, to channel: TeamTalkChannel) async throws {
         try await performCommand { moveUser(user, to: channel) }
     }
 
-    public func moveUser(_ user: User, to channel: Channel) async throws {
-        try await performCommand { moveUser(user, to: channel) }
+    public func setChannelOperator(_ user: TeamTalkUser, in channel: TeamTalkChannel, enabled: Bool) async throws {
+        try await performCommand { setChannelOperator(user, in: channel, enabled: enabled) }
+    }
+
+    public func setChannelOperator(
+        _ user: TeamTalkUser,
+        in channel: TeamTalkChannel,
+        operatorPassword: String,
+        enabled: Bool
+    ) async throws {
+        try await performCommand { setChannelOperator(user, in: channel, operatorPassword: operatorPassword, enabled: enabled) }
+    }
+
+    public func subscribe(_ subscriptions: TeamTalkSubscriptions, to user: TeamTalkUser) async throws {
+        try await performCommand { subscribe(subscriptions, to: user) }
+    }
+
+    public func unsubscribe(_ subscriptions: TeamTalkSubscriptions, from user: TeamTalkUser) async throws {
+        try await performCommand { unsubscribe(subscriptions, from: user) }
     }
 
     public func sendTextMessage(_ message: TeamTalkOutgoingTextMessage) async throws {
         try await performCommands { sendTextMessage(message) }
     }
 
-    public func sendTextMessage(to userID: TeamTalkUserID, content: String) async throws {
-        try await sendTextMessage(.user(to: userID, content: content))
-    }
-
     public func sendTextMessage(to user: TeamTalkUser, content: String) async throws {
         try await sendTextMessage(.user(to: user, content: content))
-    }
-
-    public func sendTextMessage(to channelID: TeamTalkChannelID, content: String) async throws {
-        try await sendTextMessage(.channel(channelID, content: content))
     }
 
     public func sendTextMessage(to channel: TeamTalkChannel, content: String) async throws {
@@ -276,61 +292,57 @@ extension TeamTalkClient {
         try await sendTextMessage(to: channel, content: content)
     }
 
-    public func sendTextMessage(_ message: TextMessage, content: String) async throws {
-        let outgoing = TeamTalkOutgoingTextMessage(
-            type: TeamTalkTextMessageType(rawValue: message.nMsgType),
-            toUserID: message.nToUserID,
-            channelID: message.nChannelID,
-            content: content
-        )
-        try await sendTextMessage(outgoing)
+    public func reply(to message: TeamTalkTextMessage, content: String) async throws {
+        try await sendTextMessage(.reply(to: message, content: content))
     }
 
-    public func uploadFile(at localURL: URL, toChannelID channelID: Int32) async throws {
-        try await performCommand { uploadFileCommand(at: localURL, toChannelID: channelID) }
-    }
-
-    public func uploadFile(at localURL: URL, toChannelID channelID: TeamTalkChannelID) async throws {
-        try await performCommand { uploadFileCommand(at: localURL, toChannelID: channelID) }
-    }
-
-    public func uploadFile(at localURL: URL, toChannel channel: Channel) async throws {
-        try await performCommand { uploadFileCommand(at: localURL, toChannel: channel) }
-    }
-
-    public func uploadFile(at localURL: URL, to channel: TeamTalkChannel) async throws {
-        try await performCommand { uploadFile(at: localURL, to: channel) }
-    }
-
-    public func downloadFile(channelID: Int32, fileID: Int32, to localURL: URL) async throws {
-        try await performCommand { downloadFileCommand(channelID: channelID, fileID: fileID, to: localURL) }
-    }
-
-    public func downloadFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID, to localURL: URL) async throws {
-        try await performCommand { downloadFileCommand(channelID: channelID, fileID: fileID, to: localURL) }
-    }
-
-    public func downloadFile(_ file: RemoteFile, to localURL: URL) async throws {
-        try await performCommand { downloadFileCommand(file, to: localURL) }
+    public func uploadFile(at localURL: URL, to channel: TeamTalkChannel) async throws -> TeamTalkRemoteFile {
+        let targetChannelID = channel.channelID
+        return try await performCommand({ uploadFile(at: localURL, to: channel) }) { kind, _ in
+            if case .fileCreated(let f) = kind, f.channelIdentifier == targetChannelID {
+                return f
+            }
+            return nil
+        }
     }
 
     public func downloadFile(_ file: TeamTalkRemoteFile, to localURL: URL) async throws {
-        try await performCommand { downloadFileCommand(file, to: localURL) }
-    }
-
-    public func deleteFile(channelID: Int32, fileID: Int32) async throws {
-        try await performCommand { deleteFileCommand(channelID: channelID, fileID: fileID) }
-    }
-
-    public func deleteFile(channelID: TeamTalkChannelID, fileID: TeamTalkFileID) async throws {
-        try await performCommand { deleteFileCommand(channelID: channelID, fileID: fileID) }
-    }
-
-    public func deleteFile(_ file: RemoteFile) async throws {
-        try await performCommand { deleteFileCommand(file) }
+        try await performCommand { downloadFile(file, to: localURL) }
     }
 
     public func deleteFile(_ file: TeamTalkRemoteFile) async throws {
-        try await performCommand { deleteFileCommand(file) }
+        try await performCommand { deleteFile(file) }
+    }
+
+    public func updateServer(_ configuration: TeamTalkServerPropertiesConfiguration) async throws {
+        try await performCommand { updateServer(configuration) }
+    }
+
+    public func updateServer(_ properties: TeamTalkServerProperties) async throws {
+        try await performCommand { updateServer(properties) }
+    }
+
+    public func listUserAccounts(startingAt index: Int32 = 0, count: Int32 = 100) async throws {
+        try await performCommand { listUserAccounts(startingAt: index, count: count) }
+    }
+
+    public func createUserAccount(_ configuration: TeamTalkUserAccountConfiguration) async throws {
+        try await performCommand { createUserAccount(configuration) }
+    }
+
+    public func createUserAccount(_ account: TeamTalkUserAccount) async throws {
+        try await performCommand { createUserAccount(account) }
+    }
+
+    public func deleteUserAccount(username: String) async throws {
+        try await performCommand { deleteUserAccount(username: username) }
+    }
+
+    public func saveServerConfiguration() async throws {
+        try await performCommand { saveServerConfiguration() }
+    }
+
+    public func queryServerStatistics() async throws {
+        try await performCommand { queryServerStatistics() }
     }
 }

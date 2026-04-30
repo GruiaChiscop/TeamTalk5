@@ -168,40 +168,28 @@ public struct TeamTalkOutgoingTextMessage {
         self.content = content
     }
 
-    public static func user(to userID: Int32, content: String) -> TeamTalkOutgoingTextMessage {
-        TeamTalkOutgoingTextMessage(type: .user, toUserID: userID, content: content)
-    }
-
-    public static func user(to userID: TeamTalkUserID, content: String) -> TeamTalkOutgoingTextMessage {
-        user(to: userID.cValue, content: content)
-    }
-
-    public static func user(to user: User, content: String) -> TeamTalkOutgoingTextMessage {
-        TeamTalkOutgoingTextMessage.user(to: user.userID, content: content)
-    }
-
     public static func user(to user: TeamTalkUser, content: String) -> TeamTalkOutgoingTextMessage {
-        TeamTalkOutgoingTextMessage.user(to: user.userID, content: content)
-    }
-
-    public static func channel(_ channelID: Int32, content: String) -> TeamTalkOutgoingTextMessage {
-        TeamTalkOutgoingTextMessage(type: .channel, channelID: channelID, content: content)
-    }
-
-    public static func channel(_ channelID: TeamTalkChannelID, content: String) -> TeamTalkOutgoingTextMessage {
-        channel(channelID.cValue, content: content)
-    }
-
-    public static func channel(_ channel: Channel, content: String) -> TeamTalkOutgoingTextMessage {
-        TeamTalkOutgoingTextMessage.channel(channel.channelID, content: content)
+        TeamTalkOutgoingTextMessage(type: .user, toUserID: user.userID.cValue, content: content)
     }
 
     public static func channel(_ channel: TeamTalkChannel, content: String) -> TeamTalkOutgoingTextMessage {
-        TeamTalkOutgoingTextMessage.channel(channel.channelID, content: content)
+        TeamTalkOutgoingTextMessage(type: .channel, channelID: channel.channelID.cValue, content: content)
     }
 
     public static func broadcast(content: String) -> TeamTalkOutgoingTextMessage {
         TeamTalkOutgoingTextMessage(type: .broadcast, content: content)
+    }
+
+    /// Constructs an outgoing reply matching the original message's scope.
+    /// `.user`/`.custom` reply privately to the sender; `.channel` replies in the same channel; `.broadcast` rebroadcasts.
+    public static func reply(to message: TeamTalkTextMessage, content: String) -> TeamTalkOutgoingTextMessage {
+        if message.type == .channel {
+            return TeamTalkOutgoingTextMessage(type: .channel, channelID: message.channelID, content: content)
+        }
+        if message.type == .broadcast {
+            return TeamTalkOutgoingTextMessage(type: .broadcast, content: content)
+        }
+        return TeamTalkOutgoingTextMessage(type: message.type, toUserID: message.fromUserID, content: content)
     }
 
     public var toUserIdentifier: TeamTalkUserID {
