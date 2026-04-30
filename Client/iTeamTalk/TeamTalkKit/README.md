@@ -48,8 +48,8 @@ TeamTalkKit currently contains:
 - configuration models for creating/updating user accounts, channels, server
   properties, bans and outgoing text messages;
 - `TeamTalkCommandID` for tracking command processing;
-- a typed event system through `TeamTalkEventObserver` and
-  `AsyncStream<TeamTalkEvent>`;
+- a typed event system through `TeamTalkEventObserver`,
+  `AnyPublisher<TeamTalkEvent, Never>` and `AsyncStream<TeamTalkEvent>`;
 - Swift command APIs on `TeamTalkClient` for login, channels, files, bans,
   user accounts, server settings and server statistics;
 - raw C escape hatches via the exported `TeamTalkC` module.

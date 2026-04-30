@@ -125,7 +125,7 @@ struct ChannelListView: View {
                     }
 
                     Button {
-                        model.showTextMessages(userid: user.userID.cValue)
+                        model.showTextMessages(user: user)
                     } label: {
                         Image(details.messageIconName)
                             .resizable()
@@ -143,7 +143,7 @@ struct ChannelListView: View {
                     model.selectRow(.user(user))
                 }
                 .accessibilityAction(named: "Message this user") {
-                    model.showTextMessages(userid: user.userID.cValue)
+                    model.showTextMessages(user: user)
                 }
                 .accessibilityAction(named: "Mute") {
                     model.muteUser(userID: user.userID)

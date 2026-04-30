@@ -16,6 +16,7 @@ public func close() {
         return
     }
 
+    stopEventDispatching()
     TT_CloseTeamTalk(instance)
     self.instance = nil
     observers.removeAll()
@@ -158,6 +159,14 @@ public func currentUserAccount() -> TeamTalkUserAccount? {
         return nil
     }
     return TeamTalkUserAccount(account)
+}
+
+public func currentUser() -> TeamTalkUser? {
+    user(id: myUserIdentifier)
+}
+
+public func currentChannel() -> TeamTalkChannel? {
+    channel(id: myChannelIdentifier)
 }
 
 public func clientStatisticsInfo() -> ClientStatistics? {

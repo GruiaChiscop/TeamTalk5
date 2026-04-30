@@ -253,6 +253,29 @@ extension TeamTalkClient {
         try await performCommands { sendTextMessage(message) }
     }
 
+    public func sendTextMessage(to userID: TeamTalkUserID, content: String) async throws {
+        try await sendTextMessage(.user(to: userID, content: content))
+    }
+
+    public func sendTextMessage(to user: TeamTalkUser, content: String) async throws {
+        try await sendTextMessage(.user(to: user, content: content))
+    }
+
+    public func sendTextMessage(to channelID: TeamTalkChannelID, content: String) async throws {
+        try await sendTextMessage(.channel(channelID, content: content))
+    }
+
+    public func sendTextMessage(to channel: TeamTalkChannel, content: String) async throws {
+        try await sendTextMessage(.channel(channel, content: content))
+    }
+
+    public func sendChannelMessage(_ content: String) async throws {
+        guard let channel = currentChannel() else {
+            throw TeamTalkCommandAsyncError.invalidCommand
+        }
+        try await sendTextMessage(to: channel, content: content)
+    }
+
     public func sendTextMessage(_ message: TextMessage, content: String) async throws {
         let outgoing = TeamTalkOutgoingTextMessage(
             type: TeamTalkTextMessageType(rawValue: message.nMsgType),

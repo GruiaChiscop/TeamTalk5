@@ -45,17 +45,17 @@ struct MyTextMessage {
     var message : String
     var date = Date()
     var msgtype : MsgType
-    var fromuserid : INT32 = 0
+    var fromUserID: TeamTalkUserID = .none
     
     init(m: TextMessage, nickname: String, msgtype: MsgType) {
         message = TeamTalkString.textMessage(m)
         self.nickname = nickname
         self.msgtype = msgtype
-        self.fromuserid = m.nFromUserID
+        self.fromUserID = TeamTalkUserID(m.nFromUserID)
     }
 
-    init(fromuserid: INT32, nickname: String, msgtype: MsgType, content: String) {
-        self.fromuserid = fromuserid
+    init(fromUserID: TeamTalkUserID, nickname: String, msgtype: MsgType, content: String) {
+        self.fromUserID = fromUserID
         self.message = content
         self.nickname = nickname
         self.msgtype = msgtype
@@ -68,7 +68,7 @@ struct MyTextMessage {
 }
 
 protocol MyTextMessageDelegate: AnyObject {
-    func appendTextMessage(_ userid: INT32, txtmsg: MyTextMessage)
+    func appendTextMessage(for userID: TeamTalkUserID, message: MyTextMessage)
 }
 
 class MyCustomAction : UIAccessibilityCustomAction {
@@ -118,6 +118,10 @@ func getDisplayName(_ user: User) -> String {
     }
     
     return limitText(nickname)
+}
+
+func getDisplayName(_ user: TeamTalkUser) -> String {
+    getDisplayName(user.rawValue)
 }
 
 

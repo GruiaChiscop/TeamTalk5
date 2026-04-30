@@ -9,45 +9,12 @@
 import Foundation
 import TeamTalkKit
 
-protocol TeamTalkEvent : AnyObject {
-    func handleTTMessage(_ m: TTMessage)
+func addToTeamTalkEvents(_ observer: TeamTalkEventObserver) {
+    TeamTalkClient.shared.addEventObserver(observer)
 }
 
-class TeamTalkEventHandler: TeamTalkMessageObserver {
-    weak var value : TeamTalkEvent?
-    init (value: TeamTalkEvent) {
-        self.value = value
-    }
-
-    func handleTeamTalkMessage(_ message: TTMessage) {
-        value?.handleTTMessage(message)
-    }
-}
-
-var ttMessageHandlers = [TeamTalkEventHandler]()
-
-func addToTTMessages(_ p: TeamTalkEvent) {
-    if ttMessageHandlers.contains(where: { $0.value === p }) {
-        return
-    }
-
-    let handler = TeamTalkEventHandler(value: p)
-    ttMessageHandlers.append(handler)
-    TeamTalkClient.shared.addObserver(handler)
-}
-
-func removeFromTTMessages(_ p: TeamTalkEventHandler) {
-    ttMessageHandlers.removeAll { $0 === p || $0.value == nil }
-    TeamTalkClient.shared.removeObserver(p)
-}
-
-func removeAllTTMessageHandlers() {
-    ttMessageHandlers.removeAll()
-    TeamTalkClient.shared.removeAllObservers()
-}
-
-func runTeamTalkEventHandler() {
-    TeamTalkClient.shared.pollMessages()
+func removeFromTeamTalkEvents(_ observer: TeamTalkEventObserver) {
+    TeamTalkClient.shared.removeEventObserver(observer)
 }
 
 func setupEncryption(server: Server) -> Bool {

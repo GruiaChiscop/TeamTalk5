@@ -294,7 +294,6 @@ final class PreferencesModel: ObservableObject {
         let vol = refVolume(percent)
         for userID in users {
             TeamTalkClient.shared.setUserVolume(userID: userID, stream: STREAMTYPE_MEDIAFILE_AUDIO, volume: INT32(vol))
-            TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: userID)
         }
     }
 
@@ -359,13 +358,13 @@ final class PreferencesModel: ObservableObject {
     }
 }
 
-extension PreferencesModel: TeamTalkEvent {
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
-        case CLIENTEVENT_CMD_USER_JOINED:
-            users.insert(TeamTalkMessagePayload.user(from: m).nUserID)
-        case CLIENTEVENT_CMD_USER_LEFT:
-            users.remove(TeamTalkMessagePayload.user(from: m).nUserID)
+extension PreferencesModel: TeamTalkEventObserver {
+    func handleTeamTalkEvent(_ event: TeamTalkEvent) {
+        switch event.kind {
+        case .userJoined(let user):
+            users.insert(user.userID.cValue)
+        case .userLeft(_, let user):
+            users.remove(user.userID.cValue)
         default:
             break
         }

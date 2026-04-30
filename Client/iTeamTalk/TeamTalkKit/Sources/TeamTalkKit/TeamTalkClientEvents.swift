@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(Combine)
+import Combine
+#endif
 import TeamTalkC
 
 extension TeamTalkClient {
@@ -51,12 +54,14 @@ public func configureEncryption(
     return setEncryptionContext(&encryption)
 }
 
+@available(*, deprecated, message: "Prefer addEventObserver(_:) for typed TeamTalkEvent delivery.")
 public func addObserver(_ observer: TeamTalkMessageObserver) {
     if observers.contains(where: { $0.value === observer }) {
         return
     }
 
     observers.append(TeamTalkMessageHandler(value: observer))
+    ensureEventDispatching()
 }
 
 public func addEventObserver(_ observer: TeamTalkEventObserver) {
@@ -65,8 +70,10 @@ public func addEventObserver(_ observer: TeamTalkEventObserver) {
     }
 
     eventObservers.append(TeamTalkEventHandler(value: observer))
+    ensureEventDispatching()
 }
 
+@available(*, deprecated, message: "Prefer removeEventObserver(_:) for typed TeamTalkEvent delivery.")
 public func removeObserver(_ observer: TeamTalkMessageObserver) {
     observers.removeAll { $0.value === observer || $0.value == nil }
 }
@@ -75,6 +82,7 @@ public func removeEventObserver(_ observer: TeamTalkEventObserver) {
     eventObservers.removeAll { $0.value === observer || $0.value == nil }
 }
 
+@available(*, deprecated, message: "Prefer removeAllEventObservers() for typed TeamTalkEvent delivery.")
 public func removeAllObservers() {
     observers.removeAll()
 }
@@ -97,23 +105,33 @@ public var events: AsyncStream<TeamTalkEvent> {
     }
 }
 
+#if canImport(Combine)
+@available(*, deprecated, message: "Prefer eventPublisher for typed TeamTalkEvent delivery.")
+public var messagePublisher: AnyPublisher<TTMessage, Never> {
+    ensureEventDispatching()
+    return messageSubject.eraseToAnyPublisher()
+}
+
+public var eventPublisher: AnyPublisher<TeamTalkEvent, Never> {
+    ensureEventDispatching()
+    return eventSubject.eraseToAnyPublisher()
+}
+#endif
+
 public func pollMessages() {
+    guard let instance else {
+        return
+    }
+
+    messagePollingLock.lock()
+    defer { messagePollingLock.unlock() }
+
     var message = TTMessage()
     var waitMSec: Int32 = 0
 
     while TT_GetMessage(instance, &message, &waitMSec) != 0 {
-        observers.removeAll { $0.value == nil }
-        eventObservers.removeAll { $0.value == nil }
-
-        let event = TeamTalkEvent(message)
-
-        for observer in observers {
-            observer.value?.handleTeamTalkMessage(message)
-        }
-
-        for observer in eventObservers {
-            observer.value?.handleTeamTalkEvent(event)
-        }
+        let dispatchedMessage = message
+        dispatchPolledMessage(dispatchedMessage)
     }
 }
 
@@ -186,6 +204,7 @@ public func setSoundInputPreprocess(_ preprocessor: inout AudioPreprocessor) -> 
 
 public func setUserMute(userID: Int32, stream: StreamType, muted: Bool) {
     TT_SetUserMute(instance, userID, stream, muted ? 1 : 0)
+    emitUserStateChanged(for: userID)
 }
 
 public func setUserMute(userID: Int32, stream: TeamTalkStreamTypes, muted: Bool) {
@@ -206,6 +225,7 @@ public func setUserMute(user: TeamTalkUser, stream: TeamTalkStreamTypes, muted: 
 
 public func setUserVolume(userID: Int32, stream: StreamType, volume: Int32) {
     TT_SetUserVolume(instance, userID, stream, volume)
+    emitUserStateChanged(for: userID)
 }
 
 public func setUserVolume(userID: Int32, stream: TeamTalkStreamTypes, volume: Int32) {
@@ -226,6 +246,7 @@ public func setUserVolume(user: TeamTalkUser, stream: TeamTalkStreamTypes, volum
 
 public func setUserStereo(userID: Int32, stream: StreamType, leftSpeaker: TTBOOL, rightSpeaker: TTBOOL) {
     TT_SetUserStereo(instance, userID, stream, leftSpeaker, rightSpeaker)
+    emitUserStateChanged(for: userID)
 }
 
 public func setUserStereo(
@@ -286,7 +307,9 @@ public func setUserStereo(
 
 @discardableResult
 public func subscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
-    TT_DoSubscribe(instance, userID, subscriptions)
+    let commandID = TT_DoSubscribe(instance, userID, subscriptions)
+    emitUserStateChanged(for: userID)
+    return commandID
 }
 
 @discardableResult
@@ -311,7 +334,9 @@ public func subscribe(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions) 
 
 @discardableResult
 public func unsubscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
-    TT_DoUnsubscribe(instance, userID, subscriptions)
+    let commandID = TT_DoUnsubscribe(instance, userID, subscriptions)
+    emitUserStateChanged(for: userID)
+    return commandID
 }
 
 @discardableResult
@@ -334,27 +359,65 @@ public func unsubscribe(user: TeamTalkUser, subscriptions: TeamTalkSubscriptions
     unsubscribe(userID: user.userID, subscriptions: subscriptions)
 }
 
+@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
 public func pump(_ event: ClientEvent, source: Int32) {
     TT_PumpMessage(instance, event, source)
 }
 
+@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source: Int32) {
     pump(event.cValue, source: source)
 }
 
+@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source: TeamTalkUserID) {
     pump(event, source: source.cValue)
 }
 
+@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source: TeamTalkChannelID) {
     pump(event, source: source.cValue)
 }
 
+@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source user: TeamTalkUser) {
     pump(event, source: user.userID)
 }
 
+@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source channel: TeamTalkChannel) {
     pump(event, source: channel.channelID)
+}
+}
+
+private extension TeamTalkClient {
+func dispatchPolledMessage(_ message: TTMessage) {
+    DispatchQueue.main.async { [weak self] in
+        self?.deliverPolledMessage(message)
+    }
+}
+
+func deliverPolledMessage(_ message: TTMessage) {
+    observers.removeAll { $0.value == nil }
+    eventObservers.removeAll { $0.value == nil }
+
+    let event = TeamTalkEvent(message)
+
+#if canImport(Combine)
+    messageSubject.send(message)
+    eventSubject.send(event)
+#endif
+
+    for observer in observers {
+        observer.value?.handleTeamTalkMessage(message)
+    }
+
+    for observer in eventObservers {
+        observer.value?.handleTeamTalkEvent(event)
+    }
+}
+
+func emitUserStateChanged(for userID: Int32) {
+    TT_PumpMessage(instance, CLIENTEVENT_USER_STATECHANGE, userID)
 }
 }

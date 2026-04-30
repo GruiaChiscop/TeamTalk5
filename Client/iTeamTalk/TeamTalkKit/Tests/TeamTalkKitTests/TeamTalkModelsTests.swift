@@ -248,6 +248,34 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(rawStatistics.voicePacketsReceived, 101)
     }
 
+    func testTextMessageAssemblerRebuildsMultipartMessagesUsingTypedWrappers() {
+        var assembler = TeamTalkTextMessageAssembler()
+
+        var part1 = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(7), content: "Hello ").cValue
+        part1.nFromUserID = 42
+        part1.bMore = 1
+
+        var part2 = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(7), content: "world").cValue
+        part2.nFromUserID = 42
+
+        XCTAssertNil(assembler.append(TeamTalkTextMessage(part1)))
+        XCTAssertEqual(assembler.append(TeamTalkTextMessage(part2)), "Hello world")
+    }
+
+    func testTextMessageAssemblerKeepsMessageTypesSeparated() {
+        var assembler = TeamTalkTextMessageAssembler()
+
+        var privatePart = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(7), content: "Private ").cValue
+        privatePart.nFromUserID = 42
+        privatePart.bMore = 1
+
+        var channelMessage = TeamTalkOutgoingTextMessage.channel(TeamTalkChannelID(9), content: "Channel").cValue
+        channelMessage.nFromUserID = 42
+
+        XCTAssertNil(assembler.append(TeamTalkTextMessage(privatePart)))
+        XCTAssertEqual(assembler.append(TeamTalkTextMessage(channelMessage)), "Channel")
+    }
+
     func testClientStatisticsExposeFriendlyProperties() {
         var rawStatistics = ClientStatistics()
         rawStatistics.nUdpBytesSent = 1000

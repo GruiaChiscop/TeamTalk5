@@ -122,7 +122,7 @@ func getXMLPath(elementStack : [String]) -> String {
 }
 
 // messages received but no read (blinking)
-var unreadmessages = Set<INT32>()
+var unreadmessages = Set<TeamTalkUserID>()
 
 let MAX_TEXTMESSAGES = 100
 let DEFAULT_SOUND_VU_MAX = 20 // real max is SOUND_VU_MAX
@@ -176,7 +176,6 @@ class UserCached {
             TeamTalkClient.shared.unsubscribe(userID: user.nUserID, subscriptions: user.uLocalSubscriptions ^ subscriptions)
             TeamTalkClient.shared.subscribe(userID: user.nUserID, subscriptions: subscriptions)
         }
-        TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: user.nUserID)
     }
 }
 

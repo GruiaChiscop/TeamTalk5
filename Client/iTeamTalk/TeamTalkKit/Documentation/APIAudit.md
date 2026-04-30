@@ -23,8 +23,8 @@ Application code should prefer:
 - typed IDs and option sets such as `TeamTalkUserID`, `TeamTalkChannelID`,
   `TeamTalkFileID`, `TeamTalkTransferID`, `TeamTalkCommandID`,
   `TeamTalkSubscriptions`, `TeamTalkUserRights` and `TeamTalkStreamTypes`
-- `TeamTalkEvent` and `AsyncStream<TeamTalkEvent>` instead of polling raw
-  `TTMessage` values directly
+- `TeamTalkEvent`, `eventPublisher` and `AsyncStream<TeamTalkEvent>` instead of
+  polling raw `TTMessage` values directly
 
 This is the surface area whose naming and ergonomics should keep improving.
 
@@ -60,6 +60,10 @@ candidates for deprecation are:
 - low-level event helpers in `TeamTalkClientEvents.swift` that still take raw
   `StreamType` or `UInt32` when the typed overloads become sufficient for all
   in-tree callers
+- raw `TTMessage` observation through `TeamTalkMessageObserver` and
+  `messagePublisher`
+- direct `pump(...)` calls once the remaining UI state updates are owned by the
+  typed TeamTalkClient surface
 
 The deprecation pass should be additive and gentle:
 
@@ -94,7 +98,7 @@ SDK identity types.
 
 ## Recommended Next Step
 
-After the app migrates more call sites to the typed layer, add deprecation
-attributes to the first wave of compatibility methods in
-`TeamTalkClientLegacyCommands.swift` and the duplicate `Int32` overloads that
-already have a direct typed replacement.
+Continue migrating app-side observers from raw message parsing toward typed
+`TeamTalkEvent` handling, then expand the first deprecation wave from legacy
+message observers and `pump(...)` to the oldest compatibility methods in
+`TeamTalkClientLegacyCommands.swift`.

@@ -28,7 +28,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 
     let backgroundQueue = DispatchQueue.global(qos: DispatchQoS.QoSClass.background)
-    var backgroundRunning: Bool = false
+    var backgroundRunning = false
     var backgroundTask: UIBackgroundTaskIdentifier = UIBackgroundTaskIdentifier.invalid
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {

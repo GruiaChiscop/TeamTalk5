@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(Combine)
+import Combine
+#endif
 import TeamTalkC
 
 public protocol TeamTalkMessageObserver: AnyObject {
@@ -103,8 +106,54 @@ public final class TeamTalkClient {
     var instance: UnsafeMutableRawPointer?
     var observers = [TeamTalkMessageHandler]()
     var eventObservers = [TeamTalkEventHandler]()
+    private let eventLoopQueue = DispatchQueue(label: "dk.bearware.TeamTalk5.TeamTalkClient.eventLoop")
+    private let eventLoopLock = NSLock()
+    let messagePollingLock = NSLock()
+    private var eventLoopTimer: DispatchSourceTimer?
+#if canImport(Combine)
+    let messageSubject = PassthroughSubject<TTMessage, Never>()
+    let eventSubject = PassthroughSubject<TeamTalkEvent, Never>()
+#endif
 
     private init() {}
+
+    public var isEventDispatching: Bool {
+        eventLoopLock.lock()
+        defer { eventLoopLock.unlock() }
+        return eventLoopTimer != nil
+    }
+
+    public func startEventDispatching(pollInterval: TimeInterval = 0.1) {
+        eventLoopLock.lock()
+        if eventLoopTimer != nil {
+            eventLoopLock.unlock()
+            return
+        }
+
+        let timer = DispatchSource.makeTimerSource(queue: eventLoopQueue)
+        timer.schedule(deadline: .now(), repeating: pollInterval)
+        timer.setEventHandler { [weak self] in
+            self?.pollMessages()
+        }
+        eventLoopTimer = timer
+        eventLoopLock.unlock()
+
+        timer.resume()
+    }
+
+    public func stopEventDispatching() {
+        eventLoopLock.lock()
+        let timer = eventLoopTimer
+        eventLoopTimer = nil
+        eventLoopLock.unlock()
+
+        timer?.setEventHandler {}
+        timer?.cancel()
+    }
+
+    func ensureEventDispatching() {
+        startEventDispatching()
+    }
 
     public static func touchLinkerSymbolsForTests() {
         if TT_GetRootChannelID(nil) == 1 {

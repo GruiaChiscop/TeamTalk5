@@ -89,25 +89,21 @@ final class UserDetailModel: ObservableObject {
     func voiceVolumeChanged(_ value: Double) {
         voiceVolume = value
         TeamTalkClient.shared.setUserVolume(user: currentUser, stream: .voice, volume: INT32(refVolume(value)))
-        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func mediaVolumeChanged(_ value: Double) {
         mediaVolume = value
         TeamTalkClient.shared.setUserVolume(user: currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(value)))
-        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func muteVoice(_ muted: Bool) {
         isVoiceMuted = muted
         TeamTalkClient.shared.setUserMute(user: currentUser, stream: .voice, muted: muted)
-        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func muteMediaStream(_ muted: Bool) {
         isMediaMuted = muted
         TeamTalkClient.shared.setUserMute(user: currentUser, stream: .mediaFileAudio, muted: muted)
-        TeamTalkClient.shared.pump(.userStateChanged, source: currentUser)
     }
 
     func setSubscription(_ subscription: TeamTalkSubscriptions, enabled: Bool) {

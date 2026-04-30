@@ -27,7 +27,7 @@ import SwiftUI
 import TeamTalkKit
 import UIKit
 
-final class MainTabModel: ObservableObject, TeamTalkEvent {
+final class MainTabModel: ObservableObject, TeamTalkEventObserver {
 
     let channelListModel: ChannelListModel
     let channelChatModel: TextMessageModel
@@ -41,7 +41,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     @Published var showSaveAlert = false
 
     private var pendingDismiss: (() -> Void)?
-    private var polltimer: Timer?
     private var reconnecttimer: Timer?
     private var didSetup = false
 
@@ -49,7 +48,7 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         self.server = server
         channelListModel = ChannelListModel()
         channelChatModel = TextMessageModel(
-            userid: 0,
+            target: .channelFeed,
             title: String(localized: "Messages", comment: "tab")
         )
         channelFilesModel = ChannelFilesModel()
@@ -60,7 +59,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     deinit {
         TeamTalkClient.shared.disconnect()
         closeSoundDevices()
-        runTeamTalkEventHandler()
         print("Destroyed main view controller")
     }
 
@@ -68,11 +66,11 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         guard !didSetup else { return }
         didSetup = true
 
-        addToTTMessages(self)
-        addToTTMessages(channelListModel)
-        addToTTMessages(channelChatModel)
-        addToTTMessages(channelFilesModel)
-        addToTTMessages(preferencesModel)
+        addToTeamTalkEvents(self)
+        addToTeamTalkEvents(channelListModel)
+        addToTeamTalkEvents(channelChatModel)
+        addToTeamTalkEvents(channelFilesModel)
+        addToTeamTalkEvents(preferencesModel)
 
         setupSoundDevices()
 
@@ -92,14 +90,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
             let vol = defaults.integer(forKey: PREF_MICROPHONE_GAIN)
             TeamTalkClient.shared.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
         }
-
-        polltimer = Timer.scheduledTimer(
-            timeInterval: 0.1,
-            target: self,
-            selector: #selector(timerEvent),
-            userInfo: nil,
-            repeats: true
-        )
 
         let center = NotificationCenter.default
         center.addObserver(
@@ -122,9 +112,12 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     }
 
     func teardown() {
-        polltimer?.invalidate()
         reconnecttimer?.invalidate()
-        removeAllTTMessageHandlers()
+        removeFromTeamTalkEvents(self)
+        removeFromTeamTalkEvents(channelListModel)
+        removeFromTeamTalkEvents(channelChatModel)
+        removeFromTeamTalkEvents(channelFilesModel)
+        removeFromTeamTalkEvents(preferencesModel)
         unreadmessages.removeAll()
         UIDevice.current.isProximityMonitoringEnabled = false
         UIApplication.shared.endReceivingRemoteControlEvents()
@@ -209,10 +202,6 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         }
     }
 
-    @objc private func timerEvent() {
-        runTeamTalkEventHandler()
-    }
-
     @objc private func proximityChanged(_ notification: Notification) {}
 
     @objc private func audioRouteChange(_ notification: Notification) {
@@ -235,10 +224,10 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         }
     }
 
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
+    func handleTeamTalkEvent(_ event: TeamTalkEvent) {
+        switch event.kind {
 
-        case CLIENTEVENT_CON_SUCCESS:
+        case .connectionSucceeded:
             os_log("Connected to \(self.server.ipaddr)")
 
             if AppInfo.isBearWareWebLogin(self.server.username) {
@@ -265,12 +254,12 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
             }
             login()
 
-        case CLIENTEVENT_CON_FAILED:
+        case .connectionFailed:
             TeamTalkClient.shared.disconnect()
             startReconnectTimer()
             os_log("Connect to \(self.server.ipaddr) failed")
 
-        case CLIENTEVENT_CON_LOST:
+        case .connectionLost:
             os_log("Connection to \(self.server.ipaddr) lost")
             TeamTalkClient.shared.disconnect()
             playSound(.srv_LOST)
@@ -280,66 +269,63 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
             }
             startReconnectTimer()
 
-        case CLIENTEVENT_VOICE_ACTIVATION:
-            playSound(TeamTalkMessagePayload.isActive(m) ? .voxtriggered_ON : .voxtriggered_OFF)
+        case .voiceActivation(let isActive):
+            playSound(isActive ? .voxtriggered_ON : .voxtriggered_OFF)
 
-        case CLIENTEVENT_CMD_MYSELF_LOGGEDIN:
-            let account = TeamTalkMessagePayload.userAccount(from: m)
-            let initchan = TeamTalkString.userAccount(.initialChannel, from: account)
+        case .myselfLoggedIn(_, let account):
+            let initchan = account.initialChannel
             if !initchan.isEmpty {
                 server.channel = initchan
             }
 
-        case CLIENTEVENT_CMD_MYSELF_KICKED:
+        case .myselfKicked(let channelID, let kickedBy):
             let msg: String
-            if TeamTalkMessagePayload.hasUserPayload(m) {
-                let kicker = getDisplayName(TeamTalkMessagePayload.user(from: m))
-                msg = m.nSource == 0
+            if let kickedBy {
+                let kicker = getDisplayName(kickedBy)
+                msg = !channelID.isValid
                     ? String(format: String(localized: "You have been kicked from server by %@", comment: "Dialog"), kicker)
                     : String(format: String(localized: "You have been kicked from channel by %@", comment: "Dialog"), kicker)
             } else {
-                msg = m.nSource == 0
+                msg = !channelID.isValid
                     ? String(localized: "You have been kicked from server", comment: "Dialog")
                     : String(localized: "You have been kicked from channel", comment: "Dialog")
             }
-            if m.nSource == 0 { playSound(.srv_LOST) }
+            if !channelID.isValid { playSound(.srv_LOST) }
             alertMessage = msg
 
-        case CLIENTEVENT_CMD_USER_LOGGEDIN:
-            let subs = getDefaultSubscriptions()
-            let user = TeamTalkMessagePayload.user(from: m)
-            if TeamTalkClient.shared.myUserID != user.nUserID && user.uLocalSubscriptions != subs {
-                TeamTalkClient.shared.unsubscribe(userID: user.nUserID, subscriptions: user.uLocalSubscriptions ^ subs)
+        case .userLoggedIn(let user):
+            let subscriptions = TeamTalkSubscriptions(rawValue: getDefaultSubscriptions())
+            if TeamTalkClient.shared.myUserIdentifier != user.userID && user.localSubscriptions != subscriptions {
+                let difference = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
+                TeamTalkClient.shared.unsubscribe(userID: user.userID, subscriptions: difference)
             }
             syncFromUserCache(user: user)
 
-        case CLIENTEVENT_CMD_USER_LOGGEDOUT:
-            syncToUserCache(user: TeamTalkMessagePayload.user(from: m))
+        case .userLoggedOut(let user):
+            syncToUserCache(user: user)
 
-        case CLIENTEVENT_CMD_USER_JOINED:
-            let user = TeamTalkMessagePayload.user(from: m)
+        case .userJoined(let user):
             let defaults = UserDefaults.standard
             if let mfvol = defaults.object(forKey: PREF_MEDIAFILE_VOLUME) as? Double {
                 let vol = refVolume(100.0 * mfvol)
                 TeamTalkClient.shared.setUserVolume(
-                    userID: user.nUserID, stream: STREAMTYPE_MEDIAFILE_AUDIO, volume: INT32(vol)
+                    userID: user.userID, stream: .mediaFileAudio, volume: INT32(vol)
                 )
-                TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: user.nUserID)
             }
             if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
                 syncFromUserCache(user: user)
             }
 
-        case CLIENTEVENT_CMD_USER_LEFT:
+        case .userLeft(_, let user):
             if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
-                syncToUserCache(user: TeamTalkMessagePayload.user(from: m))
+                syncToUserCache(user: user)
             }
 
-        case CLIENTEVENT_CMD_USER_TEXTMSG:
-            switch TeamTalkMessagePayload.textMessage(from: m).nMsgType {
-            case MSGTYPE_CHANNEL:   playSound(.chan_MSG)
-            case MSGTYPE_USER:      playSound(.user_MSG)
-            case MSGTYPE_BROADCAST: playSound(.broadcast_MSG)
+        case .textMessage(let message):
+            switch message.type {
+            case .channel:   playSound(.chan_MSG)
+            case .user:      playSound(.user_MSG)
+            case .broadcast: playSound(.broadcast_MSG)
             default: break
             }
 

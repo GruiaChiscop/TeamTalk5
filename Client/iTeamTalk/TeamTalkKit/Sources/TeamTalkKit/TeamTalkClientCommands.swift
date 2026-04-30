@@ -111,6 +111,34 @@ public func sendTextMessage(_ message: TeamTalkOutgoingTextMessage) -> [TeamTalk
 }
 
 @discardableResult
+public func sendTextMessage(to userID: TeamTalkUserID, content: String) -> [TeamTalkCommandID] {
+    sendTextMessage(.user(to: userID, content: content))
+}
+
+@discardableResult
+public func sendTextMessage(to user: TeamTalkUser, content: String) -> [TeamTalkCommandID] {
+    sendTextMessage(.user(to: user, content: content))
+}
+
+@discardableResult
+public func sendTextMessage(to channelID: TeamTalkChannelID, content: String) -> [TeamTalkCommandID] {
+    sendTextMessage(.channel(channelID, content: content))
+}
+
+@discardableResult
+public func sendTextMessage(to channel: TeamTalkChannel, content: String) -> [TeamTalkCommandID] {
+    sendTextMessage(.channel(channel, content: content))
+}
+
+@discardableResult
+public func sendChannelMessage(_ content: String) -> [TeamTalkCommandID] {
+    guard let channel = currentChannel() else {
+        return []
+    }
+    return sendTextMessage(to: channel, content: content)
+}
+
+@discardableResult
 public func setChannelOperator(userID: Int32, channelID: Int32, enabled: Bool) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoChannelOp(instance, userID, channelID, enabled ? 1 : 0))
 }

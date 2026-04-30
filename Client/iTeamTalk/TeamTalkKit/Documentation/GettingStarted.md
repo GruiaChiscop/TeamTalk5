@@ -69,18 +69,12 @@ Task {
 The lower-level command-returning overloads still exist when you explicitly want
 to compare `TeamTalkCommandID` values against command events.
 
-## Poll Events
+## Event Dispatch
 
-The TeamTalk C SDK is poll based. TeamTalkKit does not start a hidden polling
-thread. The host app must call:
-
-```swift
-TeamTalkClient.shared.pollMessages()
-```
-
-iTeamTalk currently drives this from its app event loop. A new app can use a
-timer, run loop integration, or a dedicated task, as long as all TeamTalk calls
-are kept on a predictable execution context.
+The TeamTalk C SDK is poll based, but new TeamTalkKit code does not need to
+call `pollMessages()` directly. As soon as you subscribe through
+`TeamTalkEventObserver`, `eventPublisher`, or `events`, TeamTalkKit starts its
+internal dispatch loop automatically.
 
 ## Observe Typed Events
 
@@ -119,6 +113,16 @@ client.addEventObserver(model)
 client.removeEventObserver(model)
 ```
 
+Use Combine when you prefer publisher-style observation:
+
+```swift
+import Combine
+
+let cancellable = client.eventPublisher.sink { event in
+    print(event.kind)
+}
+```
+
 You can also consume events as an `AsyncStream`:
 
 ```swift
@@ -128,9 +132,6 @@ Task {
     }
 }
 ```
-
-The `AsyncStream` only receives events when `pollMessages()` is called somewhere
-else.
 
 ## Query Server State
 

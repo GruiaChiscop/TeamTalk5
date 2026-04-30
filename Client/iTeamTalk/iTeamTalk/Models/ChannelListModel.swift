@@ -93,7 +93,7 @@ final class ChannelListModel: ObservableObject {
     var isProcessingCommand = false
     var srvprop = ServerProperties()
     var myuseraccount = UserAccount()
-    var textmessages = [INT32: [MyTextMessage]]()
+    var textmessages = [TeamTalkUserID: [MyTextMessage]]()
     var unreadTimer: Timer?
     var displayUsers = [TeamTalkUser]()
     var displayChans = [TeamTalkChannel]()
@@ -108,6 +108,11 @@ final class ChannelListModel: ObservableObject {
         for (_, user) in users {
             syncToUserCache(user: user)
         }
+    }
+
+    @MainActor
+    private func presentError(_ message: String) {
+        errorMessage = message
     }
 
     // MARK: - Display helpers
@@ -182,7 +187,7 @@ final class ChannelListModel: ObservableObject {
         let iconAccessibilityLabel = isTalking
             ? String(localized: "Talking", comment: "channel list")
             : String(localized: "Silent", comment: "channel list")
-        let messageIcon = unreadmessages.contains(user.userID.cValue) && Int(Date().timeIntervalSince1970) % 2 == 0
+        let messageIcon = unreadmessages.contains(user.userID) && Int(Date().timeIntervalSince1970) % 2 == 0
             ? "message_red"
             : "message_blue"
         return ChannelUserDetails(
@@ -279,12 +284,11 @@ final class ChannelListModel: ObservableObject {
             showingJoinPasswordAlert = true
         } else {
             Task { [weak self] in
+                guard let self else { return }
                 do {
                     try await TeamTalkClient.shared.joinChannel(channel)
                 } catch {
-                    await MainActor.run {
-                        self?.errorMessage = error.localizedDescription
-                    }
+                    await self.presentError(error.localizedDescription)
                 }
             }
         }
@@ -297,12 +301,11 @@ final class ChannelListModel: ObservableObject {
         joiningChannel = nil
 
         Task { [weak self] in
+            guard let self else { return }
             do {
                 try await TeamTalkClient.shared.joinChannel(channel, password: password)
             } catch {
-                await MainActor.run {
-                    self?.errorMessage = error.localizedDescription
-                }
+                await self.presentError(error.localizedDescription)
             }
         }
     }
@@ -319,15 +322,14 @@ final class ChannelListModel: ObservableObject {
         guard let user = users[userID] else { return }
         TeamTalkClient.shared.setUserMute(
             userID: userID,
-            stream: STREAMTYPE_MEDIAFILE_AUDIO,
+            stream: .mediaFileAudio,
             muted: !user.states.contains(.mediaFileMuted)
         )
         TeamTalkClient.shared.setUserMute(
             userID: userID,
-            stream: STREAMTYPE_VOICE,
+            stream: .voice,
             muted: !user.states.contains(.voiceMuted)
         )
-        TeamTalkClient.shared.pump(.userStateChanged, source: user)
     }
 
     func moveUser(userID: TeamTalkUserID) {
@@ -358,12 +360,11 @@ final class ChannelListModel: ObservableObject {
         let channel = curchannel.channelID.isValid ? curchannel : nil
 
         Task { [weak self] in
+            guard let self else { return }
             do {
                 try await TeamTalkClient.shared.kickUser(user, fromChannel: channel)
             } catch {
-                await MainActor.run {
-                    self?.errorMessage = error.localizedDescription
-                }
+                await self.presentError(error.localizedDescription)
             }
         }
     }
@@ -375,13 +376,12 @@ final class ChannelListModel: ObservableObject {
         let channel = curchannel.channelID.isValid ? curchannel : nil
 
         Task { [weak self] in
+            guard let self else { return }
             do {
                 try await TeamTalkClient.shared.banUser(user, fromChannel: channel)
                 try await TeamTalkClient.shared.kickUser(user, fromChannel: channel)
             } catch {
-                await MainActor.run {
-                    self?.errorMessage = error.localizedDescription
-                }
+                await self.presentError(error.localizedDescription)
             }
         }
     }
@@ -398,6 +398,7 @@ final class ChannelListModel: ObservableObject {
         refreshChannelList()
 
         Task { [weak self] in
+            guard let self else { return }
             var firstError: Error?
 
             for user in selectedUsers {
@@ -411,9 +412,7 @@ final class ChannelListModel: ObservableObject {
             }
 
             if let firstError {
-                await MainActor.run {
-                    self?.errorMessage = firstError.localizedDescription
-                }
+                await self.presentError(firstError.localizedDescription)
             }
         }
     }
@@ -474,15 +473,15 @@ final class ChannelListModel: ObservableObject {
         channelDetailModel = model
     }
 
-    func showTextMessages(userid: INT32) {
-        let model = makeTextMessageModel(userid: userid)
+    func showTextMessages(user: TeamTalkUser) {
+        let model = makeTextMessageModel(for: user)
         currentTextMessageModel = model
         navigationPath.append(.textMessage(model))
     }
 
-    private func makeTextMessageModel(userid: INT32) -> TextMessageModel {
+    private func makeTextMessageModel(for user: TeamTalkUser) -> TextMessageModel {
         let model = TextMessageModel(
-            userid: userid,
+            target: .directMessage(user),
             title: String(localized: "Private Text Message", comment: "text message navigation title")
         )
         openTextMessages(model)
@@ -491,8 +490,8 @@ final class ChannelListModel: ObservableObject {
 
     func openTextMessages(_ model: TextMessageModel) {
         model.delegate = self
-        addToTTMessages(model)
-        if let msgs = textmessages[model.userid] {
+        addToTeamTalkEvents(model)
+        if let user = model.privateUser, let msgs = textmessages[user.userID] {
             for m in msgs { model.appendEventMessage(m) }
         }
     }
@@ -627,24 +626,24 @@ final class ChannelListModel: ObservableObject {
 // MARK: - MyTextMessageDelegate
 
 extension ChannelListModel: MyTextMessageDelegate {
-    func appendTextMessage(_ userid: INT32, txtmsg: MyTextMessage) {
-        if textmessages[userid] == nil {
-            textmessages[userid] = [MyTextMessage]()
+    func appendTextMessage(for userID: TeamTalkUserID, message: MyTextMessage) {
+        if textmessages[userID] == nil {
+            textmessages[userID] = [MyTextMessage]()
         }
-        textmessages[userid]!.append(txtmsg)
-        if textmessages[userid]!.count > MAX_TEXTMESSAGES {
-            textmessages[userid]!.removeFirst()
+        textmessages[userID]!.append(message)
+        if textmessages[userID]!.count > MAX_TEXTMESSAGES {
+            textmessages[userID]!.removeFirst()
         }
     }
 }
 
 // MARK: - TeamTalkEvent
 
-extension ChannelListModel: TeamTalkEvent {
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
+extension ChannelListModel: TeamTalkEventObserver {
+    func handleTeamTalkEvent(_ event: TeamTalkEvent) {
+        switch event.kind {
 
-        case CLIENTEVENT_CON_LOST:
+        case .connectionLost:
             channels.removeAll()
             users.removeAll()
             curchannel = TeamTalkChannel(Channel())
@@ -652,26 +651,24 @@ extension ChannelListModel: TeamTalkEvent {
             rejoinchannel = nil
             refreshChannelList()
 
-        case CLIENTEVENT_CMD_PROCESSING:
-            isProcessingCommand = TeamTalkMessagePayload.isActive(m)
+        case .commandProcessing(_, let isActive):
+            isProcessingCommand = isActive
 
-        case CLIENTEVENT_CMD_SERVER_UPDATE:
-            srvprop = TeamTalkMessagePayload.serverProperties(from: m)
+        case .serverUpdated(let properties):
+            srvprop = properties.rawValue
 
-        case CLIENTEVENT_CMD_MYSELF_LOGGEDIN:
-            myuseraccount = TeamTalkMessagePayload.userAccount(from: m)
+        case .myselfLoggedIn(_, let account):
+            myuseraccount = account.rawValue
             if (myuseraccount.uUserType & USERTYPE_ADMIN.rawValue) != 0 {
                 myuseraccount.uUserRights = 0xFFFFFFFF
             }
 
-        case CLIENTEVENT_CMD_CHANNEL_NEW:
-            let channel = TeamTalkChannel(TeamTalkMessagePayload.channel(from: m))
+        case .channelCreated(let channel):
             channels[channel.channelID] = channel
             if !channel.parentChannelID.isValid { updateTitle() }
             if !isProcessingCommand { refreshChannelList() }
 
-        case CLIENTEVENT_CMD_CHANNEL_UPDATE:
-            let channel = TeamTalkChannel(TeamTalkMessagePayload.channel(from: m))
+        case .channelUpdated(let channel):
             channels[channel.channelID] = channel
             if mychannel.channelID == channel.channelID {
                 let myUserID = TeamTalkClient.shared.myUserIdentifier
@@ -686,41 +683,37 @@ extension ChannelListModel: TeamTalkEvent {
             }
             if !isProcessingCommand { refreshChannelList() }
 
-        case CLIENTEVENT_CMD_CHANNEL_REMOVE:
-            let channel = TeamTalkChannel(TeamTalkMessagePayload.channel(from: m))
+        case .channelRemoved(let channel):
             channels.removeValue(forKey: channel.channelID)
             if !isProcessingCommand { refreshChannelList() }
 
-        case CLIENTEVENT_CMD_USER_LOGGEDIN:
+        case .userLoggedIn(let user):
             playSound(.logged_IN)
-            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
             users[user.userID] = user
             if !isProcessingCommand {
                 if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
                 if TeamTalkClient.shared.myUserIdentifier != user.userID {
                     let defaults = UserDefaults.standard
                     if defaults.object(forKey: PREF_TTSEVENT_USERLOGIN) != nil && defaults.bool(forKey: PREF_TTSEVENT_USERLOGIN) {
-                        newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
+                        newUtterance(getDisplayName(user) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
                     }
                 }
             }
 
-        case CLIENTEVENT_CMD_USER_LOGGEDOUT:
+        case .userLoggedOut(let user):
             playSound(.logged_OUT)
-            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
             users.removeValue(forKey: user.userID)
             if !isProcessingCommand {
                 if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
                 if TeamTalkClient.shared.myUserIdentifier != user.userID {
                     let defaults = UserDefaults.standard
                     if defaults.object(forKey: PREF_TTSEVENT_USERLOGOUT) != nil && defaults.bool(forKey: PREF_TTSEVENT_USERLOGOUT) {
-                        newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
+                        newUtterance(getDisplayName(user) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
                     }
                 }
             }
 
-        case CLIENTEVENT_CMD_USER_JOINED:
-            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+        case .userJoined(let user):
             users[user.userID] = user
             if user.userID == TeamTalkClient.shared.myUserIdentifier, let joinedChannel = channels[user.channelIdentifier] {
                 curchannel = joinedChannel
@@ -736,18 +729,16 @@ extension ChannelListModel: TeamTalkEvent {
                 playSound(.joined_CHAN)
                 let defaults = UserDefaults.standard
                 if defaults.object(forKey: PREF_TTSEVENT_JOINEDCHAN) == nil || defaults.bool(forKey: PREF_TTSEVENT_JOINEDCHAN) {
-                    newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has joined the channel", comment: "TTS EVENT"))
+                    newUtterance(getDisplayName(user) + " " + String(localized: "has joined the channel", comment: "TTS EVENT"))
                 }
             }
             if !isProcessingCommand { refreshChannelList() }
 
-        case CLIENTEVENT_CMD_USER_UPDATE:
-            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+        case .userUpdated(let user):
             users[user.userID] = user
             if !isProcessingCommand { refreshChannelList() }
 
-        case CLIENTEVENT_CMD_USER_LEFT:
-            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+        case .userLeft(let previousChannelID, let user):
             if myuseraccount.uUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue == 0 {
                 users.removeValue(forKey: user.userID)
             } else {
@@ -757,57 +748,56 @@ extension ChannelListModel: TeamTalkEvent {
                 mychannel = TeamTalkChannel(Channel())
                 rejoinchannel = nil
             }
-            if TeamTalkChannelID(m.nSource) == mychannel.channelID && mychannel.channelID.isValid {
+            if previousChannelID == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.left_CHAN)
                 let defaults = UserDefaults.standard
                 if defaults.object(forKey: PREF_TTSEVENT_LEFTCHAN) == nil || defaults.bool(forKey: PREF_TTSEVENT_LEFTCHAN) {
-                    newUtterance(getDisplayName(user.rawValue) + " " + String(localized: "has left the channel", comment: "TTS EVENT"))
+                    newUtterance(getDisplayName(user) + " " + String(localized: "has left the channel", comment: "TTS EVENT"))
                 }
             }
             if !isProcessingCommand { refreshChannelList() }
 
-        case CLIENTEVENT_CMD_USER_TEXTMSG:
-            let txtmsg = TeamTalkMessagePayload.textMessage(from: m)
-            if txtmsg.nMsgType == MSGTYPE_USER {
+        case .textMessage(let message):
+            if message.type == .user {
                 let settings = UserDefaults.standard
-                let fromUserID = TeamTalkUserID(txtmsg.nFromUserID)
+                let fromUserID = message.fromUserIdentifier
                 if let user = users[fromUserID] {
-                    let name = getDisplayName(user.rawValue)
+                    let name = getDisplayName(user)
                     let newmsg = MyTextMessage(
-                        m: txtmsg,
+                        m: message.rawValue,
                         nickname: name,
-                        msgtype: TeamTalkClient.shared.myUserID == txtmsg.nFromUserID ? .PRIV_IM_MYSELF : .PRIV_IM
+                        msgtype: TeamTalkClient.shared.myUserIdentifier == message.fromUserIdentifier ? .PRIV_IM_MYSELF : .PRIV_IM
                     )
-                    appendTextMessage(txtmsg.nFromUserID, txtmsg: newmsg)
+                    appendTextMessage(for: message.fromUserIdentifier, message: newmsg)
                     if unreadmessages.isEmpty {
                         unreadTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                             self?.timerUnreadBlinker()
                         }
                     }
-                    unreadmessages.insert(txtmsg.nFromUserID)
+                    unreadmessages.insert(message.fromUserIdentifier)
                 }
 
                 // Don't auto-navigate if the private chat for this user is already visible
-                if currentTextMessageModel?.userid == txtmsg.nFromUserID {
+                if currentTextMessageModel?.isShowingConversation(with: message.fromUserIdentifier) == true {
                     break
                 }
 
-                if settings.object(forKey: PREF_DISPLAY_POPUPTXTMSG) == nil || settings.bool(forKey: PREF_DISPLAY_POPUPTXTMSG) {
-                    let model = makeTextMessageModel(userid: txtmsg.nFromUserID)
+                if let user = users[fromUserID],
+                   settings.object(forKey: PREF_DISPLAY_POPUPTXTMSG) == nil || settings.bool(forKey: PREF_DISPLAY_POPUPTXTMSG) {
+                    let model = makeTextMessageModel(for: user)
                     currentTextMessageModel = model
                     navigationPath.append(.textMessage(model))
                     if let msg = model.getLastEventMessage() {
-                        speakTextMessage(txtmsg.nMsgType, mymsg: msg)
+                        speakTextMessage(message.type.cValue, mymsg: msg)
                     }
                 }
             }
 
-        case CLIENTEVENT_USER_STATECHANGE:
-            let user = TeamTalkUser(TeamTalkMessagePayload.user(from: m))
+        case .userStateChanged(let user):
             users[user.userID] = user
             refreshChannelList()
 
-        case CLIENTEVENT_VOICE_ACTIVATION:
+        case .voiceActivation:
             refreshChannelList()
 
         default:

@@ -105,6 +105,51 @@ public struct TeamTalkTextMessage {
     }
 }
 
+public struct TeamTalkTextMessageMultipartKey: Hashable, Sendable {
+    public let type: TeamTalkTextMessageType
+    public let fromUserID: TeamTalkUserID
+
+    public init(type: TeamTalkTextMessageType, fromUserID: TeamTalkUserID) {
+        self.type = type
+        self.fromUserID = fromUserID
+    }
+
+    public init(_ message: TeamTalkTextMessage) {
+        self.init(type: message.type, fromUserID: message.fromUserIdentifier)
+    }
+}
+
+public struct TeamTalkTextMessageAssembler {
+    private var messageFragments = [TeamTalkTextMessageMultipartKey: [String]]()
+
+    public init() {}
+
+    public mutating func append(_ message: TeamTalkTextMessage) -> String? {
+        let key = TeamTalkTextMessageMultipartKey(message)
+
+        if message.hasMoreContent {
+            if messageFragments[key] == nil {
+                messageFragments[key] = []
+            }
+            messageFragments[key]?.append(message.content)
+            if messageFragments[key]?.count ?? 0 > 1000 {
+                messageFragments.removeValue(forKey: key)
+            }
+            return nil
+        }
+
+        guard let fragments = messageFragments.removeValue(forKey: key), !fragments.isEmpty else {
+            return message.content
+        }
+
+        return fragments.joined() + message.content
+    }
+
+    public mutating func clear() {
+        messageFragments.removeAll()
+    }
+}
+
 public struct TeamTalkOutgoingTextMessage {
     public var type: TeamTalkTextMessageType
     public var toUserID: Int32

@@ -125,14 +125,16 @@ default:
 
 TeamTalkKit has two event APIs:
 
-- `TeamTalkMessageObserver` receives raw `TTMessage` values;
-- `TeamTalkEventObserver` receives decoded `TeamTalkEvent` values.
+- `TeamTalkEventObserver` receives decoded `TeamTalkEvent` values;
+- `eventPublisher` exposes the same typed events through Combine;
+- `events` exposes them as `AsyncStream<TeamTalkEvent>`.
 
-Both are fed by `pollMessages()`. The typed API is additive and does not remove
-raw message support.
+Subscribing through any typed event API starts TeamTalkKit's internal dispatch
+loop automatically. Raw `TTMessage` observation still exists as a compatibility
+escape hatch, but it is now considered legacy.
 
-Important: `events: AsyncStream<TeamTalkEvent>` is only a stream wrapper over
-the observer system. It does not poll the C SDK by itself.
+If you want explicit control, `startEventDispatching(pollInterval:)` and
+`stopEventDispatching()` are available on `TeamTalkClient`.
 
 ## Server And Admin APIs
 
@@ -252,8 +254,8 @@ Recommended pattern:
 
 - start the client during app initialization;
 - connect/log in from a session model;
-- call `pollMessages()` from one predictable loop;
-- update UI state from decoded events;
+- subscribe to typed events once from a session model;
+- update UI state from decoded events or async command results;
 - close the client during shutdown.
 
 ## macOS Notes
