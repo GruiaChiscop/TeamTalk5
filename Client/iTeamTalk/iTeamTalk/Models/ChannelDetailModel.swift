@@ -110,7 +110,7 @@ final class ChannelDetailModel: ObservableObject {
 
     func joinChannelPressed() {
         if isPasswordProtected || !configuration.password.isEmpty {
-            joinPassword = passwordText
+            //joinPassword = passwordText
             showingJoinAlert = true
         } else {
             guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {

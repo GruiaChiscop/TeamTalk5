@@ -151,6 +151,11 @@ final class TextMessageModel: ObservableObject {
         appendEventMessage(MyTextMessage(logmsg: message))
     }
 
+    func lastMessage() -> MyTextMessage? {
+        sections.last?.messages.last
+    }
+    
+
     private func shouldStartNewSection(for message: MyTextMessage) -> Bool {
         guard let last = sections.last?.messages.last else { return true }
         return last.fromUserID != message.fromUserID

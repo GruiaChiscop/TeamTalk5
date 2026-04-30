@@ -280,7 +280,7 @@ final class ChannelListModel: ObservableObject {
     func joinNewChannel(_ channel: TeamTalkChannel) {
         if channel.isPasswordProtected {
             joiningChannel = channel
-            joinPassword = channel.password
+            //joinPassword = channel.password
             showingJoinPasswordAlert = true
         } else {
             Task { [weak self] in
@@ -791,7 +791,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                     let model = makeTextMessageModel(for: user)
                     currentTextMessageModel = model
                     navigationPath.append(.textMessage(model))
-                    if let msg = model.getLastEventMessage() {
+                    if let msg = model.lastMessage() {
                         speakTextMessage(message.type.cValue, mymsg: msg)
                     }
                 }

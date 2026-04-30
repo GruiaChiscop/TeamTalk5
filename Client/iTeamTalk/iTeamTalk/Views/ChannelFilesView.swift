@@ -178,6 +178,14 @@ private struct ChannelFileRowView: View {
         .accessibilityAction(named: "Delete") {
             delete()
         }
+        .contextMenu {
+            Button("Download") {
+                download()
+            }
+            Button("Delete") {
+                delete()
+            }
+        }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) {
                 delete()
