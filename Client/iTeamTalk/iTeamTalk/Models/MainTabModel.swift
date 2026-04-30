@@ -234,9 +234,7 @@ final class MainTabModel: ObservableObject, TeamTalkEventObserver {
                 let settings = UserDefaults.standard
                 let username = settings.string(forKey: PREF_GENERAL_BEARWARE_ID) ?? ""
                 let token = settings.string(forKey: PREF_GENERAL_BEARWARE_TOKEN) ?? ""
-                let accesstoken = TeamTalkClient.shared.withServerProperties {
-                    TeamTalkString.serverProperties(.accessToken, from: $0)
-                }
+                let accesstoken = TeamTalkClient.shared.serverProperties()?.accessToken ?? ""
                 let url = AppInfo.getBearWareServerTokenURL(
                     username: username, token: token, accesstoken: accesstoken
                 )
@@ -297,7 +295,7 @@ final class MainTabModel: ObservableObject, TeamTalkEventObserver {
             let subscriptions = TeamTalkSubscriptions(rawValue: getDefaultSubscriptions())
             if TeamTalkClient.shared.myUserIdentifier != user.userID && user.localSubscriptions != subscriptions {
                 let difference = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
-                TeamTalkClient.shared.unsubscribe(userID: user.userID, subscriptions: difference)
+                TeamTalkClient.shared.unsubscribe(difference, from: user)
             }
             syncFromUserCache(user: user)
 
@@ -309,7 +307,7 @@ final class MainTabModel: ObservableObject, TeamTalkEventObserver {
             if let mfvol = defaults.object(forKey: PREF_MEDIAFILE_VOLUME) as? Double {
                 let vol = refVolume(100.0 * mfvol)
                 TeamTalkClient.shared.setUserVolume(
-                    userID: user.userID, stream: .mediaFileAudio, volume: INT32(vol)
+                    user, stream: .mediaFileAudio, volume: INT32(vol)
                 )
             }
             if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
@@ -361,7 +359,7 @@ final class MainTabModel: ObservableObject, TeamTalkEventObserver {
 
                     let settings = UserDefaults.standard
                     if settings.integer(forKey: PREF_GENERAL_GENDER) != 0 {
-                        TeamTalkClient.shared.changeStatus(mode: INT32(StatusMode.STATUSMODE_FEMALE.rawValue))
+                        TeamTalkClient.shared.setStatus(mode: .female)
                     }
                 }
 

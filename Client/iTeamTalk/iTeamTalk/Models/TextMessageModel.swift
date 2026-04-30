@@ -67,11 +67,9 @@ final class TextMessageModel: ObservableObject {
     let title: String
     weak var delegate: MyTextMessageDelegate?
 
-    @Published var sections = [TextMessageSection]()
+    @Published private(set) var sections: [TextMessageSection] = []
     @Published var composedText = ""
 
-    private var messages = [Int: [MyTextMessage]]()
-    private var curMessageSection = 0
     private var messageAssembler = TeamTalkTextMessageAssembler()
 
     init(target: TextMessageTarget, title: String) {
@@ -81,16 +79,6 @@ final class TextMessageModel: ObservableObject {
 
     deinit {
         removeFromTeamTalkEvents(self)
-    }
-
-    @MainActor
-    private func clearComposer() {
-        composedText = ""
-    }
-
-    @MainActor
-    private func appendCommandError(_ message: String) {
-        appendEventMessage(MyTextMessage(logmsg: message))
     }
 
     var showLogMessages: Bool { target.showLogMessages }
@@ -104,21 +92,12 @@ final class TextMessageModel: ObservableObject {
     }
 
     func appendEventMessage(_ message: MyTextMessage) {
-        if messages[curMessageSection] == nil ||
-            messages[curMessageSection]?.last?.fromUserID != message.fromUserID ||
-            messages[curMessageSection]?.last?.nickname != message.nickname ||
-            messages[curMessageSection]?.last?.msgtype != message.msgtype {
-            curMessageSection += 1
-            messages[curMessageSection] = [MyTextMessage]()
+        if shouldStartNewSection(for: message) {
+            sections.append(TextMessageSection(title: sectionTitle(for: message), messages: [message]))
+        } else {
+            sections[sections.count - 1].messages.append(message)
         }
-        messages[curMessageSection]?.append(message)
-
         trimMessagesIfNeeded()
-        updateMessages()
-    }
-
-    func getLastEventMessage() -> MyTextMessage? {
-        messages[curMessageSection]?.last
     }
 
     func clearUnreadMessages() {
@@ -131,11 +110,10 @@ final class TextMessageModel: ObservableObject {
         guard !content.isEmpty else { return }
 
         if let privateUser {
-            let currentUser = TeamTalkClient.shared.currentUser() ?? TeamTalkUser(User())
-            let name = getDisplayName(currentUser)
+            let myID = TeamTalkClient.shared.myUserIdentifier
             let mymsg = MyTextMessage(
-                fromUserID: TeamTalkClient.shared.myUserIdentifier,
-                nickname: name,
+                fromUserID: myID,
+                nickname: myDisplayName,
                 msgtype: .PRIV_IM_MYSELF,
                 content: content
             )
@@ -163,25 +141,32 @@ final class TextMessageModel: ObservableObject {
         }
     }
 
-    private func updateMessages() {
-        let updatedSections = messages.keys.sorted().compactMap { key -> TextMessageSection? in
-            guard let values = messages[key], let first = values.first else { return nil }
-            return TextMessageSection(title: sectionTitle(for: first), messages: values)
-        }
-        sections = updatedSections
+    @MainActor
+    private func clearComposer() {
+        composedText = ""
+    }
+
+    @MainActor
+    private func appendCommandError(_ message: String) {
+        appendEventMessage(MyTextMessage(logmsg: message))
+    }
+
+    private func shouldStartNewSection(for message: MyTextMessage) -> Bool {
+        guard let last = sections.last?.messages.last else { return true }
+        return last.fromUserID != message.fromUserID
+            || last.nickname != message.nickname
+            || last.msgtype != message.msgtype
     }
 
     private func trimMessagesIfNeeded() {
-        while messageCount > MAX_TEXTMESSAGES, let key = messages.keys.sorted().first {
-            messages[key]?.removeFirst()
-            if messages[key]?.isEmpty != false {
-                messages.removeValue(forKey: key)
+        var totalCount = sections.reduce(0) { $0 + $1.messages.count }
+        while totalCount > MAX_TEXTMESSAGES, !sections.isEmpty {
+            sections[0].messages.removeFirst()
+            totalCount -= 1
+            if sections[0].messages.isEmpty {
+                sections.removeFirst()
             }
         }
-    }
-
-    private var messageCount: Int {
-        messages.values.reduce(0) { $0 + $1.count }
     }
 
     private func sectionTitle(for message: MyTextMessage) -> String {
@@ -192,77 +177,107 @@ final class TextMessageModel: ObservableObject {
             return String(localized: "Status Event", comment: "Text message view")
         }
     }
+
+    private var myDisplayName: String {
+        let me = TeamTalkClient.shared.currentUser() ?? TeamTalkUser(User())
+        return getDisplayName(me)
+    }
+
+    private func displayName(forSender userID: TeamTalkUserID) -> String {
+        let user = TeamTalkClient.shared.user(id: userID) ?? privateUser ?? TeamTalkUser(User())
+        return getDisplayName(user)
+    }
 }
 
 extension TextMessageModel: TeamTalkEventObserver {
     func handleTeamTalkEvent(_ event: TeamTalkEvent) {
         switch event.kind {
         case .textMessage(let txtmsg):
-            if target.matches(txtmsg) {
-                if let content = messageAssembler.append(txtmsg) {
-                    let user = TeamTalkClient.shared.user(id: txtmsg.fromUserIdentifier) ?? privateUser ?? TeamTalkUser(User())
-                    var msgtype = MsgType.PRIV_IM
-                    switch txtmsg.type {
-                    case .user:
-                        msgtype = TeamTalkClient.shared.myUserIdentifier == txtmsg.fromUserIdentifier ? .PRIV_IM_MYSELF : .PRIV_IM
-                    case .channel:
-                        msgtype = TeamTalkClient.shared.myUserIdentifier == txtmsg.fromUserIdentifier ? .CHAN_IM_MYSELF : .CHAN_IM
-                    case .broadcast:
-                        msgtype = .BCAST
-                    default:
-                        break
-                    }
-                    let name = getDisplayName(user)
-                    let mymsg = MyTextMessage(fromUserID: txtmsg.fromUserIdentifier, nickname: name, msgtype: msgtype, content: content)
-                    appendEventMessage(mymsg)
-                    speakTextMessage(txtmsg.type.cValue, mymsg: mymsg)
-                }
-            }
-
+            handleIncomingTextMessage(txtmsg)
         case .userLoggedIn(let user):
-            if showLogMessages && TeamTalkClient.shared.myUserIdentifier == user.userID {
-                appendEventMessage(MyTextMessage(logmsg: String(localized: "Logged on to server", comment: "log entry")))
-            }
-
+            handleMyselfLoggedIn(user)
         case .userJoined(let user):
-            if showLogMessages && TeamTalkClient.shared.myChannelIdentifier == user.channelIdentifier {
-                let logmsg: MyTextMessage
-                if TeamTalkClient.shared.myUserIdentifier == user.userID {
-                    let channame = TeamTalkClient.shared.channel(id: user.channelIdentifier).map { channel in
-                        if !channel.parentChannelID.isValid {
-                            return String(localized: "root channel", comment: "log entry")
-                        }
-                        return channel.name
-                    } ?? String(localized: "root channel", comment: "log entry")
-                    let txt = String(format: String(localized: "Joined %@", comment: "log entry"), channame)
-                    logmsg = MyTextMessage(logmsg: txt)
-                } else {
-                    let name = getDisplayName(user)
-                    let txt = String(format: String(localized: "%@ joined channel", comment: "log entry"), name)
-                    logmsg = MyTextMessage(logmsg: txt)
-                }
-                appendEventMessage(logmsg)
-            }
-
+            handleUserJoined(user)
         case .userLeft(let previousChannelID, let user):
-            if showLogMessages && TeamTalkClient.shared.myChannelIdentifier == previousChannelID {
-                let name = getDisplayName(user)
-                let txt = String(format: String(localized: "%@ left channel", comment: "log entry"), name)
-                appendEventMessage(MyTextMessage(logmsg: txt))
-            }
-
+            handleUserLeft(previousChannel: previousChannelID, user: user)
         case .commandError(_, let error):
-            let txt = String(format: String(localized: "Command failed: %@", comment: "log entry"), error.message)
-            appendEventMessage(MyTextMessage(logmsg: txt))
-
+            handleCommandError(error)
         default:
             break
         }
+    }
+
+    private func handleIncomingTextMessage(_ txtmsg: TeamTalkTextMessage) {
+        guard target.matches(txtmsg),
+              let content = messageAssembler.append(txtmsg) else { return }
+
+        let mymsg = MyTextMessage(
+            fromUserID: txtmsg.fromUserIdentifier,
+            nickname: displayName(forSender: txtmsg.fromUserIdentifier),
+            msgtype: msgType(for: txtmsg),
+            content: content
+        )
+        appendEventMessage(mymsg)
+        speakTextMessage(txtmsg.type.cValue, mymsg: mymsg)
+    }
+
+    private func msgType(for txtmsg: TeamTalkTextMessage) -> MsgType {
+        let isFromMyself = TeamTalkClient.shared.myUserIdentifier == txtmsg.fromUserIdentifier
+        switch txtmsg.type {
+        case .user:
+            return isFromMyself ? .PRIV_IM_MYSELF : .PRIV_IM
+        case .channel:
+            return isFromMyself ? .CHAN_IM_MYSELF : .CHAN_IM
+        case .broadcast:
+            return .BCAST
+        default:
+            return .PRIV_IM
+        }
+    }
+
+    private func handleMyselfLoggedIn(_ user: TeamTalkUser) {
+        guard showLogMessages, TeamTalkClient.shared.myUserIdentifier == user.userID else { return }
+        appendEventMessage(MyTextMessage(logmsg: String(localized: "Logged on to server", comment: "log entry")))
+    }
+
+    private func handleUserJoined(_ user: TeamTalkUser) {
+        guard showLogMessages, TeamTalkClient.shared.myChannelIdentifier == user.channelIdentifier else { return }
+
+        let logmsg: MyTextMessage
+        if TeamTalkClient.shared.myUserIdentifier == user.userID {
+            let channelName = joinedChannelName(for: user.channelIdentifier)
+            let txt = String(format: String(localized: "Joined %@", comment: "log entry"), channelName)
+            logmsg = MyTextMessage(logmsg: txt)
+        } else {
+            let txt = String(format: String(localized: "%@ joined channel", comment: "log entry"), getDisplayName(user))
+            logmsg = MyTextMessage(logmsg: txt)
+        }
+        appendEventMessage(logmsg)
+    }
+
+    private func joinedChannelName(for channelID: TeamTalkChannelID) -> String {
+        let rootName = String(localized: "root channel", comment: "log entry")
+        guard let channel = TeamTalkClient.shared.channel(id: channelID),
+              channel.parentChannelID.isValid else {
+            return rootName
+        }
+        return channel.name
+    }
+
+    private func handleUserLeft(previousChannel: TeamTalkChannelID, user: TeamTalkUser) {
+        guard showLogMessages, TeamTalkClient.shared.myChannelIdentifier == previousChannel else { return }
+        let txt = String(format: String(localized: "%@ left channel", comment: "log entry"), getDisplayName(user))
+        appendEventMessage(MyTextMessage(logmsg: txt))
+    }
+
+    private func handleCommandError(_ error: TeamTalkClientError) {
+        let txt = String(format: String(localized: "Command failed: %@", comment: "log entry"), error.message)
+        appendEventMessage(MyTextMessage(logmsg: txt))
     }
 }
 
 struct TextMessageSection: Identifiable {
     let id = UUID()
     let title: String
-    let messages: [MyTextMessage]
+    var messages: [MyTextMessage]
 }

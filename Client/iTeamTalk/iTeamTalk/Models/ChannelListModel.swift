@@ -200,7 +200,7 @@ final class ChannelListModel: ObservableObject {
     }
 
     func channelDetails(_ channel: TeamTalkChannel) -> ChannelDisplayDetails {
-        let op = TeamTalkClient.shared.isChannelOperator(channelID: channel.channelID.cValue)
+        let op = TeamTalkClient.shared.isChannelOperator(in: channel)
         let canEdit = (myuseraccount.uUserRights & USERRIGHT_MODIFY_CHANNELS.rawValue) != 0 || op
         let actionTitle = canEdit
             ? String(localized: "Edit", comment: "channel list")
@@ -321,12 +321,12 @@ final class ChannelListModel: ObservableObject {
     func muteUser(userID: TeamTalkUserID) {
         guard let user = users[userID] else { return }
         TeamTalkClient.shared.setUserMute(
-            userID: userID,
+            user,
             stream: .mediaFileAudio,
             muted: !user.states.contains(.mediaFileMuted)
         )
         TeamTalkClient.shared.setUserMute(
-            userID: userID,
+            user,
             stream: .voice,
             muted: !user.states.contains(.voiceMuted)
         )
@@ -354,7 +354,7 @@ final class ChannelListModel: ObservableObject {
     }
 
     func kickUser(userID: TeamTalkUserID) {
-        let op = TeamTalkClient.shared.isChannelOperator(channelID: curchannel.channelID.cValue)
+        let op = TeamTalkClient.shared.isChannelOperator(in: curchannel)
         guard (myuseraccount.uUserRights & USERRIGHT_KICK_USERS.rawValue) != 0 || op else { return }
         guard let user = users[userID] else { return }
         let channel = curchannel.channelID.isValid ? curchannel : nil
@@ -362,7 +362,7 @@ final class ChannelListModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await TeamTalkClient.shared.kickUser(user, fromChannel: channel)
+                try await TeamTalkClient.shared.kickUser(user, from: channel)
             } catch {
                 await self.presentError(error.localizedDescription)
             }
@@ -370,7 +370,7 @@ final class ChannelListModel: ObservableObject {
     }
 
     func banUser(userID: TeamTalkUserID) {
-        let op = TeamTalkClient.shared.isChannelOperator(channelID: curchannel.channelID.cValue)
+        let op = TeamTalkClient.shared.isChannelOperator(in: curchannel)
         guard (myuseraccount.uUserRights & USERRIGHT_BAN_USERS.rawValue) != 0 || op else { return }
         guard let user = users[userID] else { return }
         let channel = curchannel.channelID.isValid ? curchannel : nil
@@ -378,8 +378,8 @@ final class ChannelListModel: ObservableObject {
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await TeamTalkClient.shared.banUser(user, fromChannel: channel)
-                try await TeamTalkClient.shared.kickUser(user, fromChannel: channel)
+                try await TeamTalkClient.shared.banUser(user, from: channel)
+                try await TeamTalkClient.shared.kickUser(user, from: channel)
             } catch {
                 await self.presentError(error.localizedDescription)
             }
@@ -592,13 +592,17 @@ final class ChannelListModel: ObservableObject {
                 if chanpasswds[channelID] == nil {
                     chanpasswds[channelID] = password
                 }
-                try await TeamTalkClient.shared.joinChannel(withID: channelID, password: password)
+                if let channel = TeamTalkClient.shared.channel(id: channelID) {
+                    try await TeamTalkClient.shared.joinChannel(channel, password: password)
+                }
             } else if !rejoinchannel.name.isEmpty {
-                try await TeamTalkClient.shared.join(rejoinchannel)
+                try await TeamTalkClient.shared.joinChannel(rejoinchannel)
             }
         } else if UserDefaults.standard.object(forKey: PREF_JOINROOTCHANNEL) == nil
             || UserDefaults.standard.bool(forKey: PREF_JOINROOTCHANNEL) {
-            try await TeamTalkClient.shared.joinChannel(withID: TeamTalkChannelID(TeamTalkClient.shared.rootChannelID))
+            if let rootChannel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(TeamTalkClient.shared.rootChannelID)) {
+                try await TeamTalkClient.shared.joinChannel(rootChannel)
+            }
         }
 
         refreshChannelList()

@@ -48,7 +48,7 @@ public func sendDesktopCursorPosition(x: UInt16, y: UInt16) -> Bool {
 }
 
 @discardableResult
-public func sendDesktopInput(userID: Int32, inputs: [DesktopInput]) -> Bool {
+internal func sendDesktopInput(userID: Int32, inputs: [DesktopInput]) -> Bool {
     guard let instance, !inputs.isEmpty, inputs.count <= Int(TT_DESKTOPINPUT_MAX) else {
         return false
     }
@@ -62,41 +62,11 @@ public func sendDesktopInput(userID: Int32, inputs: [DesktopInput]) -> Bool {
 }
 
 @discardableResult
-public func sendDesktopInput(userID: TeamTalkUserID, inputs: [DesktopInput]) -> Bool {
-    sendDesktopInput(userID: userID.cValue, inputs: inputs)
+public func sendDesktopInput(_ inputs: [TeamTalkDesktopInput], to user: TeamTalkUser) -> Bool {
+    sendDesktopInput(userID: user.userID.cValue, inputs: inputs.map(\.cValue))
 }
 
-@discardableResult
-public func sendDesktopInput(userID: Int32, inputs: [TeamTalkDesktopInput]) -> Bool {
-    sendDesktopInput(userID: userID, inputs: inputs.map(\.cValue))
-}
-
-@discardableResult
-public func sendDesktopInput(userID: TeamTalkUserID, inputs: [TeamTalkDesktopInput]) -> Bool {
-    sendDesktopInput(userID: userID.cValue, inputs: inputs)
-}
-
-@discardableResult
-public func sendDesktopInput(user: User, inputs: [DesktopInput]) -> Bool {
-    sendDesktopInput(userID: user.userID, inputs: inputs)
-}
-
-@discardableResult
-public func sendDesktopInput(user: User, inputs: [TeamTalkDesktopInput]) -> Bool {
-    sendDesktopInput(userID: user.userID, inputs: inputs)
-}
-
-@discardableResult
-public func sendDesktopInput(user: TeamTalkUser, inputs: [DesktopInput]) -> Bool {
-    sendDesktopInput(userID: user.userID, inputs: inputs)
-}
-
-@discardableResult
-public func sendDesktopInput(user: TeamTalkUser, inputs: [TeamTalkDesktopInput]) -> Bool {
-    sendDesktopInput(userID: user.userID, inputs: inputs)
-}
-
-public func withAcquiredDesktopWindow<Result>(
+internal func withAcquiredDesktopWindow<Result>(
     userID: Int32,
     _ body: (DesktopWindow) throws -> Result
 ) rethrows -> Result? {
@@ -111,27 +81,13 @@ public func withAcquiredDesktopWindow<Result>(
 }
 
 public func withAcquiredDesktopWindow<Result>(
-    userID: TeamTalkUserID,
+    for user: TeamTalkUser,
     _ body: (DesktopWindow) throws -> Result
 ) rethrows -> Result? {
-    try withAcquiredDesktopWindow(userID: userID.cValue, body)
+    try withAcquiredDesktopWindow(userID: user.userID.cValue, body)
 }
 
-public func withAcquiredDesktopWindow<Result>(
-    user: User,
-    _ body: (DesktopWindow) throws -> Result
-) rethrows -> Result? {
-    try withAcquiredDesktopWindow(userID: user.userID, body)
-}
-
-public func withAcquiredDesktopWindow<Result>(
-    user: TeamTalkUser,
-    _ body: (DesktopWindow) throws -> Result
-) rethrows -> Result? {
-    try withAcquiredDesktopWindow(userID: user.userID, body)
-}
-
-public func withAcquiredDesktopWindow<Result>(
+internal func withAcquiredDesktopWindow<Result>(
     userID: Int32,
     convertTo bitmapFormat: TeamTalkBitmapFormat,
     _ body: (DesktopWindow) throws -> Result
@@ -147,71 +103,22 @@ public func withAcquiredDesktopWindow<Result>(
 }
 
 public func withAcquiredDesktopWindow<Result>(
-    userID: TeamTalkUserID,
+    for user: TeamTalkUser,
     convertTo bitmapFormat: TeamTalkBitmapFormat,
     _ body: (DesktopWindow) throws -> Result
 ) rethrows -> Result? {
-    try withAcquiredDesktopWindow(userID: userID.cValue, convertTo: bitmapFormat, body)
+    try withAcquiredDesktopWindow(userID: user.userID.cValue, convertTo: bitmapFormat, body)
 }
 
-public func withAcquiredDesktopWindow<Result>(
-    user: User,
-    convertTo bitmapFormat: TeamTalkBitmapFormat,
-    _ body: (DesktopWindow) throws -> Result
-) rethrows -> Result? {
-    try withAcquiredDesktopWindow(userID: user.userID, convertTo: bitmapFormat, body)
-}
-
-public func withAcquiredDesktopWindow<Result>(
-    user: TeamTalkUser,
-    convertTo bitmapFormat: TeamTalkBitmapFormat,
-    _ body: (DesktopWindow) throws -> Result
-) rethrows -> Result? {
-    try withAcquiredDesktopWindow(userID: user.userID, convertTo: bitmapFormat, body)
-}
-
-public func acquireDesktopWindow(userID: Int32) -> TeamTalkDesktopWindow? {
-    withAcquiredDesktopWindow(userID: userID) { TeamTalkDesktopWindow($0) }
-}
-
-public func acquireDesktopWindow(userID: TeamTalkUserID) -> TeamTalkDesktopWindow? {
-    acquireDesktopWindow(userID: userID.cValue)
-}
-
-public func acquireDesktopWindow(user: User) -> TeamTalkDesktopWindow? {
-    acquireDesktopWindow(userID: user.userID)
-}
-
-public func acquireDesktopWindow(user: TeamTalkUser) -> TeamTalkDesktopWindow? {
-    acquireDesktopWindow(userID: user.userID)
+public func acquireDesktopWindow(for user: TeamTalkUser) -> TeamTalkDesktopWindow? {
+    withAcquiredDesktopWindow(userID: user.userID.cValue) { TeamTalkDesktopWindow($0) }
 }
 
 public func acquireDesktopWindow(
-    userID: Int32,
+    for user: TeamTalkUser,
     convertTo bitmapFormat: TeamTalkBitmapFormat
 ) -> TeamTalkDesktopWindow? {
-    withAcquiredDesktopWindow(userID: userID, convertTo: bitmapFormat) { TeamTalkDesktopWindow($0) }
-}
-
-public func acquireDesktopWindow(
-    userID: TeamTalkUserID,
-    convertTo bitmapFormat: TeamTalkBitmapFormat
-) -> TeamTalkDesktopWindow? {
-    acquireDesktopWindow(userID: userID.cValue, convertTo: bitmapFormat)
-}
-
-public func acquireDesktopWindow(
-    user: User,
-    convertTo bitmapFormat: TeamTalkBitmapFormat
-) -> TeamTalkDesktopWindow? {
-    acquireDesktopWindow(userID: user.userID, convertTo: bitmapFormat)
-}
-
-public func acquireDesktopWindow(
-    user: TeamTalkUser,
-    convertTo bitmapFormat: TeamTalkBitmapFormat
-) -> TeamTalkDesktopWindow? {
-    acquireDesktopWindow(userID: user.userID, convertTo: bitmapFormat)
+    withAcquiredDesktopWindow(userID: user.userID.cValue, convertTo: bitmapFormat) { TeamTalkDesktopWindow($0) }
 }
 
 public func videoCaptureDevicesInfo() -> [VideoCaptureDevice] {
@@ -241,7 +148,7 @@ public func videoCaptureDevices() -> [TeamTalkVideoCaptureDevice] {
 }
 
 @discardableResult
-public func initVideoCaptureDevice(deviceID: String, format: VideoFormat) -> Bool {
+internal func initVideoCaptureDevice(deviceID: String, format: VideoFormat) -> Bool {
     guard let instance else {
         return false
     }
@@ -251,18 +158,8 @@ public func initVideoCaptureDevice(deviceID: String, format: VideoFormat) -> Boo
 }
 
 @discardableResult
-public func initVideoCaptureDevice(deviceID: String, format: TeamTalkVideoFormat) -> Bool {
-    initVideoCaptureDevice(deviceID: deviceID, format: format.cValue)
-}
-
-@discardableResult
-public func initVideoCaptureDevice(_ device: TeamTalkVideoCaptureDevice, format: VideoFormat) -> Bool {
-    initVideoCaptureDevice(deviceID: device.deviceIdentifier, format: format)
-}
-
-@discardableResult
 public func initVideoCaptureDevice(_ device: TeamTalkVideoCaptureDevice, format: TeamTalkVideoFormat) -> Bool {
-    initVideoCaptureDevice(deviceID: device.deviceIdentifier, format: format)
+    initVideoCaptureDevice(deviceID: device.deviceIdentifier, format: format.cValue)
 }
 
 @discardableResult

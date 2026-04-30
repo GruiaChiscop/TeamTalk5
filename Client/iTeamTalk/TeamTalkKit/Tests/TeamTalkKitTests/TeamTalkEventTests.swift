@@ -79,7 +79,9 @@ final class TeamTalkEventTests: XCTestCase {
         message.event = .userTextMessage
         message.payloadType = .textMessage
 
-        var textMessage = TeamTalkOutgoingTextMessage.channel(9, content: "Hello").cValue
+        var rawChannel = Channel()
+        rawChannel.nChannelID = 9
+        var textMessage = TeamTalkOutgoingTextMessage.channel(TeamTalkChannel(rawChannel), content: "Hello").cValue
         textMessage.nFromUserID = 4
         message.textmessage = textMessage
 

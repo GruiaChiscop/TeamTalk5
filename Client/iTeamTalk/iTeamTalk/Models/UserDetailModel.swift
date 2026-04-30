@@ -38,7 +38,6 @@ final class UserDetailModel: ObservableObject {
     let userID: TeamTalkUserID
     let displayName: String
     let subscriptionRows: [SubscriptionRow]
-
     private let initialUser: TeamTalkUser
 
     @Published var errorMessage: String?
@@ -82,37 +81,53 @@ final class UserDetailModel: ObservableObject {
         TeamTalkClient.shared.user(id: userID) ?? initialUser
     }
 
+    var clientName: String {
+        currentUser.clientName
+    }
+
+    var nickname: String {
+        currentUser.nickname
+    }
+
+    var statusMessage: String {
+        currentUser.statusMessage
+    }
+
+    var statusMode: String {
+        "\(currentUser.statusMode)"
+    }
+
     func isSubscribed(to subscription: TeamTalkSubscriptions) -> Bool {
         subscriptions.contains(subscription)
     }
 
     func voiceVolumeChanged(_ value: Double) {
         voiceVolume = value
-        TeamTalkClient.shared.setUserVolume(user: currentUser, stream: .voice, volume: INT32(refVolume(value)))
+        TeamTalkClient.shared.setUserVolume(currentUser, stream: .voice, volume: INT32(refVolume(value)))
     }
 
     func mediaVolumeChanged(_ value: Double) {
         mediaVolume = value
-        TeamTalkClient.shared.setUserVolume(user: currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(value)))
+        TeamTalkClient.shared.setUserVolume(currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(value)))
     }
 
     func muteVoice(_ muted: Bool) {
         isVoiceMuted = muted
-        TeamTalkClient.shared.setUserMute(user: currentUser, stream: .voice, muted: muted)
+        TeamTalkClient.shared.setUserMute(currentUser, stream: .voice, muted: muted)
     }
 
     func muteMediaStream(_ muted: Bool) {
         isMediaMuted = muted
-        TeamTalkClient.shared.setUserMute(user: currentUser, stream: .mediaFileAudio, muted: muted)
+        TeamTalkClient.shared.setUserMute(currentUser, stream: .mediaFileAudio, muted: muted)
     }
 
     func setSubscription(_ subscription: TeamTalkSubscriptions, enabled: Bool) {
         if enabled {
             subscriptions.insert(subscription)
-            TeamTalkClient.shared.subscribe(user: currentUser, subscriptions: subscription)
+            TeamTalkClient.shared.subscribe(subscription, to: currentUser)
         } else {
             subscriptions.remove(subscription)
-            TeamTalkClient.shared.unsubscribe(user: currentUser, subscriptions: subscription)
+            TeamTalkClient.shared.unsubscribe(subscription, from: currentUser)
         }
     }
 
@@ -123,7 +138,7 @@ final class UserDetailModel: ObservableObject {
             do {
                 let user = currentUser
                 let channel = TeamTalkClient.shared.channel(id: user.channelIdentifier)
-                try await TeamTalkClient.shared.kickUser(user, fromChannel: channel)
+                try await TeamTalkClient.shared.kickUser(user, from: channel)
             } catch {
                 await MainActor.run {
                     self.errorMessage = error.localizedDescription

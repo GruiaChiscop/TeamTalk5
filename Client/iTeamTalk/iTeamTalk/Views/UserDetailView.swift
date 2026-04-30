@@ -25,7 +25,6 @@ import SwiftUI
 
 struct UserDetailView: View {
     @ObservedObject var model: UserDetailModel
-
     var body: some View {
         Form {
             Section("General") {
@@ -34,16 +33,27 @@ struct UserDetailView: View {
                     Text(model.usernameText)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Username")
-                .accessibilityValue(model.usernameText)
                 VStack(alignment: .leading) {
                     Text("User ID")
                     Text(String(model.userid))
                 }
-                .accessibilityLabel("User ID")
-                .accessibilityValue(String(model.userid))
                 .accessibilityElement(children: .combine)
                 //todo: add TeamTalk client version
+                VStack(alignment: .leading) {
+                    Text("Client name")
+                    Text(model.clientName)
+                }
+                .accessibilityElement(children: .combine)
+                VStack(alignment: .leading) {
+                    Text("Status mode")
+                    Text(model.statusMode)
+                }
+                .accessibilityElement(children: .combine)
+                VStack(alignment: .leading) {
+                    Text("Status message")
+                    Text(model.statusMessage)
+                }
+                .accessibilityElement(children: .combine)
                             }
 
             Section("Volume Controls") {

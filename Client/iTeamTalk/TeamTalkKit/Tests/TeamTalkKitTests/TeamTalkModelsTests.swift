@@ -251,11 +251,15 @@ final class TeamTalkModelsTests: XCTestCase {
     func testTextMessageAssemblerRebuildsMultipartMessagesUsingTypedWrappers() {
         var assembler = TeamTalkTextMessageAssembler()
 
-        var part1 = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(7), content: "Hello ").cValue
+        var rawUser = User()
+        rawUser.nUserID = 7
+        let user = TeamTalkUser(rawUser)
+
+        var part1 = TeamTalkOutgoingTextMessage.user(to: user, content: "Hello ").cValue
         part1.nFromUserID = 42
         part1.bMore = 1
 
-        var part2 = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(7), content: "world").cValue
+        var part2 = TeamTalkOutgoingTextMessage.user(to: user, content: "world").cValue
         part2.nFromUserID = 42
 
         XCTAssertNil(assembler.append(TeamTalkTextMessage(part1)))
@@ -265,11 +269,17 @@ final class TeamTalkModelsTests: XCTestCase {
     func testTextMessageAssemblerKeepsMessageTypesSeparated() {
         var assembler = TeamTalkTextMessageAssembler()
 
-        var privatePart = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(7), content: "Private ").cValue
+        var rawUser = User()
+        rawUser.nUserID = 7
+        let user = TeamTalkUser(rawUser)
+        var privatePart = TeamTalkOutgoingTextMessage.user(to: user, content: "Private ").cValue
         privatePart.nFromUserID = 42
         privatePart.bMore = 1
 
-        var channelMessage = TeamTalkOutgoingTextMessage.channel(TeamTalkChannelID(9), content: "Channel").cValue
+        var rawChannel = Channel()
+        rawChannel.nChannelID = 9
+        let channel = TeamTalkChannel(rawChannel)
+        var channelMessage = TeamTalkOutgoingTextMessage.channel(channel, content: "Channel").cValue
         channelMessage.nFromUserID = 42
 
         XCTAssertNil(assembler.append(TeamTalkTextMessage(privatePart)))
@@ -944,7 +954,10 @@ final class TeamTalkModelsTests: XCTestCase {
     }
 
     func testOutgoingTextMessageRoundTrip() {
-        let outgoing = TeamTalkOutgoingTextMessage.channel(42, content: "Hello channel")
+        var rawChannel = Channel()
+        rawChannel.nChannelID = 42
+        let channel = TeamTalkChannel(rawChannel)
+        let outgoing = TeamTalkOutgoingTextMessage.channel(channel, content: "Hello channel")
         let message = TeamTalkTextMessage(outgoing.cValue)
 
         XCTAssertEqual(message.type, .channel)
@@ -953,26 +966,46 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(message.content, "Hello channel")
         XCTAssertFalse(message.hasMoreContent)
 
-        var typedOutgoing = TeamTalkOutgoingTextMessage.user(to: TeamTalkUserID(9), content: "Hello user")
-        XCTAssertEqual(typedOutgoing.toUserIdentifier, TeamTalkUserID(9))
-        typedOutgoing.channelIdentifier = TeamTalkChannelID(12)
-        XCTAssertEqual(typedOutgoing.channelID, 12)
-
         var rawUser = User()
         rawUser.nUserID = 21
         let typedUser = TeamTalkUser(rawUser)
-        let outgoingToRawUser = TeamTalkOutgoingTextMessage.user(to: rawUser, content: "Raw user")
         let outgoingToTypedUser = TeamTalkOutgoingTextMessage.user(to: typedUser, content: "Typed user")
-        XCTAssertEqual(outgoingToRawUser.toUserIdentifier, TeamTalkUserID(21))
         XCTAssertEqual(outgoingToTypedUser.toUserIdentifier, TeamTalkUserID(21))
 
-        var rawChannel = Channel()
-        rawChannel.nChannelID = 34
-        let typedChannel = TeamTalkChannel(rawChannel)
-        let outgoingToRawChannel = TeamTalkOutgoingTextMessage.channel(rawChannel, content: "Raw channel")
+        var typedOutgoing = outgoingToTypedUser
+        typedOutgoing.channelIdentifier = TeamTalkChannelID(12)
+        XCTAssertEqual(typedOutgoing.channelID, 12)
+
+        var rawChannel2 = Channel()
+        rawChannel2.nChannelID = 34
+        let typedChannel = TeamTalkChannel(rawChannel2)
         let outgoingToTypedChannel = TeamTalkOutgoingTextMessage.channel(typedChannel, content: "Typed channel")
-        XCTAssertEqual(outgoingToRawChannel.channelIdentifier, TeamTalkChannelID(34))
         XCTAssertEqual(outgoingToTypedChannel.channelIdentifier, TeamTalkChannelID(34))
+    }
+
+    func testOutgoingTextMessageReplyDerivesScope() {
+        var raw = TextMessage()
+        raw.nMsgType = MSGTYPE_USER
+        raw.nFromUserID = 7
+        raw.nChannelID = 0
+        let userMessage = TeamTalkTextMessage(raw)
+        let userReply = TeamTalkOutgoingTextMessage.reply(to: userMessage, content: "Pong")
+        XCTAssertEqual(userReply.type, .user)
+        XCTAssertEqual(userReply.toUserID, 7)
+
+        raw.nMsgType = MSGTYPE_CHANNEL
+        raw.nFromUserID = 7
+        raw.nChannelID = 99
+        let channelMessage = TeamTalkTextMessage(raw)
+        let channelReply = TeamTalkOutgoingTextMessage.reply(to: channelMessage, content: "Public pong")
+        XCTAssertEqual(channelReply.type, .channel)
+        XCTAssertEqual(channelReply.channelID, 99)
+        XCTAssertEqual(channelReply.toUserID, 0)
+
+        raw.nMsgType = MSGTYPE_BROADCAST
+        let broadcastMessage = TeamTalkTextMessage(raw)
+        let broadcastReply = TeamTalkOutgoingTextMessage.reply(to: broadcastMessage, content: "Echo")
+        XCTAssertEqual(broadcastReply.type, .broadcast)
     }
 
     func testTextMessageFactorySplitsLongContent() {

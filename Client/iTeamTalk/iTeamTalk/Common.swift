@@ -121,7 +121,7 @@ func getXMLPath(elementStack : [String]) -> String {
     return path
 }
 
-// messages received but no read (blinking)
+// messages received but not read (blinking)
 var unreadmessages = Set<TeamTalkUserID>()
 
 let MAX_TEXTMESSAGES = 100
@@ -166,15 +166,18 @@ class UserCached {
     }
     
     func sync(user: User) {
-        TeamTalkClient.shared.setUserMute(userID: user.nUserID, stream: STREAMTYPE_VOICE, muted: voiceMute)
-        TeamTalkClient.shared.setUserMute(userID: user.nUserID, stream: STREAMTYPE_MEDIAFILE_AUDIO, muted: mediaMute)
-        TeamTalkClient.shared.setUserVolume(userID: user.nUserID, stream: STREAMTYPE_VOICE, volume: voiceVolume)
-        TeamTalkClient.shared.setUserVolume(userID: user.nUserID, stream: STREAMTYPE_MEDIAFILE_AUDIO, volume: mediaVolume)
-        TeamTalkClient.shared.setUserStereo(userID: user.nUserID, stream: STREAMTYPE_VOICE, leftSpeaker: voiceLeftSpeaker, rightSpeaker: voiceRightSpeaker)
-        TeamTalkClient.shared.setUserStereo(userID: user.nUserID, stream: STREAMTYPE_MEDIAFILE_AUDIO, leftSpeaker: mediaLeftSpeaker, rightSpeaker: mediaRightSpeaker)
+        let teamTalkUser = TeamTalkUser(user)
+        TeamTalkClient.shared.setUserMute(teamTalkUser, stream: .voice, muted: voiceMute)
+        TeamTalkClient.shared.setUserMute(teamTalkUser, stream: .mediaFileAudio, muted: mediaMute)
+        TeamTalkClient.shared.setUserVolume(teamTalkUser, stream: .voice, volume: voiceVolume)
+        TeamTalkClient.shared.setUserVolume(teamTalkUser, stream: .mediaFileAudio, volume: mediaVolume)
+        TeamTalkClient.shared.setUserStereo(teamTalkUser, stream: .voice, leftSpeaker: voiceLeftSpeaker != 0, rightSpeaker: voiceRightSpeaker != 0)
+        TeamTalkClient.shared.setUserStereo(teamTalkUser, stream: .mediaFileAudio, leftSpeaker: mediaLeftSpeaker != 0, rightSpeaker: mediaRightSpeaker != 0)
         if subscriptions != user.uLocalSubscriptions {
-            TeamTalkClient.shared.unsubscribe(userID: user.nUserID, subscriptions: user.uLocalSubscriptions ^ subscriptions)
-            TeamTalkClient.shared.subscribe(userID: user.nUserID, subscriptions: subscriptions)
+            let diff = TeamTalkSubscriptions(rawValue: user.uLocalSubscriptions ^ subscriptions)
+            let target = TeamTalkSubscriptions(rawValue: subscriptions)
+            TeamTalkClient.shared.unsubscribe(diff, from: teamTalkUser)
+            TeamTalkClient.shared.subscribe(target, to: teamTalkUser)
         }
     }
 }

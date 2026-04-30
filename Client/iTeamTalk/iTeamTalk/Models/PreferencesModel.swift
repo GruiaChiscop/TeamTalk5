@@ -26,6 +26,41 @@ import SwiftUI
 import TeamTalkKit
 import UIKit
 
+struct Preferences: Codable {
+    struct General: Codable {
+    static var nickname = ""
+        static var statusMessage = ""
+        static var statusMode = TeamTalkStatusMode.available
+        static var gender = TeamTalkStatusMode.female
+        static var sendOnReturn = true
+        static var ttLock = false
+        static var joinOnroot = true
+    }
+    struct Display: Codable {
+        static var showUsernames = false
+        static var useProximitySensor = false
+        static var sortChannels = ChanSort.POPULARITY
+        static var showPublicServers = true
+        static var showUnofficialServers = false
+        static var popUpTextMesage = true
+        static var 
+    }
+    struct Sound: Codable {
+        struct Events: Codable {
+            
+        }
+    }
+    struct Speech: Codable {
+        struct Events: Codable {
+            
+        }
+    }
+    struct Subscriptions: Codable {
+        
+    }
+    var version: String
+}
+
 let PREF_GENERAL_NICKNAME = "nickname_preference"
 let PREF_GENERAL_GENDER = "gender_preference"
 let PREF_GENERAL_BEARWARE_ID = "general_bearwareid_preference"
@@ -203,7 +238,7 @@ final class PreferencesModel: ObservableObject {
 
     func nicknameChanged(_ nickname: String) {
         nicknameText = nickname
-        TeamTalkClient.shared.changeNickname(nickname)
+        TeamTalkClient.shared.setNickname(nickname)
         UserDefaults.standard.set(nickname, forKey: PREF_GENERAL_NICKNAME)
     }
 
@@ -211,8 +246,8 @@ final class PreferencesModel: ObservableObject {
         genderIndex = index
         UserDefaults.standard.set(index, forKey: PREF_GENERAL_GENDER)
 
-        let gender = index != 0 ? StatusMode.STATUSMODE_FEMALE : StatusMode.STATUSMODE_AVAILABLE
-        TeamTalkClient.shared.changeStatus(mode: INT32(gender.rawValue))
+        let mode: TeamTalkStatusMode = index != 0 ? .female : .available
+        TeamTalkClient.shared.setStatus(mode: mode)
     }
 
     func pttlockChanged(_ enabled: Bool) {
@@ -293,7 +328,9 @@ final class PreferencesModel: ObservableObject {
 
         let vol = refVolume(percent)
         for userID in users {
-            TeamTalkClient.shared.setUserVolume(userID: userID, stream: STREAMTYPE_MEDIAFILE_AUDIO, volume: INT32(vol))
+            if let user = TeamTalkClient.shared.user(id: TeamTalkUserID(userID)) {
+                TeamTalkClient.shared.setUserVolume(user, stream: .mediaFileAudio, volume: INT32(vol))
+            }
         }
     }
 

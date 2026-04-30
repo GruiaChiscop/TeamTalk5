@@ -92,7 +92,7 @@ final class ChannelDetailModel: ObservableObject {
 
             do {
                 if configuration.id == 0 {
-                    try await TeamTalkClient.shared.join(configuration)
+                    try await TeamTalkClient.shared.joinChannel(configuration)
                 } else {
                     try await TeamTalkClient.shared.updateChannel(configuration)
                 }
@@ -113,13 +113,16 @@ final class ChannelDetailModel: ObservableObject {
             joinPassword = passwordText
             showingJoinAlert = true
         } else {
-            let channelID = TeamTalkChannelID(configuration.id)
+            guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {
+                self.errorMessage = "Channel not found"
+                return
+            }
 
             Task { [weak self] in
                 guard let self else { return }
 
                 do {
-                    try await TeamTalkClient.shared.joinChannel(withID: channelID)
+                    try await TeamTalkClient.shared.joinChannel(channel)
                     await MainActor.run {
                         self.shouldDismiss = true
                     }
@@ -133,14 +136,17 @@ final class ChannelDetailModel: ObservableObject {
     }
 
     func joinWithPassword() {
-        let channelID = TeamTalkChannelID(configuration.id)
+        guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {
+            self.errorMessage = "Channel not found"
+            return
+        }
         let password = joinPassword
 
         Task { [weak self] in
             guard let self else { return }
 
             do {
-                try await TeamTalkClient.shared.joinChannel(withID: channelID, password: password)
+                try await TeamTalkClient.shared.joinChannel(channel, password: password)
                 await MainActor.run {
                     self.shouldDismiss = true
                 }
@@ -153,13 +159,16 @@ final class ChannelDetailModel: ObservableObject {
     }
 
     func deleteChannel() {
-        let channelID = TeamTalkChannelID(configuration.id)
+        guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {
+            self.errorMessage = "Channel not found"
+            return
+        }
 
         Task { [weak self] in
             guard let self else { return }
 
             do {
-                try await TeamTalkClient.shared.removeChannel(withID: channelID)
+                try await TeamTalkClient.shared.removeChannel(channel)
                 await MainActor.run {
                     self.shouldDismiss = true
                 }

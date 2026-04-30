@@ -171,13 +171,13 @@ final class ChannelFilesModel: ObservableObject {
         channelID = TeamTalkClient.shared.myChannelIdentifier
         updateChannelTitle()
 
-        guard channelID.isValid else {
+        guard channelID.isValid, let channel = TeamTalkClient.shared.channel(id: channelID) else {
             files = []
             transfers = []
             return
         }
 
-        files = TeamTalkClient.shared.remoteFiles(in: channelID)
+        files = TeamTalkClient.shared.remoteFiles(in: channel)
             .map(ChannelFileRow.init)
             .sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
@@ -190,14 +190,18 @@ final class ChannelFilesModel: ObservableObject {
             return
         }
 
+        guard let targetChannel = TeamTalkClient.shared.channel(id: channelID) else {
+            errorMessage = String(localized: "Current channel is unavailable.", comment: "files")
+            return
+        }
+
         do {
             let localURL = try prepareUploadFile(from: url)
-            let targetChannelID = channelID
             let fileManager = self.fileManager
 
             Task { [weak self] in
                 do {
-                    try await TeamTalkClient.shared.uploadFile(at: localURL, toChannelID: targetChannelID)
+                    _ = try await TeamTalkClient.shared.uploadFile(at: localURL, to: targetChannel)
                 } catch {
                     try? fileManager.removeItem(at: localURL)
                     if let self {
@@ -289,7 +293,7 @@ final class ChannelFilesModel: ObservableObject {
     }
 
     func cancelTransfer(_ transfer: FileTransferRow) {
-        if TeamTalkClient.shared.cancelFileTransfer(id: transfer.id) {
+        if TeamTalkClient.shared.cancelFileTransfer(transfer.transfer) {
             removeTransfer(id: transfer.id)
             announcedDownloadProgress.removeValue(forKey: transfer.id)
             if transfer.isDownload, let localURL = transfer.localURL {
@@ -300,17 +304,14 @@ final class ChannelFilesModel: ObservableObject {
     }
 
     private func updateChannelTitle() {
-        guard channelID.isValid else {
+        guard channelID.isValid, let channel = TeamTalkClient.shared.channel(id: channelID) else {
             channelTitle = String(localized: "Files", comment: "files")
             return
         }
 
-        let name = TeamTalkClient.shared.withChannel(id: channelID) { channel in
-            if channel.nParentID == 0 {
-                return String(localized: "root channel", comment: "files")
-            }
-            return TeamTalkString.channel(.name, from: channel)
-        }
+        let name = channel.parentID == 0
+            ? String(localized: "root channel", comment: "files")
+            : channel.name
         channelTitle = String(format: String(localized: "Files in %@", comment: "files"), name)
     }
 

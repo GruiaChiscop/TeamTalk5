@@ -86,7 +86,7 @@ public func startRecordingMuxedAudioFile(
 }
 
 @discardableResult
-public func startRecordingMuxedAudioFile(
+internal func startRecordingMuxedAudioFile(
     channelID: Int32,
     to fileURL: URL,
     audioFileFormat: TeamTalkAudioFileFormat
@@ -100,29 +100,11 @@ public func startRecordingMuxedAudioFile(
 
 @discardableResult
 public func startRecordingMuxedAudioFile(
-    channelID: TeamTalkChannelID,
-    to fileURL: URL,
-    audioFileFormat: TeamTalkAudioFileFormat
-) -> Bool {
-    startRecordingMuxedAudioFile(channelID: channelID.cValue, to: fileURL, audioFileFormat: audioFileFormat)
-}
-
-@discardableResult
-public func startRecordingMuxedAudioFile(
-    in channel: Channel,
-    to fileURL: URL,
-    audioFileFormat: TeamTalkAudioFileFormat
-) -> Bool {
-    startRecordingMuxedAudioFile(channelID: channel.channelID, to: fileURL, audioFileFormat: audioFileFormat)
-}
-
-@discardableResult
-public func startRecordingMuxedAudioFile(
     in channel: TeamTalkChannel,
     to fileURL: URL,
     audioFileFormat: TeamTalkAudioFileFormat
 ) -> Bool {
-    startRecordingMuxedAudioFile(channelID: channel.channelID, to: fileURL, audioFileFormat: audioFileFormat)
+    startRecordingMuxedAudioFile(channelID: channel.channelID.cValue, to: fileURL, audioFileFormat: audioFileFormat)
 }
 
 @discardableResult
@@ -156,7 +138,7 @@ public func stopRecordingMuxedAudioFile() -> Bool {
 }
 
 @discardableResult
-public func stopRecordingMuxedAudioFile(channelID: Int32) -> Bool {
+internal func stopRecordingMuxedAudioFile(channelID: Int32) -> Bool {
     guard let instance else {
         return false
     }
@@ -165,18 +147,8 @@ public func stopRecordingMuxedAudioFile(channelID: Int32) -> Bool {
 }
 
 @discardableResult
-public func stopRecordingMuxedAudioFile(channelID: TeamTalkChannelID) -> Bool {
-    stopRecordingMuxedAudioFile(channelID: channelID.cValue)
-}
-
-@discardableResult
-public func stopRecordingMuxedAudioFile(in channel: Channel) -> Bool {
-    stopRecordingMuxedAudioFile(channelID: channel.channelID)
-}
-
-@discardableResult
 public func stopRecordingMuxedAudioFile(in channel: TeamTalkChannel) -> Bool {
-    stopRecordingMuxedAudioFile(channelID: channel.channelID)
+    stopRecordingMuxedAudioFile(channelID: channel.channelID.cValue)
 }
 
 @discardableResult
