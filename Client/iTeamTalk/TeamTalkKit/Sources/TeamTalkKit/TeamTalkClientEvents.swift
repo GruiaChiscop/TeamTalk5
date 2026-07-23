@@ -93,15 +93,25 @@ public func removeAllEventObservers() {
 
 public var events: AsyncStream<TeamTalkEvent> {
     AsyncStream { continuation in
-        let observer = TeamTalkAsyncEventObserver { event in
-            continuation.yield(event)
-        }
+        let observer = TeamTalkAsyncEventObserver(
+            handler: { event in continuation.yield(event) },
+            finishStream: { continuation.finish() }
+        )
 
         addEventObserver(observer)
 
         continuation.onTermination = { [weak self, observer] _ in
             self?.removeEventObserver(observer)
         }
+    }
+}
+
+/// Ends every currently live `events` `AsyncStream`, so pending `for await`
+/// loops and command timeouts unblock immediately instead of waiting for a
+/// `.connectionLost` event that a synchronous teardown will never deliver.
+func finishAsyncEventObservers() {
+    for handler in eventObservers {
+        (handler.value as? TeamTalkAsyncEventObserver)?.finish()
     }
 }
 

@@ -30,13 +30,24 @@ final class TeamTalkEventHandler {
 
 final class TeamTalkAsyncEventObserver: TeamTalkEventObserver {
     private let handler: (TeamTalkEvent) -> Void
+    private let finishStream: () -> Void
 
-    init(handler: @escaping (TeamTalkEvent) -> Void) {
+    init(handler: @escaping (TeamTalkEvent) -> Void, finishStream: @escaping () -> Void) {
         self.handler = handler
+        self.finishStream = finishStream
     }
 
     func handleTeamTalkEvent(_ event: TeamTalkEvent) {
         handler(event)
+        if case .connectionLost = event.kind {
+            finishStream()
+        }
+    }
+
+    /// Ends the backing `AsyncStream` even when no `.connectionLost` event will
+    /// ever arrive, e.g. when `close()` tears down the client synchronously.
+    func finish() {
+        finishStream()
     }
 }
 

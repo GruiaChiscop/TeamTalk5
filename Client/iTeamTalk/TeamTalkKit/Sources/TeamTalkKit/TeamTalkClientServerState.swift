@@ -20,6 +20,7 @@ public func close() {
     TT_CloseTeamTalk(instance)
     self.instance = nil
     observers.removeAll()
+    finishAsyncEventObservers()
     eventObservers.removeAll()
 }
 
