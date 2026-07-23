@@ -87,15 +87,8 @@ compatibility. They also expose typed companions such as `user.userID`,
 
 ## Command Tracking
 
-Most app code should prefer the async helpers:
-
-```swift
-try await client.joinChannel(withID: channelID)
-try await client.sendTextMessage(.user(to: userID, content: "Hi"))
-```
-
-TeamTalk command IDs are still available for advanced flows. The old API
-returned `Int32`; the modern command API returns `TeamTalkCommandID`.
+TeamTalk commands return an ID. The old API returned `Int32`; the new API returns
+`TeamTalkCommandID`.
 
 ```swift
 let commandID = client.joinChannel(withID: channelID)
@@ -125,16 +118,14 @@ default:
 
 TeamTalkKit has two event APIs:
 
-- `TeamTalkEventObserver` receives decoded `TeamTalkEvent` values;
-- `eventPublisher` exposes the same typed events through Combine;
-- `events` exposes them as `AsyncStream<TeamTalkEvent>`.
+- `TeamTalkMessageObserver` receives raw `TTMessage` values;
+- `TeamTalkEventObserver` receives decoded `TeamTalkEvent` values.
 
-Subscribing through any typed event API starts TeamTalkKit's internal dispatch
-loop automatically. Raw `TTMessage` observation still exists as a compatibility
-escape hatch, but it is now considered legacy.
+Both are fed by `pollMessages()`. The typed API is additive and does not remove
+raw message support.
 
-If you want explicit control, `startEventDispatching(pollInterval:)` and
-`stopEventDispatching()` are available on `TeamTalkClient`.
+Important: `events: AsyncStream<TeamTalkEvent>` is only a stream wrapper over
+the observer system. It does not poll the C SDK by itself.
 
 ## Server And Admin APIs
 
@@ -254,8 +245,8 @@ Recommended pattern:
 
 - start the client during app initialization;
 - connect/log in from a session model;
-- subscribe to typed events once from a session model;
-- update UI state from decoded events or async command results;
+- call `pollMessages()` from one predictable loop;
+- update UI state from decoded events;
 - close the client during shutdown.
 
 ## macOS Notes

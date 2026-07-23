@@ -86,6 +86,9 @@ TTBOOL TTKitMessageActiveFlag(const TTMessage* message);
 
 const TTCHAR* TTKitGetUserString(TTKitUserStringProperty property, const User* user);
 const TTCHAR* TTKitGetChannelString(TTKitChannelStringProperty property, const Channel* channel);
+INT32 TTKitGetChannelTransmitUserID(const Channel* channel, INT32 index);
+StreamTypes TTKitGetChannelTransmitUserStreamTypes(const Channel* channel, INT32 index);
+INT32 TTKitGetChannelTransmitQueueUserID(const Channel* channel, INT32 index);
 const TTCHAR* TTKitGetTextMessageString(const TextMessage* message);
 const TTCHAR* TTKitGetServerPropertiesString(TTKitServerStringProperty property, const ServerProperties* serverProperties);
 const TTCHAR* TTKitGetClientErrorMessageString(const ClientErrorMsg* clientError);
@@ -95,10 +98,7 @@ const TTCHAR* TTKitGetRemoteFileString(TTKitRemoteFileStringProperty property, c
 const TTCHAR* TTKitGetFileTransferString(TTKitFileTransferStringProperty property, const FileTransfer* fileTransfer);
 
 void TTKitSetChannelString(TTKitChannelStringProperty property, Channel* channel, const TTCHAR* string);
-INT32 TTKitGetChannelTransmitUserID(const Channel* channel, INT32 index);
-StreamTypes TTKitGetChannelTransmitUserStreamTypes(const Channel* channel, INT32 index);
 void TTKitSetChannelTransmitUser(Channel* channel, INT32 index, INT32 userID, StreamTypes streamTypes);
-INT32 TTKitGetChannelTransmitQueueUserID(const Channel* channel, INT32 index);
 void TTKitSetChannelTransmitQueueUser(Channel* channel, INT32 index, INT32 userID);
 void TTKitSetServerPropertiesString(TTKitServerStringProperty property, ServerProperties* serverProperties, const TTCHAR* string);
 void TTKitSetUserAccountString(TTKitUserAccountStringProperty property, UserAccount* userAccount, const TTCHAR* string);

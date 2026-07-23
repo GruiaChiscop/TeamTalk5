@@ -52,29 +52,32 @@ guard didStartConnection else {
 }
 ```
 
-After receiving `.connectionSucceeded`, log in. New code should usually prefer
-the async helper:
+After receiving `.connectionSucceeded`, log in:
 
 ```swift
-Task {
-    try await client.logIn(
-        nickname: "Alice",
-        username: "alice",
-        password: "secret",
-        clientName: "iTeamTalk"
-    )
-}
+let loginCommandID = client.logIn(
+    nickname: "Alice",
+    username: "alice",
+    password: "secret",
+    clientName: "iTeamTalk"
+)
 ```
 
-The lower-level command-returning overloads still exist when you explicitly want
-to compare `TeamTalkCommandID` values against command events.
+`loginCommandID` is a `TeamTalkCommandID`, not a raw `Int32`. It can be compared
+against command events.
 
-## Event Dispatch
+## Poll Events
 
-The TeamTalk C SDK is poll based, but new TeamTalkKit code does not need to
-call `pollMessages()` directly. As soon as you subscribe through
-`TeamTalkEventObserver`, `eventPublisher`, or `events`, TeamTalkKit starts its
-internal dispatch loop automatically.
+The TeamTalk C SDK is poll based. TeamTalkKit does not start a hidden polling
+thread. The host app must call:
+
+```swift
+TeamTalkClient.shared.pollMessages()
+```
+
+iTeamTalk currently drives this from its app event loop. A new app can use a
+timer, run loop integration, or a dedicated task, as long as all TeamTalk calls
+are kept on a predictable execution context.
 
 ## Observe Typed Events
 
@@ -113,16 +116,6 @@ client.addEventObserver(model)
 client.removeEventObserver(model)
 ```
 
-Use Combine when you prefer publisher-style observation:
-
-```swift
-import Combine
-
-let cancellable = client.eventPublisher.sink { event in
-    print(event.kind)
-}
-```
-
 You can also consume events as an `AsyncStream`:
 
 ```swift
@@ -132,6 +125,9 @@ Task {
     }
 }
 ```
+
+The `AsyncStream` only receives events when `pollMessages()` is called somewhere
+else.
 
 ## Query Server State
 
@@ -159,7 +155,7 @@ if let channel = client.channel(id: client.myChannelID) {
 Join by ID:
 
 ```swift
-try await client.joinChannel(withID: channel.id, password: "")
+let commandID = client.joinChannel(withID: channel.id, password: "")
 ```
 
 Create or join with a channel configuration:
@@ -173,7 +169,7 @@ let configuration = TeamTalkChannelConfiguration(
     maxUsers: 25
 )
 
-try await client.join(configuration)
+let commandID = client.join(configuration)
 ```
 
 ## Send Text Messages
@@ -182,7 +178,7 @@ Use `TeamTalkOutgoingTextMessage`. Long messages are split into multiple
 TeamTalk text-message packets automatically.
 
 ```swift
-try await client.sendTextMessage(
+let commandIDs = client.sendTextMessage(
     .channel(client.myChannelID, content: "Hello")
 )
 ```
@@ -190,7 +186,7 @@ try await client.sendTextMessage(
 For private messages:
 
 ```swift
-try await client.sendTextMessage(.user(to: user.id, content: "Hi"))
+client.sendTextMessage(.user(to: user.id, content: "Hi"))
 ```
 
 ## Files
@@ -204,13 +200,13 @@ let files = client.remoteFiles(in: channel.id)
 Download:
 
 ```swift
-try await client.downloadFile(file, to: destinationURL)
+let commandID = client.downloadFile(file, to: destinationURL)
 ```
 
 Upload:
 
 ```swift
-try await client.uploadFile(at: localURL, to: channel)
+let commandID = client.uploadFile(at: localURL, to: channel)
 ```
 
 Track progress through `.fileTransfer` events:

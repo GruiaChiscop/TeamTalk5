@@ -141,10 +141,15 @@ else()
 
   if (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
     set (WEBRTC_FETCH_PATH $ENV{HOME}/webrtc/${CMAKE_SYSTEM_NAME} CACHE FILEPATH "Root folder for WebRTC repository")
+    set (WEBRTC_CFG_EXTRA "")
+
+    if (TEAMTALK_IOS_SIMULATOR)
+      string (APPEND WEBRTC_CFG_EXTRA "target_environment=\"simulator\"\n")
+    endif()
 
     if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
       set (WEBRTC_ARCH arm)
-      set (WEBRTC_CFG_EXTRA arm_use_neon=true)
+      string (APPEND WEBRTC_CFG_EXTRA "arm_use_neon=true\n")
     elseif ("arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
       set (WEBRTC_ARCH arm64)
     elseif ("i386" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")

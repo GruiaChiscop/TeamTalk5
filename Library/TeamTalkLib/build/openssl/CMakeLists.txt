@@ -2,6 +2,10 @@ project(OpenSSL)
 
 include(ExternalProject)
 
+if (POLICY CMP0097)
+  cmake_policy(SET CMP0097 NEW)
+endif()
+
 ##################################################
 # OpenSSL
 ##################################################
@@ -26,6 +30,7 @@ if (MSVC)
       GIT_REPOSITORY    https://github.com/openssl/openssl.git
       GIT_TAG           openssl-3.6.2
       GIT_SHALLOW       TRUE
+      GIT_SUBMODULES    ""
       UPDATE_COMMAND    ""
       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
       CONFIGURE_COMMAND ""
@@ -71,6 +76,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
       GIT_REPOSITORY    https://github.com/openssl/openssl.git
       GIT_TAG           openssl-3.6.2
       GIT_SHALLOW       TRUE
+      GIT_SUBMODULES    ""
       UPDATE_COMMAND    ""
       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl-intel
       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}-intel
@@ -87,6 +93,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
       GIT_REPOSITORY    https://github.com/openssl/openssl.git
       GIT_TAG           openssl-3.6.2
       GIT_SHALLOW       TRUE
+      GIT_SUBMODULES    ""
       UPDATE_COMMAND    ""
       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl-arm64
       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}-arm64
@@ -141,14 +148,14 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
 
 elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
 
-  if ("armv7" STREQUAL "${CMAKE_OSX_ARCHITECTURES}" OR "arm64" STREQUAL "${CMAKE_OSX_ARCHITECTURES}")
-    set (OPENSSL_CFG_PREFIX export CROSS_TOP=${CMAKE_OSX_SYSROOT}/../.. && export CROSS_SDK=iPhoneOS.sdk)
-    set (OPENSSL_CFG_TARGET iphoneos-cross)
-    set (OPENSSL_CFG_POSTFIX -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
-  else()
+  if (TEAMTALK_IOS_SIMULATOR)
     set (OPENSSL_CFG_PREFIX export CROSS_TOP=${CMAKE_OSX_SYSROOT}/../.. && export CROSS_SDK=iPhoneSimulator.sdk)
     set (OPENSSL_CFG_TARGET iossimulator-xcrun)
     set (OPENSSL_CFG_POSTFIX -mios-simulator-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
+  else()
+    set (OPENSSL_CFG_PREFIX export CROSS_TOP=${CMAKE_OSX_SYSROOT}/../.. && export CROSS_SDK=iPhoneOS.sdk)
+    set (OPENSSL_CFG_TARGET iphoneos-cross)
+    set (OPENSSL_CFG_POSTFIX -miphoneos-version-min=${CMAKE_OSX_DEPLOYMENT_TARGET})
   endif()
 
   if (TOOLCHAIN_BUILD_EXTERNALPROJECTS)
@@ -156,6 +163,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "iOS")
       GIT_REPOSITORY    https://github.com/openssl/openssl.git
       GIT_TAG           openssl-3.6.2
       GIT_SHALLOW       TRUE
+      GIT_SUBMODULES    ""
       UPDATE_COMMAND    ""
       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
@@ -194,6 +202,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
       GIT_REPOSITORY    https://github.com/openssl/openssl.git
       GIT_TAG           openssl-3.6.2
       GIT_SHALLOW       TRUE
+      GIT_SUBMODULES    ""
       UPDATE_COMMAND    ""
       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
@@ -250,6 +259,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Android")
       GIT_REPOSITORY    https://github.com/openssl/openssl.git
       GIT_TAG           openssl-3.6.2
       GIT_SHALLOW       TRUE
+      GIT_SUBMODULES    ""
       UPDATE_COMMAND    ""
       PREFIX            ${TOOLCHAIN_BUILD_PREFIX}/openssl
       INSTALL_DIR       ${TOOLCHAIN_INSTALL_PREFIX_OPENSSL}
