@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-public struct TeamTalkServerProperties {
+public struct TeamTalkServerProperties: Equatable, Hashable, Sendable {
     public let rawValue: ServerProperties
 
     public init(_ rawValue: ServerProperties) {
@@ -10,6 +10,14 @@ public struct TeamTalkServerProperties {
 
     public var cValue: ServerProperties {
         rawValue
+    }
+
+    public static func == (lhs: TeamTalkServerProperties, rhs: TeamTalkServerProperties) -> Bool {
+        rawStructsEqual(lhs.rawValue, rhs.rawValue)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hashRawStruct(rawValue, into: &hasher)
     }
 
     public var name: String {

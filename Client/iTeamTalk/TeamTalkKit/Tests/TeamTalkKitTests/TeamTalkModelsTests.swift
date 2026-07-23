@@ -33,6 +33,31 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(rawTransfer.channelIdentifier, TeamTalkChannelID(66))
     }
 
+    func testSnapshotModelsAreEquatableAndHashable() {
+        var rawUserA = User()
+        rawUserA.nUserID = 11
+        rawUserA.nChannelID = 22
+        var rawUserB = rawUserA
+        let userA = TeamTalkUser(rawUserA)
+        let userB = TeamTalkUser(rawUserB)
+
+        XCTAssertEqual(userA, userB)
+        XCTAssertEqual(userA.hashValue, userB.hashValue)
+        XCTAssertEqual(Set([userA, userB]).count, 1)
+
+        rawUserB.nChannelID = 23
+        let userC = TeamTalkUser(rawUserB)
+        XCTAssertNotEqual(userA, userC)
+
+        var rawChannelA = Channel()
+        rawChannelA.nChannelID = 5
+        var rawChannelB = rawChannelA
+        XCTAssertEqual(TeamTalkChannel(rawChannelA), TeamTalkChannel(rawChannelB))
+
+        rawChannelB.nMaxUsers = 25
+        XCTAssertNotEqual(TeamTalkChannel(rawChannelA), TeamTalkChannel(rawChannelB))
+    }
+
     func testUserAccountConfigurationRoundTrip() {
         let configuration = TeamTalkUserAccountConfiguration(
             username: "guest",
@@ -120,6 +145,7 @@ final class TeamTalkModelsTests: XCTestCase {
                 TeamTalkChannelTransmitUser(userID: TeamTalkUserID(42), streamTypes: [.voice, .videoCapture]),
                 .classroomFreeForAll(streamTypes: [.desktopInput])
             ],
+            transmitUsersQueue: [TeamTalkUserID(5), TeamTalkUserID(6), TeamTalkUserID(7)],
             transmitUsersQueueDelayMilliseconds: 750,
             voiceTimeoutMilliseconds: 1_500,
             mediaFileTimeoutMilliseconds: 3_000
@@ -144,6 +170,7 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(channel.transmitUsers[0].streamTypes, [.voice, .videoCapture])
         XCTAssertTrue(channel.transmitUsers[1].isClassroomFreeForAll)
         XCTAssertEqual(channel.transmitUsers[1].streamTypes, [.desktopInput])
+        XCTAssertEqual(channel.transmitUsersQueue, [TeamTalkUserID(5), TeamTalkUserID(6), TeamTalkUserID(7)])
         XCTAssertEqual(channel.transmitUsersQueueDelayMilliseconds, 750)
         XCTAssertEqual(channel.voiceTimeoutMilliseconds, 1_500)
         XCTAssertEqual(channel.mediaFileTimeoutMilliseconds, 3_000)

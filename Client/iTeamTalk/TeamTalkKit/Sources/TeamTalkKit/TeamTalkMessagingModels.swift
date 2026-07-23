@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-public struct TeamTalkFileTransfer: Identifiable {
+public struct TeamTalkFileTransfer: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: FileTransfer
 
     public init(_ rawValue: FileTransfer) {
@@ -10,6 +10,14 @@ public struct TeamTalkFileTransfer: Identifiable {
 
     public var cValue: FileTransfer {
         rawValue
+    }
+
+    public static func == (lhs: TeamTalkFileTransfer, rhs: TeamTalkFileTransfer) -> Bool {
+        rawStructsEqual(lhs.rawValue, rhs.rawValue)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hashRawStruct(rawValue, into: &hasher)
     }
 
     public var id: Int32 {
@@ -57,7 +65,7 @@ public struct TeamTalkFileTransfer: Identifiable {
     }
 }
 
-public struct TeamTalkTextMessage {
+public struct TeamTalkTextMessage: Equatable, Hashable, Sendable {
     public let rawValue: TextMessage
 
     public init(_ rawValue: TextMessage) {
@@ -66,6 +74,14 @@ public struct TeamTalkTextMessage {
 
     public var cValue: TextMessage {
         rawValue
+    }
+
+    public static func == (lhs: TeamTalkTextMessage, rhs: TeamTalkTextMessage) -> Bool {
+        rawStructsEqual(lhs.rawValue, rhs.rawValue)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hashRawStruct(rawValue, into: &hasher)
     }
 
     public var type: TeamTalkTextMessageType {

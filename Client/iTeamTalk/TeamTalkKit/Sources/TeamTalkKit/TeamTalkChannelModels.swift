@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-public struct TeamTalkChannel: Identifiable {
+public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: Channel
 
     public init(_ rawValue: Channel) {
@@ -10,6 +10,14 @@ public struct TeamTalkChannel: Identifiable {
 
     public var cValue: Channel {
         rawValue
+    }
+
+    public static func == (lhs: TeamTalkChannel, rhs: TeamTalkChannel) -> Bool {
+        rawStructsEqual(lhs.rawValue, rhs.rawValue)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hashRawStruct(rawValue, into: &hasher)
     }
 
     public var id: Int32 {
@@ -106,6 +114,7 @@ public struct TeamTalkChannelConfiguration {
     public var maxUsers: Int32
     public var audioCodec: AudioCodec
     public var transmitUsers: [TeamTalkChannelTransmitUser]
+    public var transmitUsersQueue: [TeamTalkUserID]
     public var transmitUsersQueueDelayMilliseconds: Int32
     public var voiceTimeoutMilliseconds: Int32
     public var mediaFileTimeoutMilliseconds: Int32
@@ -123,6 +132,7 @@ public struct TeamTalkChannelConfiguration {
         maxUsers: Int32 = 0,
         audioCodec: AudioCodec = TeamTalkAudioCodec.makeAudioCodec(.opus),
         transmitUsers: [TeamTalkChannelTransmitUser] = [],
+        transmitUsersQueue: [TeamTalkUserID] = [],
         transmitUsersQueueDelayMilliseconds: Int32 = 500,
         voiceTimeoutMilliseconds: Int32 = 0,
         mediaFileTimeoutMilliseconds: Int32 = 0
@@ -139,6 +149,7 @@ public struct TeamTalkChannelConfiguration {
         self.maxUsers = maxUsers
         self.audioCodec = audioCodec
         self.transmitUsers = transmitUsers
+        self.transmitUsersQueue = transmitUsersQueue
         self.transmitUsersQueueDelayMilliseconds = transmitUsersQueueDelayMilliseconds
         self.voiceTimeoutMilliseconds = voiceTimeoutMilliseconds
         self.mediaFileTimeoutMilliseconds = mediaFileTimeoutMilliseconds
@@ -157,6 +168,7 @@ public struct TeamTalkChannelConfiguration {
         maxUsers: Int32 = 0,
         audioCodec: AudioCodec = TeamTalkAudioCodec.makeAudioCodec(.opus),
         transmitUsers: [TeamTalkChannelTransmitUser] = [],
+        transmitUsersQueue: [TeamTalkUserID] = [],
         transmitUsersQueueDelayMilliseconds: Int32 = 500,
         voiceTimeoutMilliseconds: Int32 = 0,
         mediaFileTimeoutMilliseconds: Int32 = 0
@@ -174,6 +186,7 @@ public struct TeamTalkChannelConfiguration {
             maxUsers: maxUsers,
             audioCodec: audioCodec,
             transmitUsers: transmitUsers,
+            transmitUsersQueue: transmitUsersQueue,
             transmitUsersQueueDelayMilliseconds: transmitUsersQueueDelayMilliseconds,
             voiceTimeoutMilliseconds: voiceTimeoutMilliseconds,
             mediaFileTimeoutMilliseconds: mediaFileTimeoutMilliseconds
@@ -194,6 +207,7 @@ public struct TeamTalkChannelConfiguration {
             maxUsers: channel.maxUsers,
             audioCodec: channel.rawValue.audiocodec,
             transmitUsers: channel.transmitUsers,
+            transmitUsersQueue: channel.transmitUsersQueue,
             transmitUsersQueueDelayMilliseconds: channel.transmitUsersQueueDelayMilliseconds,
             voiceTimeoutMilliseconds: channel.voiceTimeoutMilliseconds,
             mediaFileTimeoutMilliseconds: channel.mediaFileTimeoutMilliseconds
@@ -215,6 +229,7 @@ public struct TeamTalkChannelConfiguration {
         channel.nMaxUsers = maxUsers
         channel.audiocodec = audioCodec
         channel.transmitUserList = transmitUsers
+        channel.transmitQueueUsers = transmitUsersQueue
         channel.transmitQueueDelayMilliseconds = transmitUsersQueueDelayMilliseconds
         channel.voiceTimeoutMilliseconds = voiceTimeoutMilliseconds
         channel.mediaFileTimeoutMilliseconds = mediaFileTimeoutMilliseconds

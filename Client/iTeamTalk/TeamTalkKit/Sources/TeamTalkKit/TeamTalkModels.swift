@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-public struct TeamTalkUser: Identifiable {
+public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: User
 
     public init(_ rawValue: User) {
@@ -10,6 +10,14 @@ public struct TeamTalkUser: Identifiable {
 
     public var cValue: User {
         rawValue
+    }
+
+    public static func == (lhs: TeamTalkUser, rhs: TeamTalkUser) -> Bool {
+        rawStructsEqual(lhs.rawValue, rhs.rawValue)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hashRawStruct(rawValue, into: &hasher)
     }
 
     public var id: Int32 {
@@ -132,7 +140,7 @@ public struct TeamTalkAbusePreventionConfiguration {
     }
 }
 
-public struct TeamTalkUserAccount {
+public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
     public let rawValue: UserAccount
 
     public init(_ rawValue: UserAccount) {
@@ -141,6 +149,14 @@ public struct TeamTalkUserAccount {
 
     public var cValue: UserAccount {
         rawValue
+    }
+
+    public static func == (lhs: TeamTalkUserAccount, rhs: TeamTalkUserAccount) -> Bool {
+        rawStructsEqual(lhs.rawValue, rhs.rawValue)
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hashRawStruct(rawValue, into: &hasher)
     }
 
     public var username: String {
