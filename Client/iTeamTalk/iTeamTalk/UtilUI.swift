@@ -106,7 +106,7 @@ func announceForAccessibility(_ message: String) {
     UIAccessibility.post(notification: .announcement, argument: message)
 }
 
-func getDisplayName(_ user: User) -> String {
+private func getDisplayName(_ user: User) -> String {
     let settings = UserDefaults.standard
     if settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME) {
         return limitText(TeamTalkString.user(.username, from: user))
@@ -168,4 +168,24 @@ func formPasswordField(
         Text(title)
             .accessibilityHidden(true)
     }
+}
+
+let DEFAULT_NICKNAME = String(localized: "Noname", comment: "default nickname")
+
+func within<T: Comparable>(_ min_v: T, max_v: T, value: T) -> T {
+    if value < min_v {
+        return min_v
+    }
+    if value > max_v {
+        return max_v
+    }
+    return value
+}
+
+func getXMLPath(elementStack: [String]) -> String {
+    var path = ""
+    for s in elementStack {
+        path += "/" + s
+    }
+    return path
 }

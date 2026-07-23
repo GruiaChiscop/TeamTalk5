@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct UserDetailView: View {
-    @ObservedObject var model: UserDetailModel
+    let model: UserDetailModel
     var body: some View {
         Form {
             Section("General") {

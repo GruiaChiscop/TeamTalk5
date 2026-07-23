@@ -22,12 +22,14 @@
  */
 
 import AVFoundation
+import Observation
 import OSLog
 import SwiftUI
 import TeamTalkKit
 import UIKit
 
-final class MainTabModel: ObservableObject, TeamTalkEventObserver {
+@Observable
+final class MainTabModel: TeamTalkEventObserver {
 
     let channelListModel: ChannelListModel
     let channelChatModel: TextMessageModel
@@ -36,9 +38,9 @@ final class MainTabModel: ObservableObject, TeamTalkEventObserver {
 
     var server: Server
 
-    @Published var alertMessage: String?
-    @Published var fatalAlertMessage: String?   // dismisses the view when OK tapped
-    @Published var showSaveAlert = false
+    var alertMessage: String?
+    var fatalAlertMessage: String?   // dismisses the view when OK tapped
+    var showSaveAlert = false
 
     private var pendingDismiss: (() -> Void)?
     private var reconnecttimer: Timer?

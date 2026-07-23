@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct ChannelDetailView: View {
-    @ObservedObject var model: ChannelDetailModel
+    @Bindable var model: ChannelDetailModel
     @Environment(\.dismiss) private var dismiss
 
     let setupCodec: () -> Void

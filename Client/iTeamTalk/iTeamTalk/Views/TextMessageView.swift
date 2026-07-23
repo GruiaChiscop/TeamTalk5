@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct TextMessageView: View {
-    @ObservedObject var model: TextMessageModel
+    @Bindable var model: TextMessageModel
     @FocusState private var isComposing: Bool
 
     var body: some View {

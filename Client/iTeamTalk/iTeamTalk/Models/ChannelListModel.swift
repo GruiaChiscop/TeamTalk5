@@ -22,6 +22,7 @@
  */
 
 import AVFoundation
+import Observation
 import SwiftUI
 import TeamTalkKit
 
@@ -49,7 +50,7 @@ enum ChannelListDestination: Hashable {
 
 // MARK: - Row model
 
-enum ChannelListRow: Identifiable {
+enum ChannelListRow: Identifiable, Equatable {
     case join
     case user(TeamTalkUser)
     case channel(TeamTalkChannel)
@@ -63,24 +64,28 @@ enum ChannelListRow: Identifiable {
     }
 }
 
+// Text messages received but not yet read (drives the blinking message icon).
+var unreadmessages = Set<TeamTalkUserID>()
+
 // MARK: - Channel List Model
 
-final class ChannelListModel: ObservableObject {
+@Observable
+final class ChannelListModel {
 
     // MARK: Published state for the channel list view
-    @Published var rows: [ChannelListRow] = []
-    @Published var isTransmitting: Bool = false
-    @Published var pttHint: String = String(localized: "Toggle to enable/disable transmission", comment: "channel list")
-    @Published var navigationTitle: String = ""
+    var rows: [ChannelListRow] = []
+    var isTransmitting: Bool = false
+    var pttHint: String = String(localized: "Toggle to enable/disable transmission", comment: "channel list")
+    var navigationTitle: String = ""
 
     // MARK: Published navigation state
-    @Published var navigationPath: [ChannelListDestination] = []
-    @Published var channelDetailModel: ChannelDetailModel?
+    var navigationPath: [ChannelListDestination] = []
+    var channelDetailModel: ChannelDetailModel?
 
     // MARK: Published alert state
-    @Published var showingJoinPasswordAlert = false
-    @Published var joinPassword = ""
-    @Published var errorMessage: String?
+    var showingJoinPasswordAlert = false
+    var joinPassword = ""
+    var errorMessage: String?
 
     // MARK: Server / channel state
     var channels = [TeamTalkChannelID: TeamTalkChannel]()
@@ -91,8 +96,13 @@ final class ChannelListModel: ObservableObject {
     var users = [TeamTalkUserID: TeamTalkUser]()
     var moveusers = Set<TeamTalkUserID>()
     var isProcessingCommand = false
-    var srvprop = ServerProperties()
-    var myuseraccount = UserAccount()
+    var srvprop = TeamTalkServerProperties(ServerProperties())
+    var myuseraccount = TeamTalkUserAccount(UserAccount())
+
+    // Admins implicitly hold every right, regardless of what the account grants.
+    var effectiveUserRights: TeamTalkUserRights {
+        myuseraccount.types.contains(.administrator) ? TeamTalkUserRights(rawValue: .max) : myuseraccount.rights
+    }
     var textmessages = [TeamTalkUserID: [MyTextMessage]]()
     var unreadTimer: Timer?
     var displayUsers = [TeamTalkUser]()
@@ -101,7 +111,12 @@ final class ChannelListModel: ObservableObject {
 
     // MARK: Private state
     private var joiningChannel: TeamTalkChannel?
-    private weak var currentTextMessageModel: TextMessageModel?
+    @ObservationIgnored private weak var currentTextMessageModel: TextMessageModel?
+    private var isRefreshScheduled = false
+    // Indices rebuilt each refresh so lookups don't re-scan the full users/channels
+    // dictionaries per row, per render (see updateDisplayItems / getUsersCount).
+    private var usersByChannel = [TeamTalkChannelID: [TeamTalkUser]]()
+    private var childrenByParent = [TeamTalkChannelID: [TeamTalkChannel]]()
 
     // MARK: Deinit
     deinit {
@@ -118,8 +133,17 @@ final class ChannelListModel: ObservableObject {
     // MARK: - Display helpers
 
     func updateDisplayItems() {
-        let subchans: [TeamTalkChannel] = channels.values.filter { $0.parentChannelID == curchannel.channelID }
-        let chanusers: [TeamTalkUser] = users.values.filter { $0.channelIdentifier == curchannel.channelID }
+        usersByChannel.removeAll(keepingCapacity: true)
+        for user in users.values {
+            usersByChannel[user.channelIdentifier, default: []].append(user)
+        }
+        childrenByParent.removeAll(keepingCapacity: true)
+        for channel in channels.values {
+            childrenByParent[channel.parentChannelID, default: []].append(channel)
+        }
+
+        let subchans = childrenByParent[curchannel.channelID] ?? []
+        let chanusers = usersByChannel[curchannel.channelID] ?? []
 
         let settings = UserDefaults.standard
         let chansort = settings.object(forKey: PREF_DISPLAY_SORTCHANNELS) == nil
@@ -129,13 +153,13 @@ final class ChannelListModel: ObservableObject {
         switch chansort {
         case ChanSort.POPULARITY.rawValue:
             displayChans = subchans.sorted { lhs, rhs in
-                let au = users.values.filter { $0.channelIdentifier == lhs.channelID }
-                let bu = users.values.filter { $0.channelIdentifier == rhs.channelID }
+                let au = usersByChannel[lhs.channelID]?.count ?? 0
+                let bu = usersByChannel[rhs.channelID]?.count ?? 0
                 let aname = lhs.name
                 let bname = rhs.name
-                return au.count == bu.count
+                return au == bu
                     ? aname.caseInsensitiveCompare(bname) == .orderedAscending
-                    : au.count > bu.count
+                    : au > bu
             }
         default:
             displayChans = subchans.sorted {
@@ -145,14 +169,30 @@ final class ChannelListModel: ObservableObject {
             }
         }
         displayUsers = chanusers.sorted {
-            getDisplayName($0.rawValue).caseInsensitiveCompare(getDisplayName($1.rawValue)) == .orderedAscending
+            getDisplayName($0).caseInsensitiveCompare(getDisplayName($1)) == .orderedAscending
         }
     }
 
     func refreshChannelList() {
         moveusers = Set(moveusers.filter { users[$0] != nil })
         updateDisplayItems()
-        rows = displayRows()
+        let newRows = displayRows()
+        if newRows != rows {
+            rows = newRows
+        }
+    }
+
+    // Coalesces bursts of high-frequency events (talk-state toggles, voice
+    // activation) into a single refresh per runloop tick instead of one
+    // full list rebuild per event.
+    private func scheduleRefresh() {
+        guard !isRefreshScheduled else { return }
+        isRefreshScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            self.isRefreshScheduled = false
+            self.refreshChannelList()
+        }
     }
 
     private func displayRows() -> [ChannelListRow] {
@@ -169,7 +209,7 @@ final class ChannelListModel: ObservableObject {
 
     func updateTitle() {
         if !curchannel.parentChannelID.isValid {
-            navigationTitle = TeamTalkString.serverProperties(.name, from: srvprop)
+            navigationTitle = srvprop.name
         } else {
             navigationTitle = curchannel.name
         }
@@ -178,7 +218,7 @@ final class ChannelListModel: ObservableObject {
     // MARK: - User / channel detail providers
 
     func userDetails(_ user: TeamTalkUser) -> ChannelUserDetails {
-        let female = (UInt(user.rawValue.nStatusMode) & StatusMode.STATUSMODE_FEMALE.rawValue) != 0
+        let female = user.statusMode.contains(.female)
         let isTalking = user.states.contains(.voice) ||
             (TeamTalkClient.shared.myUserIdentifier == user.userID && TeamTalkClient.shared.isVoiceTransmitting)
         let iconName = isTalking
@@ -191,7 +231,7 @@ final class ChannelListModel: ObservableObject {
             ? "message_red"
             : "message_blue"
         return ChannelUserDetails(
-            title: getDisplayName(user.rawValue),
+            title: getDisplayName(user),
             subtitle: user.statusMessage,
             iconName: iconName,
             iconAccessibilityLabel: iconAccessibilityLabel,
@@ -201,7 +241,7 @@ final class ChannelListModel: ObservableObject {
 
     func channelDetails(_ channel: TeamTalkChannel) -> ChannelDisplayDetails {
         let op = TeamTalkClient.shared.isChannelOperator(in: channel)
-        let canEdit = (myuseraccount.uUserRights & USERRIGHT_MODIFY_CHANNELS.rawValue) != 0 || op
+        let canEdit = effectiveUserRights.contains(.canModifyChannels) || op
         let actionTitle = canEdit
             ? String(localized: "Edit", comment: "channel list")
             : String(localized: "View", comment: "channel list")
@@ -212,7 +252,7 @@ final class ChannelListModel: ObservableObject {
                 ? String(localized: "Password protected", comment: "channel list")
                 : String(localized: "No password", comment: "channel list")
             return ChannelDisplayDetails(
-                title: TeamTalkString.serverProperties(.name, from: srvprop),
+                title: srvprop.name,
                 subtitle: channel.topic,
                 iconName: iconName,
                 iconAccessibilityLabel: iconLabel,
@@ -223,7 +263,7 @@ final class ChannelListModel: ObservableObject {
 
         if channel.channelID == curchannel.parentChannelID {
             let subtitle = !channel.parentChannelID.isValid
-                ? TeamTalkString.serverProperties(.name, from: srvprop)
+                ? srvprop.name
                 : channel.name
             return ChannelDisplayDetails(
                 title: String(localized: "Parent channel", comment: "channel list"),
@@ -249,8 +289,8 @@ final class ChannelListModel: ObservableObject {
     }
 
     func getUsersCount(_ channelID: TeamTalkChannelID) -> Int {
-        var count = users.values.filter { $0.channelIdentifier == channelID }.count
-        for channel in channels.values.filter({ $0.parentChannelID == channelID }) {
+        var count = usersByChannel[channelID]?.count ?? 0
+        for channel in childrenByParent[channelID] ?? [] {
             count += getUsersCount(channel.channelID)
         }
         return count
@@ -348,14 +388,14 @@ final class ChannelListModel: ObservableObject {
                 format: isSelected
                     ? String(localized: "%@ deselected", comment: "channel list")
                     : String(localized: "%@ selected", comment: "channel list"),
-                getDisplayName(user.rawValue)
+                getDisplayName(user)
             )
         )
     }
 
     func kickUser(userID: TeamTalkUserID) {
         let op = TeamTalkClient.shared.isChannelOperator(in: curchannel)
-        guard (myuseraccount.uUserRights & USERRIGHT_KICK_USERS.rawValue) != 0 || op else { return }
+        guard effectiveUserRights.contains(.canKickUsers) || op else { return }
         guard let user = users[userID] else { return }
         let channel = curchannel.channelID.isValid ? curchannel : nil
 
@@ -371,7 +411,7 @@ final class ChannelListModel: ObservableObject {
 
     func banUser(userID: TeamTalkUserID) {
         let op = TeamTalkClient.shared.isChannelOperator(in: curchannel)
-        guard (myuseraccount.uUserRights & USERRIGHT_BAN_USERS.rawValue) != 0 || op else { return }
+        guard effectiveUserRights.contains(.canBanUsers) || op else { return }
         guard let user = users[userID] else { return }
         let channel = curchannel.channelID.isValid ? curchannel : nil
 
@@ -469,7 +509,7 @@ final class ChannelListModel: ObservableObject {
                 newChannel.nParentID = root.channelID.cValue
             }
         }
-        let model = ChannelDetailModel(channel: newChannel)
+        let model = ChannelDetailModel(channel: TeamTalkChannel(newChannel))
         channelDetailModel = model
     }
 
@@ -537,7 +577,7 @@ final class ChannelListModel: ObservableObject {
     }
 
     func timerUnreadBlinker() {
-        refreshChannelList()
+        scheduleRefresh()
         if unreadmessages.isEmpty {
             unreadTimer?.invalidate()
         }
@@ -659,13 +699,10 @@ extension ChannelListModel: TeamTalkEventObserver {
             isProcessingCommand = isActive
 
         case .serverUpdated(let properties):
-            srvprop = properties.rawValue
+            srvprop = properties
 
         case .myselfLoggedIn(_, let account):
-            myuseraccount = account.rawValue
-            if (myuseraccount.uUserType & USERTYPE_ADMIN.rawValue) != 0 {
-                myuseraccount.uUserRights = 0xFFFFFFFF
-            }
+            myuseraccount = account
 
         case .channelCreated(let channel):
             channels[channel.channelID] = channel
@@ -743,7 +780,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             if !isProcessingCommand { refreshChannelList() }
 
         case .userLeft(let previousChannelID, let user):
-            if myuseraccount.uUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue == 0 {
+            if !effectiveUserRights.contains(.canViewAllUsers) {
                 users.removeValue(forKey: user.userID)
             } else {
                 users[user.userID] = user
@@ -799,10 +836,10 @@ extension ChannelListModel: TeamTalkEventObserver {
 
         case .userStateChanged(let user):
             users[user.userID] = user
-            refreshChannelList()
+            scheduleRefresh()
 
         case .voiceActivation:
-            refreshChannelList()
+            scheduleRefresh()
 
         default:
             break

@@ -21,6 +21,7 @@
  *
  */
 
+import Observation
 import SwiftUI
 import TeamTalkKit
 
@@ -62,13 +63,14 @@ extension TextMessageTarget: Equatable {
     }
 }
 
-final class TextMessageModel: ObservableObject {
+@Observable
+final class TextMessageModel {
     let target: TextMessageTarget
     let title: String
-    weak var delegate: MyTextMessageDelegate?
+    @ObservationIgnored weak var delegate: MyTextMessageDelegate?
 
-    @Published private(set) var sections: [TextMessageSection] = []
-    @Published var composedText = ""
+    private(set) var sections: [TextMessageSection] = []
+    var composedText = ""
 
     private var messageAssembler = TeamTalkTextMessageAssembler()
 

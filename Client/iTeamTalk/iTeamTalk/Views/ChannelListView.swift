@@ -26,7 +26,7 @@ import SwiftUI
 // MARK: - Container view
 
 struct ChannelListContainerView: View {
-    @ObservedObject var model: ChannelListModel
+    @State var model: ChannelListModel
     @State private var isPressingTalkButton = false
 
     var body: some View {
@@ -85,7 +85,7 @@ struct ChannelListContainerView: View {
 // MARK: - List view
 
 struct ChannelListView: View {
-    @ObservedObject var model: ChannelListModel
+    let model: ChannelListModel
 
     var body: some View {
         List(model.rows) { row in

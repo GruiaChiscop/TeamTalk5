@@ -25,7 +25,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ChannelFilesView: View {
-    @ObservedObject var model: ChannelFilesModel
+    let model: ChannelFilesModel
     @State private var showingFileImporter = false
     @State private var showingDownloadFolderImporter = false
 

@@ -21,10 +21,12 @@
  *
  */
 
+import Observation
 import SwiftUI
 import TeamTalkKit
 
-final class UserDetailModel: ObservableObject {
+@Observable
+final class UserDetailModel {
 
     struct SubscriptionRow: Identifiable {
         let title: String
@@ -40,22 +42,18 @@ final class UserDetailModel: ObservableObject {
     let subscriptionRows: [SubscriptionRow]
     private let initialUser: TeamTalkUser
 
-    @Published var errorMessage: String?
-    @Published var usernameText: String
-    @Published var voiceVolume: Double
-    @Published var mediaVolume: Double
-    @Published var isVoiceMuted: Bool
-    @Published var isMediaMuted: Bool
-    @Published private var subscriptions: TeamTalkSubscriptions
-
-    convenience init(user: User) {
-        self.init(user: TeamTalkUser(user))
-    }
+    var errorMessage: String?
+    var usernameText: String
+    var voiceVolume: Double
+    var mediaVolume: Double
+    var isVoiceMuted: Bool
+    var isMediaMuted: Bool
+    private var subscriptions: TeamTalkSubscriptions
 
     init(user: TeamTalkUser) {
         initialUser = user
         userID = user.userID
-        displayName = getDisplayName(user.rawValue)
+        displayName = getDisplayName(user)
         usernameText = user.username
         voiceVolume = Double(refVolumeToPercent(Int(user.rawValue.nVolumeVoice)))
         mediaVolume = Double(refVolumeToPercent(Int(user.rawValue.nVolumeMediaFile)))

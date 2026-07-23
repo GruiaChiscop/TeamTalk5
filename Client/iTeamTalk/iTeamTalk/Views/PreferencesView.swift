@@ -26,7 +26,7 @@ import SwiftUI
 import TeamTalkKit
 
 struct PreferencesView: View {
-    @ObservedObject var model: PreferencesModel
+    let model: PreferencesModel
 
     var body: some View {
         Form {

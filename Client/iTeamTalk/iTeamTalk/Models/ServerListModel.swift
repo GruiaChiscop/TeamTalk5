@@ -21,6 +21,7 @@
  *
  */
 
+import Observation
 import SwiftUI
 import UIKit
 
@@ -152,18 +153,19 @@ enum ServerListDestination: Hashable {
 
 // MARK: - Server List Model
 
-final class ServerListModel: ObservableObject {
-    @Published var servers: [Server] = []
-    @Published var navigationPath: [ServerListDestination] = []
-    @Published var activeMainTabModel: MainTabModel?
-    @Published var serverDetailModel: ServerDetailModel?
+@Observable
+final class ServerListModel {
+    var servers: [Server] = []
+    var navigationPath: [ServerListDestination] = []
+    var activeMainTabModel: MainTabModel?
+    var serverDetailModel: ServerDetailModel?
 
     // Join code alert
-    @Published var showJoinCodeAlert = false
-    @Published var joinCodeInput = ""
+    var showJoinCodeAlert = false
+    var joinCodeInput = ""
 
     // Error alert
-    @Published var errorMessage: String?
+    var errorMessage: String?
 
     var nextappupdate = Date()
 

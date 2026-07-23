@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct SoundDevicesView: View {
-    @StateObject private var model = SoundDevicesModel()
+    @State private var model = SoundDevicesModel()
 
     var body: some View {
         Form {

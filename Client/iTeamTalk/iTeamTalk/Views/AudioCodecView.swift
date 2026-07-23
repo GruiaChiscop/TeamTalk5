@@ -25,7 +25,7 @@ import SwiftUI
 import TeamTalkKit
 
 struct AudioCodecView: View {
-    @ObservedObject var model: AudioCodecModel
+    @Bindable var model: AudioCodecModel
     let performAction: (AudioCodecAction) -> Void
 
     var body: some View {

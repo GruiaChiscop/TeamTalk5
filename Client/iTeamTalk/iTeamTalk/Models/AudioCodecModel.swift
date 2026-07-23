@@ -21,6 +21,7 @@
  *
  */
 
+import Observation
 import SwiftUI
 import TeamTalkKit
 
@@ -31,7 +32,8 @@ enum AudioCodecAction {
     case useSpeexVBR
 }
 
-final class AudioCodecModel: ObservableObject {
+@Observable
+final class AudioCodecModel {
 
     struct Section: Identifiable {
         let codec: Codec
@@ -59,24 +61,24 @@ final class AudioCodecModel: ObservableObject {
     private let opusSampleRates: [Int32] = [8000, 12000, 16000, 24000, 48000]
     private let speexBandmodes: [INT32] = [0, 1, 2]
 
-    @Published var opusApplicationIndex: Int
-    @Published var opusSampleRateIndex: Int
-    @Published var opusChannelsIndex: Int
-    @Published var opusBitrate: Double
-    @Published var opusVBR: Bool
-    @Published var opusDTX: Bool
-    @Published var opusFrameSize: Double
-    @Published var opusTransmitInterval: Double
+    var opusApplicationIndex: Int
+    var opusSampleRateIndex: Int
+    var opusChannelsIndex: Int
+    var opusBitrate: Double
+    var opusVBR: Bool
+    var opusDTX: Bool
+    var opusFrameSize: Double
+    var opusTransmitInterval: Double
 
-    @Published var speexSampleRateIndex: Int
-    @Published var speexQuality: Double
-    @Published var speexTransmitInterval: Double
+    var speexSampleRateIndex: Int
+    var speexQuality: Double
+    var speexTransmitInterval: Double
 
-    @Published var speexVBRSampleRateIndex: Int
-    @Published var speexVBRQuality: Double
-    @Published var speexVBRBitrate: Double
-    @Published var speexVBRDTX: Bool
-    @Published var speexVBRTransmitInterval: Double
+    var speexVBRSampleRateIndex: Int
+    var speexVBRQuality: Double
+    var speexVBRBitrate: Double
+    var speexVBRDTX: Bool
+    var speexVBRTransmitInterval: Double
 
     init(activeCodec: Codec, opuscodec: OpusCodec, speexcodec: SpeexCodec, speexvbrcodec: SpeexVBRCodec) {
         self.activeCodec = activeCodec

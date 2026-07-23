@@ -21,32 +21,30 @@
  *
  */
 
+import Observation
 import SwiftUI
 import TeamTalkKit
 
-final class ChannelDetailModel: ObservableObject {
+@Observable
+final class ChannelDetailModel {
     private var configuration: TeamTalkChannelConfiguration
     private let isPasswordProtected: Bool
     let isExistingChannel: Bool
 
-    @Published var nameText: String
-    @Published var passwordText: String
-    @Published var topicText: String
-    @Published var isPermanent: Bool
-    @Published var hasNoInterruptions: Bool
-    @Published var hasNoVoiceActivation: Bool
-    @Published var hasNoAudioRecording: Bool
-    @Published var isHidden: Bool
-    @Published var codecDescription: String
-    @Published var errorMessage: String?
-    @Published var shouldDismiss = false
-    @Published var showingJoinAlert = false
-    @Published var joinPassword = ""
-    @Published var audioCodecModel: AudioCodecModel?
-
-    convenience init(channel: Channel) {
-        self.init(channel: TeamTalkChannel(channel))
-    }
+    var nameText: String
+    var passwordText: String
+    var topicText: String
+    var isPermanent: Bool
+    var hasNoInterruptions: Bool
+    var hasNoVoiceActivation: Bool
+    var hasNoAudioRecording: Bool
+    var isHidden: Bool
+    var codecDescription: String
+    var errorMessage: String?
+    var shouldDismiss = false
+    var showingJoinAlert = false
+    var joinPassword = ""
+    var audioCodecModel: AudioCodecModel?
 
     init(channel: TeamTalkChannel) {
         var rawChannel = channel.cValue

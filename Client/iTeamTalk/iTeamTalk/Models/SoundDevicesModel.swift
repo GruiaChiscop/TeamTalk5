@@ -22,10 +22,12 @@
  */
 
 import AVFoundation
+import Observation
 import SwiftUI
 import TeamTalkKit
 
-final class SoundDevicesModel: ObservableObject {
+@Observable
+final class SoundDevicesModel {
     struct ToggleRow: Identifiable {
         let id: String
         let title: String
@@ -40,7 +42,7 @@ final class SoundDevicesModel: ObservableObject {
         let dataSources: [AVAudioSessionDataSourceDescription?]
     }
 
-    @Published private var revision = 0
+    private var revision = 0
 
     let toggleRows = [
         ToggleRow(

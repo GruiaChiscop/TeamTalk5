@@ -22,6 +22,7 @@
  */
 
 import AVFoundation
+import Observation
 import SwiftUI
 import TeamTalkKit
 import UIKit
@@ -110,6 +111,86 @@ let PREF_SUB_MEDIAFILE = "sub_mediafile_preference"
 let PREF_SUB_DESKTOP = "sub_desktop_preference"
 let PREF_SUB_DESKTOPINPUT = "sub_desktopinput_preference"
 
+let DEFAULT_SUBSCRIPTION_USERMSG = true
+let DEFAULT_SUBSCRIPTION_CHANMSG = true
+let DEFAULT_SUBSCRIPTION_BCASTMSG = true
+let DEFAULT_SUBSCRIPTION_VOICE = true
+let DEFAULT_SUBSCRIPTION_VIDEOCAP = true
+let DEFAULT_SUBSCRIPTION_MEDIAFILE = true
+let DEFAULT_SUBSCRIPTION_DESKTOP = true
+let DEFAULT_SUBSCRIPTION_DESKTOPINPUT = false
+
+func getDefaultSubscriptions() -> Subscriptions {
+    let settings = UserDefaults.standard
+
+    var sub_usermsg = DEFAULT_SUBSCRIPTION_USERMSG
+    if settings.object(forKey: PREF_SUB_USERMSG) != nil {
+        sub_usermsg = settings.bool(forKey: PREF_SUB_USERMSG)
+    }
+    var sub_chanmsg = DEFAULT_SUBSCRIPTION_CHANMSG
+    if settings.object(forKey: PREF_SUB_CHANMSG) != nil {
+        sub_chanmsg = settings.bool(forKey: PREF_SUB_CHANMSG)
+    }
+    var sub_bcastmsg = DEFAULT_SUBSCRIPTION_BCASTMSG
+    if settings.object(forKey: PREF_SUB_BROADCAST) != nil {
+        sub_bcastmsg = settings.bool(forKey: PREF_SUB_BROADCAST)
+    }
+    var sub_voice = DEFAULT_SUBSCRIPTION_VOICE
+    if settings.object(forKey: PREF_SUB_VOICE) != nil {
+        sub_voice = settings.bool(forKey: PREF_SUB_VOICE)
+    }
+    var sub_vidcap = DEFAULT_SUBSCRIPTION_VIDEOCAP
+    if settings.object(forKey: PREF_SUB_VIDEOCAP) != nil {
+        sub_vidcap = settings.bool(forKey: PREF_SUB_VIDEOCAP)
+    }
+    var sub_mediafile = DEFAULT_SUBSCRIPTION_MEDIAFILE
+    if settings.object(forKey: PREF_SUB_MEDIAFILE) != nil {
+        sub_mediafile = settings.bool(forKey: PREF_SUB_MEDIAFILE)
+    }
+    var sub_desktop = DEFAULT_SUBSCRIPTION_DESKTOP
+    if settings.object(forKey: PREF_SUB_DESKTOP) != nil {
+        sub_desktop = settings.bool(forKey: PREF_SUB_DESKTOP)
+    }
+    var sub_deskinput = DEFAULT_SUBSCRIPTION_DESKTOPINPUT
+    if settings.object(forKey: PREF_SUB_DESKTOPINPUT) != nil {
+        sub_deskinput = settings.bool(forKey: PREF_SUB_DESKTOPINPUT)
+    }
+
+    var subs: Subscriptions = SUBSCRIBE_CUSTOM_MSG.rawValue
+    if sub_usermsg {
+        subs |= SUBSCRIBE_USER_MSG.rawValue
+    }
+    if sub_chanmsg {
+        subs |= SUBSCRIBE_CHANNEL_MSG.rawValue
+    }
+    if sub_bcastmsg {
+        subs |= SUBSCRIBE_BROADCAST_MSG.rawValue
+    }
+    if sub_voice {
+        subs |= SUBSCRIBE_VOICE.rawValue
+    }
+    if sub_vidcap {
+        subs |= SUBSCRIBE_VIDEOCAPTURE.rawValue
+    }
+    if sub_mediafile {
+        subs |= SUBSCRIBE_MEDIAFILE.rawValue
+    }
+    if sub_desktop {
+        subs |= SUBSCRIBE_DESKTOP.rawValue
+    }
+    if sub_deskinput {
+        subs |= SUBSCRIBE_DESKTOPINPUT.rawValue
+    }
+
+    return subs
+}
+
+let MAX_TEXTMESSAGES = 100
+let VOICEACT_DISABLED = 21 // one past the real max voice activation level (SOUND_VU_MAX = 20)
+let DEFAULT_VOICEACT = 2
+let DEFAULT_MEDIAFILE_VOLUME: Float = 0.5
+let DEFAULT_LIMIT_TEXT = 25
+
 let PREF_TTSEVENT_VOICEID = "tts_voiceid_preference"
 let PREF_TTSEVENT_VOICELANG = "tts_voicelang_preference"
 let PREF_TTSEVENT_JOINEDCHAN = "tts_joinedchan_preference"
@@ -122,7 +203,8 @@ let PREF_TTSEVENT_VOL = "tts_volume_preference"
 let PREF_TTSEVENT_USERLOGIN = "tts_user_login"
 let PREF_TTSEVENT_USERLOGOUT = "tts_user_logout"
 
-final class PreferencesModel: ObservableObject {
+@Observable
+final class PreferencesModel {
 
     struct SubscriptionRow: Identifiable {
         let title: String
@@ -144,24 +226,24 @@ final class PreferencesModel: ObservableObject {
         }
     }
 
-    @Published var nicknameText: String
-    @Published var genderIndex: Int
-    @Published var pushToTalkLock: Bool
-    @Published var headsetTXToggle: Bool
-    @Published var sendOnReturn: Bool
-    @Published var proximitySensor: Bool
-    @Published var popupTextMessages: Bool
-    @Published var limitText: Double
-    @Published var showUsername: Bool
-    @Published var channelSortIndex: Int
-    @Published var joinRoot: Bool
-    @Published var defaultSubscriptions: Subscriptions
-    @Published var masterVolumePercent: Double
-    @Published var mediaFileVolumePercent: Double
-    @Published var microphoneGainPercent: Double
-    @Published var voiceActivationLevel: Double
-    @Published var ttsRate: Double
-    @Published var ttsVolume: Double
+    var nicknameText: String
+    var genderIndex: Int
+    var pushToTalkLock: Bool
+    var headsetTXToggle: Bool
+    var sendOnReturn: Bool
+    var proximitySensor: Bool
+    var popupTextMessages: Bool
+    var limitText: Double
+    var showUsername: Bool
+    var channelSortIndex: Int
+    var joinRoot: Bool
+    var defaultSubscriptions: Subscriptions
+    var masterVolumePercent: Double
+    var mediaFileVolumePercent: Double
+    var microphoneGainPercent: Double
+    var voiceActivationLevel: Double
+    var ttsRate: Double
+    var ttsVolume: Double
 
     var users = Set<INT32>()
 

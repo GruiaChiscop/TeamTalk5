@@ -22,6 +22,7 @@
  */
 
 import Foundation
+import Observation
 import TeamTalkKit
 import UIKit
 
@@ -132,14 +133,15 @@ struct DownloadedFileRow: Identifiable {
     }
 }
 
-final class ChannelFilesModel: ObservableObject {
-    @Published var files = [ChannelFileRow]()
-    @Published var transfers = [FileTransferRow]()
-    @Published var downloadedFiles = [DownloadedFileRow]()
-    @Published var channelTitle = String(localized: "Files", comment: "files")
-    @Published var errorMessage: String?
-    @Published var filePendingDownload: ChannelFileRow?
-    @Published var filePendingDeletion: ChannelFileRow?
+@Observable
+final class ChannelFilesModel {
+    var files = [ChannelFileRow]()
+    var transfers = [FileTransferRow]()
+    var downloadedFiles = [DownloadedFileRow]()
+    var channelTitle = String(localized: "Files", comment: "files")
+    var errorMessage: String?
+    var filePendingDownload: ChannelFileRow?
+    var filePendingDeletion: ChannelFileRow?
 
     private var channelID: TeamTalkChannelID = .none
     private var announcedDownloadProgress = [TeamTalkTransferID: Set<Int>]()

@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct ServerListView: View {
-    @ObservedObject var model: ServerListModel
+    @Bindable var model: ServerListModel
 
     var body: some View {
         Group {

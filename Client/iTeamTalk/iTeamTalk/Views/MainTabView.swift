@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @ObservedObject var model: MainTabModel
+    @Bindable var model: MainTabModel
     let close: () -> Void
     @State private var saveAlertName = String(localized: "New Server", comment: "Dialog message")
 
@@ -115,8 +115,8 @@ struct MainTabView: View {
 // MARK: - Channels tab
 
 private struct ChannelsTabView: View {
-    @ObservedObject var mainModel: MainTabModel
-    @ObservedObject var model: ChannelListModel
+    let mainModel: MainTabModel
+    @Bindable var model: ChannelListModel
     let close: () -> Void
 
     var body: some View {
@@ -162,7 +162,7 @@ private struct ChannelsTabView: View {
 // MARK: - Channel detail sheet
 
 private struct ChannelDetailSheetView: View {
-    @ObservedObject var model: ChannelDetailModel
+    let model: ChannelDetailModel
 
     var body: some View {
         NavigationStack {
