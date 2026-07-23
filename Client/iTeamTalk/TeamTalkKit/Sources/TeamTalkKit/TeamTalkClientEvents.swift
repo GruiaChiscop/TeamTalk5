@@ -128,10 +128,22 @@ public func pollMessages() {
 
     var message = TTMessage()
     var waitMSec: Int32 = 0
+    var drained: [TTMessage] = []
 
     while TT_GetMessage(instance, &message, &waitMSec) != 0 {
-        let dispatchedMessage = message
-        dispatchPolledMessage(dispatchedMessage)
+        drained.append(message)
+    }
+
+    guard !drained.isEmpty else { return }
+
+    // Deliver the whole drained batch in a single main-thread hop instead of
+    // one DispatchQueue.main.async per message, which matters during bursts
+    // (e.g. the full channel/user list arriving as many discrete events on login).
+    DispatchQueue.main.async { [weak self] in
+        guard let self else { return }
+        for message in drained {
+            self.deliverPolledMessage(message)
+        }
     }
 }
 
@@ -285,12 +297,6 @@ public func pump(_ event: TeamTalkClientEvent, source channel: TeamTalkChannel) 
 }
 
 private extension TeamTalkClient {
-func dispatchPolledMessage(_ message: TTMessage) {
-    DispatchQueue.main.async { [weak self] in
-        self?.deliverPolledMessage(message)
-    }
-}
-
 func deliverPolledMessage(_ message: TTMessage) {
     observers.removeAll { $0.value == nil }
     eventObservers.removeAll { $0.value == nil }
