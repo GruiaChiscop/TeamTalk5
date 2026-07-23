@@ -16,30 +16,25 @@ Swift SDK.
   copied through `TeamTalkC`.
 - [x] Cover initial `TeamTalkEvent.Kind` decoding for common event payloads.
 - [x] Vendor TeamTalk native SDK artifacts inside the Swift package.
-- [x] Add initial async command helpers so app code can use
-  `try await` instead of manually tracking command IDs.
-- [ ] Apply the compatibility/deprecation plan from
-  `Documentation/APIAudit.md` once the app migration is further along.
+- [ ] Decide which APIs should be public compatibility APIs and which should be
+  deprecated once the app migrates to the Swift model layer.
 - [ ] Add documentation comments to the public Swift API once the names settle.
 
 ## Wrapper Coverage Still Missing
 
-- [x] Sound device enumeration and richer sound-device models.
-- [x] Audio input/output configuration models beyond the current helper methods.
-- [x] Sound device effects wrappers.
-- [x] Media file playback APIs and typed media file models.
-- [x] Desktop sharing and desktop input wrappers.
-- [x] Video capture device wrappers.
-- Hotkey registration wrappers (Windows-only).
-- [x] Local recording wrappers.
-- [x] Audio block APIs.
-- [x] Advanced audio preprocessors wrappers.
-- [x] Complete channel transmission list helpers for `transmitUsers` and
-  `transmitUsersQueue`.
-- [x] Channel path helpers and typed path components.
-- [x] More complete server abuse-prevention helpers.
-- [x] More complete server logging/admin helpers where the SDK has additional
-  commands not yet exposed by the Swift layer.
+Verified against the current source (2026-07-23). Sound device enumeration,
+audio input/output configuration, media file playback, desktop sharing/input,
+video capture devices, user/client statistics, keep-alive, audio block APIs,
+advanced audio preprocessors, channel path helpers, server abuse-prevention
+and server logging/admin are all already implemented — this list previously
+went stale as the package grew. Nothing is currently tracked here as missing.
+
+Hotkey registration (`TT_HotKey_*`) is **not applicable**, not missing: the
+entire native API is guarded by `#if defined(WIN32)` in `TeamTalk.h` (one of
+the functions even takes a Win32 `HWND`), so it does not exist in the headers
+TeamTalkKit compiles against on iOS or macOS. `TeamTalkEvent.Kind.hotkey` /
+`.hotkeyTest` stay decoded for SDK message compatibility, but nothing can ever
+register a hotkey to trigger them on the platforms this package targets.
 
 ## API Design Follow-Ups
 
@@ -47,8 +42,8 @@ Swift SDK.
   IDs to lightweight ID wrappers where it improves clarity.
 - Consider a dedicated `TeamTalkSession` type instead of exposing only
   `TeamTalkClient.shared`.
-- Continue expanding async command helper coverage and decide which command-ID
-  returning APIs should remain first-class for advanced workflows.
+- Consider async command helpers which wait for matching success/error events:
+  `try await client.joinChannel(...)`.
 - Consider typed event streams filtered by command ID or event kind.
 - Consider model builders for `Channel`, `UserAccount`, `ServerProperties` and
   `BannedUser` once the configuration structs grow.
@@ -78,9 +73,8 @@ Swift SDK.
 
 - Migrate iTeamTalk from raw `Channel`, `User`, `RemoteFile` and `FileTransfer`
   usage to Swift models where it improves clarity.
-- [x] Remove explicit command tracking from migrated app models by using
-  `TeamTalkKit` async helpers where practical.
-- [x] Migrate file tab code to `TeamTalkRemoteFile` and `TeamTalkFileTransfer`.
+- Move command tracking in the app from raw `Int32` to `TeamTalkCommandID`.
+- Migrate file tab code to `TeamTalkRemoteFile` and `TeamTalkFileTransfer`.
 - Migrate user rights/subscriptions checks to the Swift option sets.
 - Keep raw C escape hatches only where a TeamTalk feature has not been wrapped
   yet.
@@ -89,5 +83,5 @@ Swift SDK.
 
 - Add examples for account administration once the app has an admin UI.
 - Add examples for file browsing once the Files tab is migrated to the new API.
-- Add examples for async command helpers and model-first operations.
+- Add examples for async command helpers if they are implemented.
 - Add a generated symbol reference later, after the public API stabilizes.
