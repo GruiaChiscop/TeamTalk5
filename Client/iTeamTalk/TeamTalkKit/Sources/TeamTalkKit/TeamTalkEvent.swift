@@ -1,6 +1,9 @@
 import Foundation
 import TeamTalkC
 
+/// A decoded notification from the server or SDK, delivered to every
+/// registered ``TeamTalkEventObserver``. Switch on ``kind``; ``rawMessage``
+/// is kept around for cases ``Kind`` doesn't decode a payload for.
 public struct TeamTalkEvent {
     public let rawMessage: TTMessage
     public let kind: Kind
@@ -12,23 +15,36 @@ public struct TeamTalkEvent {
 }
 
 public extension TeamTalkEvent {
+    /// What happened. Some cases only announce that new data is ready to
+    /// pull (e.g. ``userAudioBlock(userID:streamType:)``,
+    /// ``userDesktopWindow(userID:streamID:)``) rather than carrying the
+    /// data itself — see the corresponding `acquire...` method on
+    /// `TeamTalkClient` for those.
     enum Kind {
         case none
         case connectionSucceeded
         case connectionEncryptionError(TeamTalkClientError)
         case connectionFailed
         case connectionLost
+        /// The server renegotiated the maximum single-message payload size
+        /// mid-connection.
         case connectionMaxPayloadUpdated(maxPayloadSize: Int32)
+        /// Marks the start (`isActive: true`) or end (`false`) of a
+        /// long-running command; not itself a success/failure signal.
         case commandProcessing(commandID: TeamTalkCommandID, isActive: Bool)
         case commandError(commandID: TeamTalkCommandID, error: TeamTalkClientError)
         case commandSucceeded(commandID: TeamTalkCommandID)
         case myselfLoggedIn(userID: TeamTalkUserID, account: TeamTalkUserAccount)
         case myselfLoggedOut
+        /// `by` is `nil` when the server doesn't attribute the kick to a
+        /// specific user (e.g. a ban taking effect rather than a live kick).
         case myselfKicked(channelID: TeamTalkChannelID, by: TeamTalkUser?)
         case userLoggedIn(TeamTalkUser)
         case userLoggedOut(TeamTalkUser)
         case userUpdated(TeamTalkUser)
         case userJoined(TeamTalkUser)
+        /// By the time this fires, `user`'s own channel has already changed;
+        /// `previousChannelID` is the channel they just left.
         case userLeft(previousChannelID: TeamTalkChannelID, user: TeamTalkUser)
         case textMessage(TeamTalkTextMessage)
         case channelCreated(TeamTalkChannel)
@@ -38,6 +54,8 @@ public extension TeamTalkEvent {
         case serverStatistics(TeamTalkServerStatistics)
         case fileCreated(TeamTalkRemoteFile)
         case fileRemoved(TeamTalkRemoteFile)
+        /// One page of results from `TeamTalkClient.listUserAccounts(startingAt:count:)`,
+        /// delivered per account rather than as a single batched array.
         case userAccount(TeamTalkUserAccount)
         case userAccountCreated(TeamTalkUserAccount)
         case userAccountRemoved(TeamTalkUserAccount)
@@ -52,11 +70,21 @@ public extension TeamTalkEvent {
         case userAudioBlock(userID: TeamTalkUserID, streamType: TeamTalkStreamTypes)
         case internalError(TeamTalkClientError)
         case voiceActivation(isActive: Bool)
+        /// Decoded for SDK message compatibility only: hotkey registration
+        /// (`TT_HotKey_*`) is Windows-only in the native SDK, so nothing in
+        /// this package can ever trigger this case on iOS or macOS.
         case hotkey(hotkeyID: Int32, isActive: Bool)
+        /// See ``hotkey(hotkeyID:isActive:)`` — same Windows-only caveat.
         case hotkeyTest(keyCode: Int32, isActive: Bool)
         case fileTransfer(TeamTalkFileTransfer)
         case desktopWindowTransfer(sessionID: TeamTalkDesktopSessionID, bytesRemaining: Int32)
+        /// A `startStreamingMediaFileToChannel`/`updateStreamingMediaFileToChannel`/
+        /// `stopStreamingMediaFileToChannel` playback state change for this
+        /// client's own channel stream. Carries no identifier since there's
+        /// at most one such stream per client.
         case streamMediaFile
+        /// A playback state change for a `initLocalPlayback(from:playback:)`
+        /// session, identified by `sessionID`.
         case localMediaFile(sessionID: TeamTalkPlaybackSessionID)
         case audioInput(streamID: TeamTalkMediaStreamID)
         case userFirstVoiceStreamPacket(streamID: TeamTalkMediaStreamID, user: TeamTalkUser)
@@ -67,6 +95,9 @@ public extension TeamTalkEvent {
         case soundDeviceNewDefaultOutput
         case soundDeviceNewDefaultInputCommunicationDevice
         case soundDeviceNewDefaultOutputCommunicationDevice
+        /// Catch-all for native SDK events without a dedicated case above
+        /// yet. `event`/`payloadType` identify what arrived so a caller can
+        /// fall back to ``TeamTalkEvent/rawMessage`` if needed.
         case unhandled(event: TeamTalkClientEvent, payloadType: TeamTalkPayloadType)
     }
 }
