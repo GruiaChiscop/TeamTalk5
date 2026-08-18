@@ -1,6 +1,9 @@
 import Foundation
 import TeamTalkC
 
+/// Which platform audio backend to use for `TeamTalkClient.defaultSoundDevices(for:)`.
+/// Most cases are platform-specific; only ``coreAudio``/``audioUnit`` are
+/// relevant on iOS/macOS.
 public struct TeamTalkSoundSystem: RawRepresentable, Hashable, Sendable {
     public let rawValue: SoundSystem
 
@@ -28,6 +31,8 @@ public struct TeamTalkSoundSystem: RawRepresentable, Hashable, Sendable {
     public static let pulseAudio = TeamTalkSoundSystem(rawValue: SOUNDSYSTEM_PULSEAUDIO)
 }
 
+/// DSP capabilities a ``TeamTalkSoundDevice`` supports or currently has
+/// enabled (see ``TeamTalkSoundDeviceEffects/enabledEffects``).
 public struct TeamTalkSoundDeviceFeatures: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -52,6 +57,10 @@ public struct TeamTalkSoundDeviceFeatures: OptionSet, Hashable, Sendable {
     public static let defaultCommunicationDevice = TeamTalkSoundDeviceFeatures(rawValue: SOUNDDEVICEFEATURE_DEFAULTCOMDEVICE.rawValue)
 }
 
+/// Identifies a sound input/output device. Unlike most IDs in this package,
+/// this one packs flags into the raw value (``isShared``,
+/// ``physicalDeviceID``) rather than being an opaque integer, and includes
+/// well-known constants below for platform-specific virtual devices.
 public struct TeamTalkSoundDeviceID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -83,13 +92,20 @@ public struct TeamTalkSoundDeviceID: RawRepresentable, Hashable, Sendable, Custo
         String(rawValue)
     }
 
+    /// iOS's Audio Unit Remote I/O device, without built-in voice processing.
     public static let remoteIO = TeamTalkSoundDeviceID(TT_SOUNDDEVICE_ID_REMOTEIO)
+    /// iOS's Audio Unit Voice-Processing I/O device: Remote I/O plus the
+    /// system's own echo cancellation/AGC.
     public static let voiceProcessingIO = TeamTalkSoundDeviceID(TT_SOUNDDEVICE_ID_VOICEPREPROCESSINGIO)
     public static let openSLESDefault = TeamTalkSoundDeviceID(TT_SOUNDDEVICE_ID_OPENSLES_DEFAULT)
     public static let openSLESVoiceCommunication = TeamTalkSoundDeviceID(TT_SOUNDDEVICE_ID_OPENSLES_VOICECOM)
     public static let teamTalkVirtual = TeamTalkSoundDeviceID(TT_SOUNDDEVICE_ID_TEAMTALK_VIRTUAL)
 }
 
+/// A command or internal SDK error code, carried by ``TeamTalkClientError``.
+/// Three bands: ``success`` (0), command errors (1000–9999, rejected by the
+/// server — see ``isCommandError``), and internal errors (10000+, local SDK
+/// failures — see ``isInternalError``).
 public struct TeamTalkErrorCode: RawRepresentable, Hashable, Sendable, ExpressibleByIntegerLiteral, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -176,6 +192,8 @@ public struct TeamTalkErrorCode: RawRepresentable, Hashable, Sendable, Expressib
     public static let soundEffectFailure = TeamTalkErrorCode(cValue: INTERR_SNDEFFECT_FAILURE)
 }
 
+/// Permissions granted to a ``TeamTalkUserAccount``, checked via
+/// `TeamTalkClient.myRights`/`getUserRight(_:)`.
 public struct TeamTalkUserRights: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -211,7 +229,10 @@ public struct TeamTalkUserRights: OptionSet, Hashable, Sendable {
     public static let canTransmitMediaFileAudio = TeamTalkUserRights(rawValue: USERRIGHT_TRANSMIT_MEDIAFILE_AUDIO.rawValue)
     public static let canTransmitMediaFileVideo = TeamTalkUserRights(rawValue: USERRIGHT_TRANSMIT_MEDIAFILE_VIDEO.rawValue)
     public static let canTransmitMediaFiles = TeamTalkUserRights(rawValue: USERRIGHT_TRANSMIT_MEDIAFILE.rawValue)
+    /// Unlike the other cases, this is a restriction, not a permission: the
+    /// account may not change its own nickname.
     public static let lockedNickname = TeamTalkUserRights(rawValue: USERRIGHT_LOCKED_NICKNAME.rawValue)
+    /// Restriction: the account may not change its own status mode/message.
     public static let lockedStatus = TeamTalkUserRights(rawValue: USERRIGHT_LOCKED_STATUS.rawValue)
     public static let canRecordVoice = TeamTalkUserRights(rawValue: USERRIGHT_RECORD_VOICE.rawValue)
     public static let canViewHiddenChannels = TeamTalkUserRights(rawValue: USERRIGHT_VIEW_HIDDEN_CHANNELS.rawValue)
@@ -219,6 +240,8 @@ public struct TeamTalkUserRights: OptionSet, Hashable, Sendable {
     public static let canSendChannelTextMessages = TeamTalkUserRights(rawValue: USERRIGHT_TEXTMESSAGE_CHANNEL.rawValue)
 }
 
+/// Whether an account is a regular user or an administrator (who implicitly
+/// holds every ``TeamTalkUserRights`` regardless of what's explicitly granted).
 public struct TeamTalkUserTypes: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -239,6 +262,9 @@ public struct TeamTalkUserTypes: OptionSet, Hashable, Sendable {
     public static let administrator = TeamTalkUserTypes(rawValue: USERTYPE_ADMIN.rawValue)
 }
 
+/// What one client receives from another — set per-peer via
+/// `TeamTalkClient.subscribe(_:to:)`/`unsubscribe(_:from:)`, independent of
+/// whether the peer is actually transmitting that stream type.
 public struct TeamTalkSubscriptions: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -264,6 +290,9 @@ public struct TeamTalkSubscriptions: OptionSet, Hashable, Sendable {
     public static let desktop = TeamTalkSubscriptions(rawValue: SUBSCRIBE_DESKTOP.rawValue)
     public static let desktopInput = TeamTalkSubscriptions(rawValue: SUBSCRIBE_DESKTOPINPUT.rawValue)
     public static let mediaFile = TeamTalkSubscriptions(rawValue: SUBSCRIBE_MEDIAFILE.rawValue)
+    /// The `intercept*` cases below mirror the plain ones above but for
+    /// silently receiving a stream meant for someone else — e.g. an admin
+    /// tool auditing private messages — rather than being an ordinary recipient.
     public static let interceptUserMessages = TeamTalkSubscriptions(rawValue: SUBSCRIBE_INTERCEPT_USER_MSG.rawValue)
     public static let interceptChannelMessages = TeamTalkSubscriptions(rawValue: SUBSCRIBE_INTERCEPT_CHANNEL_MSG.rawValue)
     public static let interceptCustomMessages = TeamTalkSubscriptions(rawValue: SUBSCRIBE_INTERCEPT_CUSTOM_MSG.rawValue)
@@ -273,6 +302,10 @@ public struct TeamTalkSubscriptions: OptionSet, Hashable, Sendable {
     public static let interceptMediaFile = TeamTalkSubscriptions(rawValue: SUBSCRIBE_INTERCEPT_MEDIAFILE.rawValue)
 }
 
+/// What a user is currently doing (talking, sharing desktop, ...). The
+/// `*Muted` cases reflect this *client's own* local mute setting for that
+/// user (see `TeamTalkClient.setUserMute(_:stream:muted:)`), not whether
+/// the user has muted themselves.
 public struct TeamTalkUserStates: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -299,6 +332,9 @@ public struct TeamTalkUserStates: OptionSet, Hashable, Sendable {
     public static let mediaFile = TeamTalkUserStates(rawValue: USERSTATE_MEDIAFILE.rawValue)
 }
 
+/// Which kind(s) of media/data stream an operation applies to — used both
+/// for querying/muting a specific stream and, combined, for audio block
+/// subscriptions and muxed recording.
 public struct TeamTalkStreamTypes: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -332,9 +368,11 @@ public struct TeamTalkStreamTypes: OptionSet, Hashable, Sendable {
     public static let mediaFile = TeamTalkStreamTypes(rawValue: STREAMTYPE_MEDIAFILE.rawValue)
     public static let channelMessage = TeamTalkStreamTypes(rawValue: STREAMTYPE_CHANNELMSG.rawValue)
     public static let localMediaPlaybackAudio = TeamTalkStreamTypes(rawValue: STREAMTYPE_LOCALMEDIAPLAYBACK_AUDIO.rawValue)
+    /// Every stream type relevant to a classroom-mode channel, combined.
     public static let classroomAll = TeamTalkStreamTypes(rawValue: STREAMTYPE_CLASSROOM_ALL.rawValue)
 }
 
+/// Behavioral flags for a channel, set via ``TeamTalkChannelConfiguration/types``.
 public struct TeamTalkChannelTypes: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -351,15 +389,26 @@ public struct TeamTalkChannelTypes: OptionSet, Hashable, Sendable {
     }
 
     public static let `default` = TeamTalkChannelTypes(rawValue: CHANNEL_DEFAULT.rawValue)
+    /// Survives even when empty, instead of being deleted once the last
+    /// user leaves.
     public static let permanent = TeamTalkChannelTypes(rawValue: CHANNEL_PERMANENT.rawValue)
+    /// "No Interruptions" mode: only one user (or the front of
+    /// ``TeamTalkChannel/transmitUsersQueue``) may transmit at a time.
     public static let soloTransmit = TeamTalkChannelTypes(rawValue: CHANNEL_SOLO_TRANSMIT.rawValue)
+    /// Only the channel operator can be heard by everyone by default; other
+    /// users' voice is limited to those the operator specifically enables.
     public static let classroom = TeamTalkChannelTypes(rawValue: CHANNEL_CLASSROOM.rawValue)
+    /// The channel operator only receives audio/video, without being able
+    /// to transmit into it themselves.
     public static let operatorReceiveOnly = TeamTalkChannelTypes(rawValue: CHANNEL_OPERATOR_RECVONLY.rawValue)
     public static let noVoiceActivation = TeamTalkChannelTypes(rawValue: CHANNEL_NO_VOICEACTIVATION.rawValue)
     public static let noRecording = TeamTalkChannelTypes(rawValue: CHANNEL_NO_RECORDING.rawValue)
+    /// Not shown to users without the "view hidden channels" right.
     public static let hidden = TeamTalkChannelTypes(rawValue: CHANNEL_HIDDEN.rawValue)
 }
 
+/// Which categories of activity the server writes to its own log file. Set
+/// via ``TeamTalkServerPropertiesConfiguration/logEvents``.
 public struct TeamTalkServerLogEvents: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -405,6 +454,8 @@ public struct TeamTalkServerLogEvents: OptionSet, Hashable, Sendable {
     public static let userNewStream = TeamTalkServerLogEvents(rawValue: SERVERLOGEVENT_USER_NEW_STREAM.rawValue)
 }
 
+/// What a ``TeamTalkBanConfiguration``/``TeamTalkBannedUser`` matches
+/// against: a channel, an IP address, and/or a username, combinable.
 public struct TeamTalkBanTypes: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -426,6 +477,12 @@ public struct TeamTalkBanTypes: OptionSet, Hashable, Sendable {
     public static let username = TeamTalkBanTypes(rawValue: BANTYPE_USERNAME.rawValue)
 }
 
+/// A user's presence, packed as a low-byte "mode" (``available``/``away``/
+/// ``question`` — mutually exclusive, despite this being an `OptionSet`)
+/// plus independent high-byte flags (``female``, ``videoTransmit``, ...)
+/// that combine with whichever mode is set. ``modeMask``/``flagsMask``
+/// isolate one half from a combined value; they aren't states to set
+/// themselves.
 public struct TeamTalkStatusMode: OptionSet, Hashable, Sendable {
     public let rawValue: Int32
 
@@ -436,7 +493,9 @@ public struct TeamTalkStatusMode: OptionSet, Hashable, Sendable {
     public static let available: TeamTalkStatusMode = []
     public static let away = TeamTalkStatusMode(rawValue: 0x00000001)
     public static let question = TeamTalkStatusMode(rawValue: 0x00000002)
+    /// Isolates the mode bits from a combined value, e.g. `status.intersection(.modeMask)`.
     public static let modeMask = TeamTalkStatusMode(rawValue: 0x000000FF)
+    /// Isolates the flag bits from a combined value.
     public static let flagsMask = TeamTalkStatusMode(rawValue: Int32(bitPattern: 0xFFFFFF00))
     public static let female = TeamTalkStatusMode(rawValue: 0x00000100)
     public static let videoTransmit = TeamTalkStatusMode(rawValue: 0x00000200)
