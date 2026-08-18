@@ -1,6 +1,10 @@
 import Foundation
 import TeamTalkC
 
+/// One frame of a desktop share: a bitmap plus the session/protocol
+/// metadata needed to decode it. Owns its pixel data as `Data`, unlike the
+/// raw `DesktopWindow` C struct it wraps, which points at SDK-owned memory
+/// only valid until the acquire/release call that produced it returns.
 public struct TeamTalkDesktopWindow {
     public let width: Int32
     public let height: Int32
@@ -68,7 +72,11 @@ public struct TeamTalkDesktopWindow {
     }
 }
 
+/// One synthetic keyboard/mouse event to forward via
+/// `TeamTalkClient.sendDesktopInput(_:to:)` when remote-controlling another
+/// user's shared desktop.
 public struct TeamTalkDesktopInput {
+    /// The maximum number of inputs `sendDesktopInput(_:to:)` accepts in one call.
     public static let maximumCount = Int(TT_DESKTOPINPUT_MAX)
 
     public let rawValue: DesktopInput
@@ -124,6 +132,8 @@ public struct TeamTalkDesktopInput {
     }
 }
 
+/// One webcam/capture device visible to the OS, as reported by
+/// `TeamTalkClient.videoCaptureDevices()`.
 public struct TeamTalkVideoCaptureDevice: Identifiable {
     public let rawValue: VideoCaptureDevice
 

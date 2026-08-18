@@ -1,6 +1,8 @@
 import Foundation
 import TeamTalkC
 
+/// One audio input/output device visible to the OS, as reported by
+/// `TeamTalkClient.soundDevices()`.
 public struct TeamTalkSoundDevice: Identifiable {
     public let rawValue: SoundDevice
 
@@ -16,10 +18,14 @@ public struct TeamTalkSoundDevice: Identifiable {
         rawValue.id
     }
 
+    /// The ID to pass to `TeamTalkClient.initSoundInputDevice(id:)`/`initSoundOutputDevice(id:)`.
     public var soundDeviceID: TeamTalkSoundDeviceID {
         rawValue.soundDeviceID
     }
 
+    /// The underlying physical device's ID, which may differ from
+    /// ``soundDeviceID`` when the SDK exposes this device as a distinct
+    /// logical entry (e.g. under a specific sound system/API).
     public var physicalDeviceID: TeamTalkSoundDeviceID {
         rawValue.physicalDeviceID
     }
@@ -64,6 +70,8 @@ public struct TeamTalkSoundDevice: Identifiable {
         rawValue.features
     }
 
+    /// Whether this device can be opened in shared mode — see
+    /// `TeamTalkClient.initSoundInputSharedDevice(sampleRate:channels:frameSize:)`.
     public var isShared: Bool {
         rawValue.isShared
     }
@@ -89,6 +97,9 @@ public struct TeamTalkSoundDevice: Identifiable {
     }
 }
 
+/// Platform-level audio effects (AGC, denoise, echo cancellation) currently
+/// applied to the open sound devices, distinct from the SDK-level
+/// preprocessing in ``TeamTalkAudioPreprocessorConfiguration``.
 public struct TeamTalkSoundDeviceEffects {
     public let rawValue: SoundDeviceEffects
 
@@ -117,6 +128,8 @@ public struct TeamTalkSoundDeviceEffects {
     }
 }
 
+/// Mutable counterpart to ``TeamTalkSoundDeviceEffects`` for
+/// `TeamTalkClient.setSoundDeviceEffects(_:)`.
 public struct TeamTalkSoundDeviceEffectsConfiguration {
     public var automaticGainControlEnabled: Bool
     public var denoiseEnabled: Bool
@@ -170,6 +183,9 @@ public struct TeamTalkSoundDeviceEffectsConfiguration {
     }
 }
 
+/// Parameters for `TeamTalkClient.initSoundInputSharedDevice(_:)`/
+/// `initSoundOutputSharedDevice(_:)`. Leaving a field at `0` uses the
+/// device's own default (see ``usesDefaultValues``).
 public struct TeamTalkSharedSoundDeviceConfiguration {
     public var sampleRate: Int32
     public var channels: Int32
@@ -202,6 +218,7 @@ public struct TeamTalkSharedSoundDeviceConfiguration {
     }
 }
 
+/// Parameters for `TeamTalkClient.initSoundDuplexDevices(_:)`.
 public struct TeamTalkSoundDuplexConfiguration {
     public var inputDeviceID: TeamTalkSoundDeviceID
     public var outputDeviceID: TeamTalkSoundDeviceID
