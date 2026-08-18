@@ -22,10 +22,8 @@
  */
 
 import AVFoundation
-import Observation
 import SwiftUI
 import TeamTalkKit
-import UIKit
 
 // In-memory snapshot of the settings shown on the Preferences screen. This is
 // the single source of truth PreferencesModel reads from and writes through;
