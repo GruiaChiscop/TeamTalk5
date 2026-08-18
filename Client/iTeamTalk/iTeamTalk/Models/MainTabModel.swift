@@ -141,9 +141,9 @@ final class MainTabModel: TeamTalkEventObserver {
         guard let rc = event?.subtype else { return }
         switch rc {
         case .remoteControlPause, .remoteControlTogglePlayPause:
-            channelListModel.enableVoiceTx(false)
+            channelListModel.pushToTalk.enableVoiceTx(false)
         case .remoteControlPreviousTrack, .remoteControlNextTrack:
-            channelListModel.enableVoiceTx(true)
+            channelListModel.pushToTalk.enableVoiceTx(true)
         default:
             break
         }

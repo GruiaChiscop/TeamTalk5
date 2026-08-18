@@ -45,6 +45,8 @@
 		CC0003000000000000000001 /* AudioCodecModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0002000000000000000001 /* AudioCodecModel.swift */; };
 		CC0003000000000000000002 /* ChannelDetailModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0002000000000000000002 /* ChannelDetailModel.swift */; };
 		CC0003000000000000000003 /* ChannelListModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0002000000000000000003 /* ChannelListModel.swift */; };
+		CC000300000000000000000D /* ChannelModerationActions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000200000000000000000D /* ChannelModerationActions.swift */; };
+		CC000300000000000000000E /* PushToTalkController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000200000000000000000E /* PushToTalkController.swift */; };
 		CC0003000000000000000004 /* MainTabModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0002000000000000000004 /* MainTabModel.swift */; };
 		CC0003000000000000000005 /* PreferencesModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0002000000000000000005 /* PreferencesModel.swift */; };
 		CC0003000000000000000006 /* ServerDetailModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0002000000000000000006 /* ServerDetailModel.swift */; };
@@ -161,6 +163,8 @@
 		CC000200000000000000000A /* UserDetailModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserDetailModel.swift; sourceTree = "<group>"; };
 		CC000200000000000000000B /* WebLoginModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebLoginModel.swift; sourceTree = "<group>"; };
 		CC000200000000000000000C /* ChannelFilesModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelFilesModel.swift; sourceTree = "<group>"; };
+		CC000200000000000000000D /* ChannelModerationActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelModerationActions.swift; sourceTree = "<group>"; };
+		CC000200000000000000000E /* PushToTalkController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushToTalkController.swift; sourceTree = "<group>"; };
 		CC0004000000000000000001 /* AudioCodecView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioCodecView.swift; sourceTree = "<group>"; };
 		CC0004000000000000000002 /* ChannelDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelDetailView.swift; sourceTree = "<group>"; };
 		CC0004000000000000000003 /* ChannelListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelListView.swift; sourceTree = "<group>"; };
@@ -314,6 +318,8 @@
 				CC000200000000000000000C /* ChannelFilesModel.swift */,
 				CC0002000000000000000003 /* ChannelListModel.swift */,
 				CC0002000000000000000004 /* MainTabModel.swift */,
+				CC000200000000000000000D /* ChannelModerationActions.swift */,
+				CC000200000000000000000E /* PushToTalkController.swift */,
 				CC0002000000000000000005 /* PreferencesModel.swift */,
 				CC0002000000000000000006 /* ServerDetailModel.swift */,
 				CC0002000000000000000007 /* ServerListModel.swift */,
@@ -511,6 +517,8 @@
 				CC0003000000000000000002 /* ChannelDetailModel.swift in Sources */,
 				CC000300000000000000000C /* ChannelFilesModel.swift in Sources */,
 				CC0003000000000000000003 /* ChannelListModel.swift in Sources */,
+				CC000300000000000000000D /* ChannelModerationActions.swift in Sources */,
+				CC000300000000000000000E /* PushToTalkController.swift in Sources */,
 				CC0003000000000000000004 /* MainTabModel.swift in Sources */,
 				CC0003000000000000000005 /* PreferencesModel.swift in Sources */,
 				CC0003000000000000000006 /* ServerDetailModel.swift in Sources */,

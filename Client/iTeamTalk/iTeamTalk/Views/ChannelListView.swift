@@ -36,7 +36,7 @@ struct ChannelListContainerView: View {
             Text("Talk")
                 .frame(maxWidth: .infinity)
                 .frame(height: 50)
-                .background(model.isTransmitting ? Color.red : Color.green)
+                .background(model.pushToTalk.isTransmitting ? Color.red : Color.green)
                 .foregroundStyle(.white)
                 .fontWeight(.semibold)
                 .contentShape(Rectangle())
@@ -45,22 +45,22 @@ struct ChannelListContainerView: View {
                     .onChanged { _ in
                         guard !isPressingTalkButton else { return }
                         isPressingTalkButton = true
-                        model.txBtnDown()
+                        model.pushToTalk.txBtnDown()
                     }
                     .onEnded { _ in
                         guard isPressingTalkButton else { return }
                         isPressingTalkButton = false
-                        model.txBtnUp()
+                        model.pushToTalk.txBtnUp()
                     }
             )
             .accessibilityLabel("Push to Talk")
-            .accessibilityHint(model.pttHint)
-            .accessibilityValue(model.isTransmitting
+            .accessibilityHint(model.pushToTalk.pttHint)
+            .accessibilityValue(model.pushToTalk.isTransmitting
                 ? Text("Active")
                 : Text("Inactive"))
             .accessibilityAddTraits(.isButton)
             .accessibilityAction {
-                model.txBtnAccessibilityAction()
+                model.pushToTalk.txBtnAccessibilityAction()
             }
         }
         .navigationTitle(model.navigationTitle)
@@ -98,7 +98,7 @@ struct ChannelListView: View {
 
             case .user(let user):
                 let details = model.userDetails(user)
-                let isMoveSelected = model.isMoveUserSelected(userID: user.userID)
+                let isMoveSelected = model.moderation.isMoveUserSelected(userID: user.userID)
                 HStack(spacing: 10) {
                     Image(details.iconName)
                         .resizable()
@@ -146,16 +146,16 @@ struct ChannelListView: View {
                     model.showTextMessages(user: user)
                 }
                 .accessibilityAction(named: "Mute") {
-                    model.muteUser(userID: user.userID)
+                    model.moderation.muteUser(userID: user.userID)
                 }
-                .accessibilityAction(named: model.moveUserActionTitle(userID: user.userID)) {
-                    model.moveUser(userID: user.userID)
+                .accessibilityAction(named: model.moderation.moveUserActionTitle(userID: user.userID)) {
+                    model.moderation.moveUser(userID: user.userID)
                 }
                 .accessibilityAction(named: "Kick user") {
-                    model.kickUser(userID: user.userID)
+                    model.moderation.kickUser(userID: user.userID)
                 }
                 .accessibilityAction(named: "Ban user") {
-                    model.banUser(userID: user.userID)
+                    model.moderation.banUser(userID: user.userID)
                 }
 
             case .channel(let channel):
@@ -187,7 +187,7 @@ struct ChannelListView: View {
                     .buttonStyle(.borderless)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityHint(model.moveDestinationAccessibilityHint())
+                .accessibilityHint(model.moderation.moveDestinationAccessibilityHint())
                 .contentShape(Rectangle())
                 .onTapGesture {
                     model.selectRow(.channel(channel))
@@ -196,7 +196,7 @@ struct ChannelListView: View {
                     model.selectRow(.channel(channel))
                 }
                 .accessibilityAction(named: "Move users here") {
-                    model.moveIntoChannel(channelID: channel.channelID)
+                    model.moderation.moveIntoChannel(channelID: channel.channelID)
                 }
                 .accessibilityAction(named: "Join channel") {
                     model.joinChannelFromAccessibility(channelID: channel.channelID)

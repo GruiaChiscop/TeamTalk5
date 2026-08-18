@@ -73,9 +73,11 @@ final class ChannelListModel {
 
     // MARK: Published state for the channel list view
     var rows: [ChannelListRow] = []
-    var isTransmitting: Bool = false
-    var pttHint: String = String(localized: "Toggle to enable/disable transmission", comment: "channel list")
     var navigationTitle: String = ""
+
+    // MARK: Split-out sub-controllers
+    let moderation = ChannelModerationActions()
+    let pushToTalk = PushToTalkController()
 
     // MARK: Published navigation state
     var navigationPath: [ChannelListDestination] = []
@@ -93,7 +95,6 @@ final class ChannelListModel {
     var mychannel = TeamTalkChannel(Channel())
     var rejoinchannel: TeamTalkChannelConfiguration?
     var users = [TeamTalkUserID: TeamTalkUser]()
-    var moveusers = Set<TeamTalkUserID>()
     var isProcessingCommand = false
     var srvprop = TeamTalkServerProperties(ServerProperties())
     var myuseraccount = TeamTalkUserAccount(UserAccount())
@@ -106,7 +107,6 @@ final class ChannelListModel {
     var unreadTimer: Timer?
     var displayUsers = [TeamTalkUser]()
     var displayChans = [TeamTalkChannel]()
-    var pttLockTimeout = Date()
 
     // MARK: Private state
     private var joiningChannel: TeamTalkChannel?
@@ -117,6 +117,11 @@ final class ChannelListModel {
     private var usersByChannel = [TeamTalkChannelID: [TeamTalkUser]]()
     private var childrenByParent = [TeamTalkChannelID: [TeamTalkChannel]]()
 
+    init() {
+        moderation.owner = self
+        pushToTalk.owner = self
+    }
+
     // MARK: Deinit
     deinit {
         for (_, user) in users {
@@ -125,7 +130,7 @@ final class ChannelListModel {
     }
 
     @MainActor
-    private func presentError(_ message: String) {
+    func presentError(_ message: String) {
         errorMessage = message
     }
 
@@ -170,7 +175,7 @@ final class ChannelListModel {
     }
 
     func refreshChannelList() {
-        moveusers = Set(moveusers.filter { users[$0] != nil })
+        moderation.moveusers = Set(moderation.moveusers.filter { users[$0] != nil })
         updateDisplayItems()
         let newRows = displayRows()
         if newRows != rows {
@@ -352,132 +357,6 @@ final class ChannelListModel {
         }
     }
 
-    // MARK: - Accessibility actions
-
-    func muteUser(userID: TeamTalkUserID) {
-        guard let user = users[userID] else { return }
-        TeamTalkClient.shared.setUserMute(
-            user,
-            stream: .mediaFileAudio,
-            muted: !user.states.contains(.mediaFileMuted)
-        )
-        TeamTalkClient.shared.setUserMute(
-            user,
-            stream: .voice,
-            muted: !user.states.contains(.voiceMuted)
-        )
-    }
-
-    func moveUser(userID: TeamTalkUserID) {
-        guard let user = users[userID] else { return }
-
-        let isSelected = moveusers.contains(userID)
-        if isSelected {
-            moveusers.remove(userID)
-        } else {
-            moveusers.insert(userID)
-        }
-
-        refreshChannelList()
-        announceForAccessibility(
-            String(
-                format: isSelected
-                    ? String(localized: "%@ deselected", comment: "channel list")
-                    : String(localized: "%@ selected", comment: "channel list"),
-                getDisplayName(user)
-            )
-        )
-    }
-
-    func kickUser(userID: TeamTalkUserID) {
-        let op = TeamTalkClient.shared.isChannelOperator(in: curchannel)
-        guard effectiveUserRights.contains(.canKickUsers) || op else { return }
-        guard let user = users[userID] else { return }
-        let channel = curchannel.channelID.isValid ? curchannel : nil
-
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await TeamTalkClient.shared.kickUser(user, from: channel)
-            } catch {
-                await self.presentError(error.localizedDescription)
-            }
-        }
-    }
-
-    func banUser(userID: TeamTalkUserID) {
-        let op = TeamTalkClient.shared.isChannelOperator(in: curchannel)
-        guard effectiveUserRights.contains(.canBanUsers) || op else { return }
-        guard let user = users[userID] else { return }
-        let channel = curchannel.channelID.isValid ? curchannel : nil
-
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                try await TeamTalkClient.shared.banUser(user, from: channel)
-                try await TeamTalkClient.shared.kickUser(user, from: channel)
-            } catch {
-                await self.presentError(error.localizedDescription)
-            }
-        }
-    }
-
-    func moveIntoChannel(channelID: TeamTalkChannelID) {
-        guard !moveusers.isEmpty else {
-            announceForAccessibility(String(localized: "No users selected to move", comment: "channel list"))
-            return
-        }
-        guard let destinationChannel = channels[channelID] else { return }
-
-        let selectedUsers = moveusers.compactMap { users[$0] }
-        moveusers.removeAll()
-        refreshChannelList()
-
-        Task { [weak self] in
-            guard let self else { return }
-            var firstError: Error?
-
-            for user in selectedUsers {
-                do {
-                    try await TeamTalkClient.shared.moveUser(user, to: destinationChannel)
-                } catch {
-                    if firstError == nil {
-                        firstError = error
-                    }
-                }
-            }
-
-            if let firstError {
-                await self.presentError(firstError.localizedDescription)
-            }
-        }
-    }
-
-    func isMoveUserSelected(userID: TeamTalkUserID) -> Bool {
-        moveusers.contains(userID)
-    }
-
-    func moveUserActionTitle(userID: TeamTalkUserID) -> String {
-        if isMoveUserSelected(userID: userID) {
-            return String(localized: "Deselect user", comment: "channel list")
-        }
-        return String(localized: "Move user", comment: "channel list")
-    }
-
-    func moveDestinationAccessibilityHint() -> String {
-        switch moveusers.count {
-        case 0:
-            return String(localized: "No users selected to move", comment: "channel list")
-        case 1:
-            return String(localized: "1 user selected to move here", comment: "channel list")
-        default:
-            return String(
-                format: String(localized: "%d users selected to move here", comment: "channel list"),
-                moveusers.count
-            )
-        }
-    }
-
     // MARK: - Navigation
 
     func showUserDetail(_ user: TeamTalkUser) {
@@ -530,46 +409,6 @@ final class ChannelListModel {
         if let user = model.privateUser, let msgs = textmessages[user.userID] {
             for m in msgs { model.appendEventMessage(m) }
         }
-    }
-
-    // MARK: - PTT
-
-    func txBtnDown() {
-        if hasPTTLock() {
-            enableVoiceTx(true)
-        } else {
-            enableVoiceTx(!TeamTalkClient.shared.isVoiceTransmitting)
-        }
-    }
-
-    func enableVoiceTx(_ enable: Bool) {
-        TeamTalkClient.shared.enableVoiceTransmission(enable)
-        playSound(enable ? .tx_ON : .tx_OFF)
-        updateTX()
-    }
-
-    func txBtnUp() {
-        if hasPTTLock() {
-            let now = Date()
-            if (pttLockTimeout as NSDate).earlierDate(now) == now {
-                enableVoiceTx(true)
-            } else {
-                enableVoiceTx(false)
-            }
-            pttLockTimeout = now.addingTimeInterval(0.5)
-        }
-    }
-
-    func txBtnAccessibilityAction() {
-        enableVoiceTx(!TeamTalkClient.shared.isVoiceTransmitting)
-    }
-
-    func updateTX() {
-        isTransmitting = TeamTalkClient.shared.isVoiceTransmitting
-        pttHint = hasPTTLock()
-            ? String(localized: "Double tap and hold to transmit. Triple tap fast to lock transmission.", comment: "channel list")
-            : String(localized: "Toggle to enable/disable transmission", comment: "channel list")
-        refreshChannelList()
     }
 
     func timerUnreadBlinker() {
