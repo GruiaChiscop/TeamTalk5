@@ -1,6 +1,7 @@
 import Foundation
 import TeamTalkC
 
+/// Which audio codec a channel/stream uses.
 public struct TeamTalkCodec: RawRepresentable, Hashable, Sendable {
     public let rawValue: Codec
 
@@ -23,6 +24,8 @@ public struct TeamTalkCodec: RawRepresentable, Hashable, Sendable {
     public static let webMVP8 = TeamTalkCodec(rawValue: WEBM_VP8_CODEC)
 }
 
+/// Which sound-input preprocessing backend is active — the discriminant
+/// behind ``TeamTalkAudioPreprocessorConfiguration``.
 public struct TeamTalkAudioPreprocessorType: RawRepresentable, Hashable, Sendable {
     public let rawValue: AudioPreprocessorType
 
@@ -45,6 +48,7 @@ public struct TeamTalkAudioPreprocessorType: RawRepresentable, Hashable, Sendabl
     public static let webRTC = TeamTalkAudioPreprocessorType(rawValue: WEBRTC_AUDIOPREPROCESSOR)
 }
 
+/// How aggressively the WebRTC preprocessor suppresses background noise.
 public struct TeamTalkWebRTCNoiseSuppressionLevel: RawRepresentable, Hashable, Sendable {
     public let rawValue: Int32
 
@@ -66,6 +70,10 @@ public struct TeamTalkWebRTCNoiseSuppressionLevel: RawRepresentable, Hashable, S
     public static let veryHigh = TeamTalkWebRTCNoiseSuppressionLevel(rawValue: 3)
 }
 
+/// One entry in ``TeamTalkChannel/transmitUsers``: who may transmit which
+/// stream types right now. In a classroom channel, an entry can instead
+/// mean "anyone may transmit" — see ``isClassroomFreeForAll``/``classroomFreeForAll(streamTypes:)``
+/// — rather than naming a specific user.
 public struct TeamTalkChannelTransmitUser: Hashable, Sendable {
     public var userID: Int32
     public var streamTypes: TeamTalkStreamTypes
@@ -95,6 +103,7 @@ public struct TeamTalkChannelTransmitUser: Hashable, Sendable {
     }
 }
 
+/// Who a ``TeamTalkTextMessage``/``TeamTalkOutgoingTextMessage`` is addressed to.
 public struct TeamTalkTextMessageType: RawRepresentable, Hashable, Sendable {
     public let rawValue: TextMsgType
 
@@ -117,6 +126,7 @@ public struct TeamTalkTextMessageType: RawRepresentable, Hashable, Sendable {
     public static let custom = TeamTalkTextMessageType(rawValue: MSGTYPE_CUSTOM)
 }
 
+/// A ``TeamTalkFileTransfer``'s current state.
 public struct TeamTalkFileTransferStatus: RawRepresentable, Hashable, Sendable {
     public let rawValue: FileTransferStatus
 
@@ -138,6 +148,8 @@ public struct TeamTalkFileTransferStatus: RawRepresentable, Hashable, Sendable {
     public static let finished = TeamTalkFileTransferStatus(rawValue: FILETRANSFER_FINISHED)
 }
 
+/// Pixel encoding to convert a ``TeamTalkDesktopWindow`` frame to, e.g. via
+/// `TeamTalkClient.sendDesktopWindow(_:convertTo:)`/`acquireDesktopWindow(for:convertTo:)`.
 public struct TeamTalkBitmapFormat: RawRepresentable, Hashable, Sendable {
     public let rawValue: BitmapFormat
 
@@ -160,6 +172,7 @@ public struct TeamTalkBitmapFormat: RawRepresentable, Hashable, Sendable {
     public static let rgb32 = TeamTalkBitmapFormat(rawValue: BMP_RGB32)
 }
 
+/// How a ``TeamTalkDesktopWindow``'s frame buffer is compressed.
 public struct TeamTalkDesktopProtocol: RawRepresentable, Hashable, Sendable {
     public let rawValue: DesktopProtocol
 
@@ -179,6 +192,8 @@ public struct TeamTalkDesktopProtocol: RawRepresentable, Hashable, Sendable {
     public static let zlib = TeamTalkDesktopProtocol.zlib1
 }
 
+/// Whether a forwarded ``TeamTalkDesktopInput`` key/button is being pressed
+/// or released.
 public struct TeamTalkDesktopKeyState: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -199,6 +214,7 @@ public struct TeamTalkDesktopKeyState: OptionSet, Hashable, Sendable {
     public static let up = TeamTalkDesktopKeyState(rawValue: DESKTOPKEYSTATE_UP.rawValue)
 }
 
+/// A key or mouse button forwarded in a ``TeamTalkDesktopInput``.
 public struct TeamTalkDesktopKeyCode: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: UInt32
 
@@ -236,6 +252,7 @@ public struct TeamTalkDesktopKeyCode: RawRepresentable, Hashable, Sendable, Cust
     public static let middleMouseButton = TeamTalkDesktopKeyCode(UInt32(TT_DESKTOPINPUT_KEYCODE_MMOUSEBTN))
 }
 
+/// A ``TeamTalkMediaFileInfo``'s current playback/probe state.
 public struct TeamTalkMediaFileStatus: RawRepresentable, Hashable, Sendable {
     public let rawValue: MediaFileStatus
 
@@ -260,6 +277,8 @@ public struct TeamTalkMediaFileStatus: RawRepresentable, Hashable, Sendable {
     public static let playing = TeamTalkMediaFileStatus(rawValue: MFS_PLAYING)
 }
 
+/// Output format for recorded audio files (`startRecordingMuxedAudioFile`,
+/// `setUserMediaStorage`, ...).
 public struct TeamTalkAudioFileFormat: RawRepresentable, Hashable, Sendable {
     public let rawValue: AudioFileFormat
 
@@ -276,6 +295,8 @@ public struct TeamTalkAudioFileFormat: RawRepresentable, Hashable, Sendable {
     }
 
     public static let none = TeamTalkAudioFileFormat(rawValue: AFF_NONE)
+    /// Records raw encoded audio in the channel's own codec, rather than
+    /// transcoding to a fixed output format.
     public static let channelCodec = TeamTalkAudioFileFormat(rawValue: AFF_CHANNELCODEC_FORMAT)
     public static let wave = TeamTalkAudioFileFormat(rawValue: AFF_WAVE_FORMAT)
     public static let mp3_16kbit = TeamTalkAudioFileFormat(rawValue: AFF_MP3_16KBIT_FORMAT)
@@ -286,6 +307,7 @@ public struct TeamTalkAudioFileFormat: RawRepresentable, Hashable, Sendable {
     public static let mp3_320kbit = TeamTalkAudioFileFormat(rawValue: AFF_MP3_320KBIT_FORMAT)
 }
 
+/// A video frame's pixel layout (as a FourCC code).
 public struct TeamTalkVideoPixelFormat: RawRepresentable, Hashable, Sendable {
     public let rawValue: FourCC
 
@@ -307,6 +329,10 @@ public struct TeamTalkVideoPixelFormat: RawRepresentable, Hashable, Sendable {
     public static let rgb32 = TeamTalkVideoPixelFormat(rawValue: FOURCC_RGB32)
 }
 
+/// The native SDK's own event tag, 1:1 with each ``TeamTalkEvent/Kind``
+/// case. Only surfaced through ``TeamTalkEvent/Kind/unhandled(event:payloadType:)``
+/// for events without a dedicated case; everything else decodes straight to
+/// `Kind` and callers shouldn't need to compare against this directly.
 public struct TeamTalkClientEvent: RawRepresentable, Hashable, Sendable {
     public let rawValue: ClientEvent
 
@@ -378,6 +404,9 @@ public struct TeamTalkClientEvent: RawRepresentable, Hashable, Sendable {
     public static let soundDeviceNewDefaultOutputCommunicationDevice = TeamTalkClientEvent(rawValue: CLIENTEVENT_SOUNDDEVICE_NEW_DEFAULT_OUTPUT_COMDEVICE)
 }
 
+/// Which C struct type a raw `TTMessage`'s payload actually is. Mainly
+/// useful alongside ``TeamTalkEvent/Kind/unhandled(event:payloadType:)`` to
+/// know how to interpret ``TeamTalkEvent/rawMessage`` yourself.
 public struct TeamTalkPayloadType: RawRepresentable, Hashable, Sendable {
     public let rawValue: TTType
 
