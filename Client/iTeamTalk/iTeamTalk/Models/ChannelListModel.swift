@@ -49,16 +49,22 @@ enum ChannelListDestination: Hashable {
 
 // MARK: - Row model
 
-enum ChannelListRow: Identifiable, Equatable {
-    case join
-    case user(TeamTalkUser)
-    case channel(TeamTalkChannel)
+// One node in the channel tree rendered by an OutlineGroup: a channel's
+// `children` are its subchannels followed by the users in it, or `nil` (not
+// an empty array) when there's nothing to show, so empty channels get no
+// disclosure indicator. Users are always leaves.
+struct ChannelTreeNode: Identifiable, Equatable {
+    enum Kind: Equatable {
+        case channel(TeamTalkChannel)
+        case user(TeamTalkUser)
+    }
+    let kind: Kind
+    let children: [ChannelTreeNode]?
 
     var id: String {
-        switch self {
-        case .join: return "join"
-        case .user(let user): return "user-\(user.userID)"
+        switch kind {
         case .channel(let channel): return "channel-\(channel.channelID)"
+        case .user(let user): return "user-\(user.userID)"
         }
     }
 }
@@ -74,7 +80,7 @@ final class ChannelListModel {
     let session: TeamTalkSession
 
     // MARK: Published state for the channel list view
-    var rows: [ChannelListRow] = []
+    var rootNodes: [ChannelTreeNode] = []
     var navigationTitle: String = ""
 
     // MARK: Split-out sub-controllers
@@ -98,7 +104,6 @@ final class ChannelListModel {
     // MARK: Server / channel state
     var channels = [TeamTalkChannelID: TeamTalkChannel]()
     var chanpasswds = [TeamTalkChannelID: String]()
-    var curchannel = TeamTalkChannel(Channel())
     var mychannel = TeamTalkChannel(Channel())
     var rejoinchannel: TeamTalkChannelConfiguration?
     var users = [TeamTalkUserID: TeamTalkUser]()
@@ -112,8 +117,6 @@ final class ChannelListModel {
     }
     var textmessages = [TeamTalkUserID: [MyTextMessage]]()
     var unreadTimer: Timer?
-    var displayUsers = [TeamTalkUser]()
-    var displayChans = [TeamTalkChannel]()
 
     // MARK: Private state
     private var joiningChannel: TeamTalkChannel?
@@ -155,41 +158,43 @@ final class ChannelListModel {
         for channel in channels.values {
             childrenByParent[channel.parentChannelID, default: []].append(channel)
         }
+    }
 
-        let subchans = childrenByParent[curchannel.channelID] ?? []
-        let chanusers = usersByChannel[curchannel.channelID] ?? []
-
-        let chansort = Preferences.current.display.channelSortIndex
-
-        switch chansort {
-        case ChanSort.POPULARITY.rawValue:
-            displayChans = subchans.sorted { lhs, rhs in
-                let au = usersByChannel[lhs.channelID]?.count ?? 0
-                let bu = usersByChannel[rhs.channelID]?.count ?? 0
-                let aname = lhs.name
-                let bname = rhs.name
-                return au == bu
-                    ? aname.caseInsensitiveCompare(bname) == .orderedAscending
-                    : au > bu
-            }
-        default:
-            displayChans = subchans.sorted {
-                let aname = $0.name
-                let bname = $1.name
-                return aname.caseInsensitiveCompare(bname) == .orderedAscending
-            }
+    private func channelSortComparator(_ lhs: TeamTalkChannel, _ rhs: TeamTalkChannel) -> Bool {
+        guard Preferences.current.display.channelSortIndex == ChanSort.POPULARITY.rawValue else {
+            return lhs.name.caseInsensitiveCompare(rhs.name) == .orderedAscending
         }
-        displayUsers = chanusers.sorted {
-            getDisplayName($0).caseInsensitiveCompare(getDisplayName($1)) == .orderedAscending
-        }
+        let au = usersByChannel[lhs.channelID]?.count ?? 0
+        let bu = usersByChannel[rhs.channelID]?.count ?? 0
+        return au == bu
+            ? lhs.name.caseInsensitiveCompare(rhs.name) == .orderedAscending
+            : au > bu
+    }
+
+    private func userSortComparator(_ lhs: TeamTalkUser, _ rhs: TeamTalkUser) -> Bool {
+        getDisplayName(lhs).caseInsensitiveCompare(getDisplayName(rhs)) == .orderedAscending
+    }
+
+    private func buildNode(for channel: TeamTalkChannel) -> ChannelTreeNode {
+        let subchannels = (childrenByParent[channel.channelID] ?? []).sorted(by: channelSortComparator)
+        let channelUsers = (usersByChannel[channel.channelID] ?? []).sorted(by: userSortComparator)
+        let children = channelUsers.map { ChannelTreeNode(kind: .user($0), children: nil) } + subchannels.map(buildNode)
+        return ChannelTreeNode(kind: .channel(channel), children: children.isEmpty ? nil : children)
+    }
+
+    private func buildRootNodes() -> [ChannelTreeNode] {
+        channels.values
+            .filter { !$0.parentChannelID.isValid }
+            .sorted(by: channelSortComparator)
+            .map(buildNode)
     }
 
     func refreshChannelList() {
         moderation.moveusers = Set(moderation.moveusers.filter { users[$0] != nil })
         updateDisplayItems()
-        let newRows = displayRows()
-        if newRows != rows {
-            rows = newRows
+        let newRootNodes = buildRootNodes()
+        if newRootNodes != rootNodes {
+            rootNodes = newRootNodes
         }
     }
 
@@ -206,24 +211,8 @@ final class ChannelListModel {
         }
     }
 
-    private func displayRows() -> [ChannelListRow] {
-        let showJoin = curchannel.channelID != mychannel.channelID && curchannel.channelID.isValid
-        var result = [ChannelListRow]()
-        if showJoin { result.append(.join) }
-        for user in displayUsers { result.append(.user(user)) }
-        if curchannel.parentChannelID.isValid, let parent = channels[curchannel.parentChannelID] {
-            result.append(.channel(parent))
-        }
-        for channel in displayChans { result.append(.channel(channel)) }
-        return result
-    }
-
     func updateTitle() {
-        if !curchannel.parentChannelID.isValid {
-            navigationTitle = srvprop.name
-        } else {
-            navigationTitle = curchannel.name
-        }
+        navigationTitle = srvprop.name
     }
 
     // MARK: - User / channel detail providers
@@ -257,45 +246,29 @@ final class ChannelListModel {
             ? String(localized: "Edit", comment: "channel list")
             : String(localized: "View", comment: "channel list")
 
-        if !curchannel.channelID.isValid {
-            let iconName = channel.isPasswordProtected ? "channel_pink.png" : "channel_orange.png"
-            let iconLabel = channel.isPasswordProtected
-                ? String(localized: "Password protected", comment: "channel list")
-                : String(localized: "No password", comment: "channel list")
-            return ChannelDisplayDetails(
-                title: srvprop.name,
-                subtitle: channel.topic,
-                iconName: iconName,
-                iconAccessibilityLabel: iconLabel,
-                actionTitle: actionTitle,
-                isParent: false
-            )
-        }
-
-        if channel.channelID == curchannel.parentChannelID {
-            let subtitle = !channel.parentChannelID.isValid
-                ? srvprop.name
-                : channel.name
-            return ChannelDisplayDetails(
-                title: String(localized: "Parent channel", comment: "channel list"),
-                subtitle: subtitle,
-                iconName: "back_orange.png",
-                iconAccessibilityLabel: String(localized: "Return to previous channel", comment: "channel list"),
-                actionTitle: actionTitle,
-                isParent: true
-            )
-        }
-
-        let userCount = getUsersCount(channel.channelID)
         let iconName = channel.isPasswordProtected ? "channel_pink.png" : "channel_orange.png"
-        let iconLabel = String(format: String(localized: "Channel. %d users", comment: "channel list"), userCount)
+        let iconLabel = channel.isPasswordProtected
+            ? String(localized: "Password protected", comment: "channel list")
+            : String(localized: "No password", comment: "channel list")
+
+        // The root channel's own name is typically empty - show the server's
+        // display name there instead.
+        let displayName = channel.parentChannelID.isValid ? channel.name : srvprop.name
+        let hasChildren = !(childrenByParent[channel.channelID] ?? []).isEmpty
+        let directCount = usersByChannel[channel.channelID]?.count ?? 0
+        let totalCount = getUsersCount(channel.channelID)
+        // Channels with subchannels show direct/total ("MyServer: 0/7") since the
+        // two counts can differ; leaves only ever have one meaningful count.
+        let title = hasChildren
+            ? "\(displayName): \(directCount)/\(totalCount)"
+            : "\(displayName) (\(totalCount))"
+
         return ChannelDisplayDetails(
-            title: channel.name + " (\(userCount))",
+            title: title,
             subtitle: channel.topic,
             iconName: iconName,
             iconAccessibilityLabel: iconLabel,
-            actionTitle: actionTitle,
-            isParent: false
+            actionTitle: actionTitle
         )
     }
 
@@ -305,25 +278,6 @@ final class ChannelListModel {
             count += getUsersCount(channel.channelID)
         }
         return count
-    }
-
-    // MARK: - Row selection
-
-    func selectRow(_ row: ChannelListRow) {
-        switch row {
-        case .join:
-            joinCurrentChannel()
-        case .user(let user):
-            showUserDetail(user)
-        case .channel(let channel):
-            curchannel = channel
-            refreshChannelList()
-            updateTitle()
-        }
-    }
-
-    func joinCurrentChannel() {
-        joinNewChannel(curchannel)
     }
 
     // MARK: - Channel joining
@@ -361,12 +315,6 @@ final class ChannelListModel {
         }
     }
 
-    func joinChannelFromAccessibility(channelID: TeamTalkChannelID) {
-        if let channel = channels[channelID] {
-            joinNewChannel(channel)
-        }
-    }
-
     // MARK: - Navigation
 
     func showUserDetail(_ user: TeamTalkUser) {
@@ -387,7 +335,7 @@ final class ChannelListModel {
 
     func showNewChannel() {
         var newChannel = Channel()
-        newChannel.nParentID = curchannel.channelID.cValue
+        newChannel.nParentID = mychannel.channelID.cValue
         if newChannel.nParentID == 0 {
             let subchans = channels.values.filter { !$0.parentChannelID.isValid }
             if let root = subchans.first {
@@ -537,7 +485,6 @@ extension ChannelListModel: TeamTalkEventObserver {
         case .connectionLost:
             channels.removeAll()
             users.removeAll()
-            curchannel = TeamTalkChannel(Channel())
             mychannel = TeamTalkChannel(Channel())
             rejoinchannel = nil
             refreshChannelList()
@@ -579,7 +526,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             playSound(.logged_IN)
             users[user.userID] = user
             if !isProcessingCommand {
-                if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
+                refreshChannelList()
                 if session.myUserIdentifier != user.userID {
                     if Preferences.current.textToSpeechEvents.userLoggedIn {
                         newUtterance(getDisplayName(user) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
@@ -591,7 +538,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             playSound(.logged_OUT)
             users.removeValue(forKey: user.userID)
             if !isProcessingCommand {
-                if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
+                refreshChannelList()
                 if session.myUserIdentifier != user.userID {
                     if Preferences.current.textToSpeechEvents.userLoggedOut {
                         newUtterance(getDisplayName(user) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
@@ -602,7 +549,6 @@ extension ChannelListModel: TeamTalkEventObserver {
         case .userJoined(let user):
             users[user.userID] = user
             if user.userID == session.myUserIdentifier, let joinedChannel = channels[user.channelIdentifier] {
-                curchannel = joinedChannel
                 mychannel = joinedChannel
                 if rejoinchannel?.id == 0 && chanpasswds[user.channelIdentifier] == nil {
                     chanpasswds[user.channelIdentifier] = rejoinchannel?.password ?? ""

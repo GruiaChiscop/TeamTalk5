@@ -22,6 +22,7 @@
  */
 
 import SwiftUI
+import TeamTalkKit
 
 // MARK: - Container view
 
@@ -85,119 +86,139 @@ struct ChannelListView: View {
     let model: ChannelListModel
 
     var body: some View {
-        List(model.rows) { row in
-            switch row {
-            case .join:
-                Button(action: model.joinCurrentChannel) {
-                    Text("Join this channel")
-                        .frame(maxWidth: .infinity, alignment: .center)
+        List {
+            OutlineGroup(model.rootNodes, children: \.children) { node in
+                switch node.kind {
+                case .channel(let channel):
+                    channelRow(channel)
+                case .user(let user):
+                    userRow(user)
                 }
+            }
+        }
+    }
 
-            case .user(let user):
-                let details = model.userDetails(user)
-                let isMoveSelected = model.moderation.isMoveUserSelected(userID: user.userID)
-                HStack(spacing: 10) {
-                    Image(details.iconName)
-                        .resizable()
-                        .frame(width: 36, height: 36)
-                        .accessibilityLabel(details.iconAccessibilityLabel)
+    private func userRow(_ user: TeamTalkUser) -> some View {
+        let details = model.userDetails(user)
+        let isMoveSelected = model.moderation.isMoveUserSelected(userID: user.userID)
+        return HStack(spacing: 10) {
+            Image(details.iconName)
+                .resizable()
+                .frame(width: 36, height: 36)
+                .accessibilityLabel(details.iconAccessibilityLabel)
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(details.title)
-                            .font(.body)
-                            .lineLimit(1)
-                        if let subtitle = details.subtitle {
-                            Text(subtitle)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(details.title)
+                    .font(.body)
+                    .lineLimit(1)
+                if let subtitle = details.subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 12)
+
+            if isMoveSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+
+            Button {
+                model.showTextMessages(user: user)
+            } label: {
+                Image(details.messageIconName)
+                    .resizable()
+                    .frame(width: 24, height: 24)
+            }
+            .buttonStyle(.borderless)
+            .accessibilityLabel("Text Messaging")
+        }
+        .accessibilityElement(children: .combine)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            model.showUserDetail(user)
+        }
+        .accessibilityAction(named: "Show user details") {
+            model.showUserDetail(user)
+        }
+        .accessibilityAction(named: "Message this user") {
+            model.showTextMessages(user: user)
+        }
+        .accessibilityAction(named: "Mute") {
+            model.moderation.muteUser(userID: user.userID)
+        }
+        .accessibilityAction(named: model.moderation.moveUserActionTitle(userID: user.userID)) {
+            model.moderation.moveUser(userID: user.userID)
+        }
+        .accessibilityAction(named: "Kick user") {
+            model.moderation.kickUser(userID: user.userID)
+        }
+        .accessibilityAction(named: "Ban user") {
+            model.moderation.banUser(userID: user.userID)
+        }
+    }
+
+    private func channelRow(_ channel: TeamTalkChannel) -> some View {
+        let details = model.channelDetails(channel)
+        let hasSelectedUsers = !model.moderation.moveusers.isEmpty
+
+        let content = HStack(spacing: 10) {
+            Image(details.iconName)
+                .resizable()
+                .frame(width: 36, height: 36)
+                .accessibilityLabel(details.iconAccessibilityLabel)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(limitText(details.title))
+                    .font(.body)
+                    .lineLimit(1)
+                if let subtitle = details.subtitle {
+                    Text(subtitle)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer(minLength: 12)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(model.moderation.moveDestinationAccessibilityHint())
+        .contentShape(Rectangle())
+        .onTapGesture {
+            model.joinNewChannel(channel)
+        }
+        .swipeActions(edge: .trailing) {
+            // swipeActions buttons are automatically exposed to VoiceOver as a
+            // custom action of their own - adding a matching .accessibilityAction
+            // below would just announce this one twice.
+            Button(details.actionTitle) {
+                model.showChannelDetail(channel)
+            }
+            .tint(.blue)
+        }
+
+        // Direct tap expands/collapses under VoiceOver (that's fine - it's the
+        // native OutlineGroup disclosure behavior), so Join is a named action
+        // instead. Move only makes sense - and only appears - once users are
+        // actually selected, in which case it comes before Join.
+        return Group {
+            if hasSelectedUsers {
+                content
+                    .accessibilityAction(named: "Move users here") {
+                        model.moderation.moveIntoChannel(channelID: channel.channelID)
                     }
-
-                    Spacer(minLength: 12)
-
-                    if isMoveSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
+                    .accessibilityAction(named: "Join") {
+                        model.joinNewChannel(channel)
                     }
-
-                    Button {
-                        model.showTextMessages(user: user)
-                    } label: {
-                        Image(details.messageIconName)
-                            .resizable()
-                            .frame(width: 24, height: 24)
+            } else {
+                content
+                    .accessibilityAction(named: "Join") {
+                        model.joinNewChannel(channel)
                     }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Text Messaging")
-                }
-                .accessibilityElement(children: .combine)
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    model.selectRow(.user(user))
-                }
-                .accessibilityAction(named: "Show user details") {
-                    model.selectRow(.user(user))
-                }
-                .accessibilityAction(named: "Message this user") {
-                    model.showTextMessages(user: user)
-                }
-                .accessibilityAction(named: "Mute") {
-                    model.moderation.muteUser(userID: user.userID)
-                }
-                .accessibilityAction(named: model.moderation.moveUserActionTitle(userID: user.userID)) {
-                    model.moderation.moveUser(userID: user.userID)
-                }
-                .accessibilityAction(named: "Kick user") {
-                    model.moderation.kickUser(userID: user.userID)
-                }
-                .accessibilityAction(named: "Ban user") {
-                    model.moderation.banUser(userID: user.userID)
-                }
-
-            case .channel(let channel):
-                let details = model.channelDetails(channel)
-                HStack(spacing: 10) {
-                    Image(details.iconName)
-                        .resizable()
-                        .frame(width: 36, height: 36)
-                        .accessibilityLabel(details.iconAccessibilityLabel)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(limitText(details.title))
-                            .font(.body)
-                            .foregroundStyle(details.isParent ? .secondary : .primary)
-                            .lineLimit(1)
-                        if let subtitle = details.subtitle {
-                            Text(subtitle)
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(2)
-                        }
-                    }
-
-                    Spacer(minLength: 12)
-
-                    Button(details.actionTitle) {
-                        model.showChannelDetail(channel)
-                    }
-                    .buttonStyle(.borderless)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityHint(model.moderation.moveDestinationAccessibilityHint())
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    model.selectRow(.channel(channel))
-                }
-                .accessibilityAction(named: "Expand") {
-                    model.selectRow(.channel(channel))
-                }
-                .accessibilityAction(named: "Move users here") {
-                    model.moderation.moveIntoChannel(channelID: channel.channelID)
-                }
-                .accessibilityAction(named: "Join channel") {
-                    model.joinChannelFromAccessibility(channelID: channel.channelID)
-                }
             }
         }
     }
@@ -219,5 +240,4 @@ struct ChannelDisplayDetails {
     let iconName: String
     let iconAccessibilityLabel: String
     let actionTitle: String
-    let isParent: Bool
 }

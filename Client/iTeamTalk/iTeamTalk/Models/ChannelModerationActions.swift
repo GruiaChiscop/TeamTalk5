@@ -74,11 +74,10 @@ final class ChannelModerationActions {
     }
 
     func kickUser(userID: TeamTalkUserID) {
-        guard let owner else { return }
-        let op = session.isChannelOperator(in: owner.curchannel)
+        guard let owner, let user = owner.users[userID] else { return }
+        let channel = owner.channels[user.channelIdentifier]
+        let op = channel.map { session.isChannelOperator(in: $0) } ?? false
         guard owner.effectiveUserRights.contains(.canKickUsers) || op else { return }
-        guard let user = owner.users[userID] else { return }
-        let channel = owner.curchannel.channelID.isValid ? owner.curchannel : nil
 
         Task { [weak owner, session] in
             guard let owner else { return }
@@ -91,11 +90,10 @@ final class ChannelModerationActions {
     }
 
     func banUser(userID: TeamTalkUserID) {
-        guard let owner else { return }
-        let op = session.isChannelOperator(in: owner.curchannel)
+        guard let owner, let user = owner.users[userID] else { return }
+        let channel = owner.channels[user.channelIdentifier]
+        let op = channel.map { session.isChannelOperator(in: $0) } ?? false
         guard owner.effectiveUserRights.contains(.canBanUsers) || op else { return }
-        guard let user = owner.users[userID] else { return }
-        let channel = owner.curchannel.channelID.isValid ? owner.curchannel : nil
 
         Task { [weak owner, session] in
             guard let owner else { return }
