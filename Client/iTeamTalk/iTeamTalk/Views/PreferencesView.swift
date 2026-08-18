@@ -170,34 +170,58 @@ struct PreferencesView: View {
 
     private var soundSection: some View {
         Section("Sound System") {
-            PreferenceSlider(
-                title: "Master Volume",
-                value: $model.masterVolumePercent,
-                range: 0...100,
-                step: 10,
-                valueText: { model.percentText($0) }
-            )
-            PreferenceSlider(
-                title: "Media File Volume",
-                value: $model.mediaFileVolumePercent,
-                range: 0...100,
-                step: 1,
-                valueText: { "\(Int($0.rounded())) %" }
-            )
-            PreferenceSlider(
-                title: "Microphone Gain",
-                value: $model.microphoneGainPercent,
-                range: 0...100,
-                step: 10,
-                valueText: { model.percentText($0) }
-            )
-            PreferenceSlider(
-                title: "Voice Activation Level",
-                value: $model.voiceActivationLevel,
-                range: 0...Double(VOICEACT_DISABLED),
-                step: 1,
-                valueText: { model.voiceActivationValueText($0) }
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text("Master Volume")
+                    Spacer(minLength: 16)
+                    Text(model.percentText(model.masterVolumePercent))
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Slider(value: $model.masterVolumePercent, in: 0...100, step: 10) {
+                    Text("Master Volume")
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text("Media File Volume")
+                    Spacer(minLength: 16)
+                    Text("\(Int(model.mediaFileVolumePercent.rounded())) %")
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Slider(value: $model.mediaFileVolumePercent, in: 0...100, step: 1) {
+                    Text("Media File Volume")
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text("Microphone Gain")
+                    Spacer(minLength: 16)
+                    Text(model.percentText(model.microphoneGainPercent))
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Slider(value: $model.microphoneGainPercent, in: 0...100, step: 10) {
+                    Text("Microphone Gain")
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text("Voice Activation Level")
+                    Spacer(minLength: 16)
+                    Text(model.voiceActivationValueText(model.voiceActivationLevel))
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Slider(value: $model.voiceActivationLevel, in: 0...Double(VOICEACT_DISABLED), step: 1) {
+                    Text("Voice Activation Level")
+                }
+            }
             NavigationLink {
                 SoundDevicesView(session: model.session)
             } label: {
@@ -238,20 +262,32 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            PreferenceSlider(
-                title: "Speech Rate",
-                value: $model.ttsRate,
-                range: Double(AVSpeechUtteranceMinimumSpeechRate)...Double(AVSpeechUtteranceMaximumSpeechRate),
-                step: 0.1,
-                valueText: { String(format: "%.1f", $0) }
-            )
-            PreferenceSlider(
-                title: "Speech Volume",
-                value: $model.ttsVolume,
-                range: 0...1,
-                step: 0.1,
-                valueText: { String(format: "%.1f", $0) }
-            )
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text("Speech Rate")
+                    Spacer(minLength: 16)
+                    Text(String(format: "%.1f", model.ttsRate))
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Slider(value: $model.ttsRate, in: Double(AVSpeechUtteranceMinimumSpeechRate)...Double(AVSpeechUtteranceMaximumSpeechRate), step: 0.1) {
+                    Text("Speech Rate")
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Text("Speech Volume")
+                    Spacer(minLength: 16)
+                    Text(String(format: "%.1f", model.ttsVolume))
+                        .font(.body.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                Slider(value: $model.ttsVolume, in: 0...1, step: 0.1) {
+                    Text("Speech Volume")
+                }
+            }
             NavigationLink {
                 TextToSpeechEventsView()
             } label: {
@@ -322,30 +358,5 @@ struct PreferenceSubtitle: View {
         text
             .font(.footnote)
             .foregroundStyle(.secondary)
-    }
-}
-
-/// A titled slider with a trailing value label. No subtitle: the value is only shown once.
-struct PreferenceSlider: View {
-    let title: LocalizedStringKey
-    @Binding var value: Double
-    let range: ClosedRange<Double>
-    let step: Double
-    let valueText: (Double) -> String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Text(title)
-                Spacer(minLength: 16)
-                Text(valueText(value))
-                    .font(.body.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .accessibilityHidden(true)
-            }
-            Slider(value: $value, in: range, step: step) {
-                Text(title)
-            }
-        }
     }
 }
