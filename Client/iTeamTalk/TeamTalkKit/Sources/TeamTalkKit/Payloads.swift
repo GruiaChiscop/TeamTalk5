@@ -1,6 +1,11 @@
 import Foundation
 import TeamTalkC
 
+// The *StringProperty enums below select which variable-length string field
+// to read/write via TeamTalkString's functions, which every raw C struct's
+// string accessor in this package (including the ones TeamTalkUser.nickname
+// and friends delegate to) is built on top of — this is the one place that
+// actually calls into the underlying TTKit string-marshaling functions.
 public enum TeamTalkUserStringProperty {
     case nickname
     case username
@@ -170,6 +175,10 @@ public enum TeamTalkFileTransferStringProperty {
     }
 }
 
+/// Decodes a raw `TTMessage`'s payload into the specific C struct it
+/// carries. `TeamTalkEvent.Kind`'s initializer is the only place in this
+/// package that needs these; most callers get an already-decoded `Kind`
+/// case instead of using this directly.
 public enum TeamTalkMessagePayload {
     public static func channel(from message: TTMessage) -> Channel {
         var message = message
@@ -231,6 +240,10 @@ public enum TeamTalkMessagePayload {
     }
 }
 
+/// Reads/writes the variable-length string fields of raw C structs. Backs
+/// every string accessor on this package's raw C struct extensions
+/// (`Channel.name`, `User.nickname`, ...) and the `Configuration` types'
+/// `cValue` builders.
 public enum TeamTalkString {
     public static func user(_ property: TeamTalkUserStringProperty, from user: User) -> String {
         var user = user
@@ -302,6 +315,10 @@ public enum TeamTalkString {
     }
 }
 
+/// Splits an outgoing text message's content across as many raw
+/// `TextMessage` values as needed to fit the SDK's fixed per-message string
+/// limit (`TT_STRLEN`), setting `bMore` on every part but the last. The
+/// receiving side reassembles them with ``TeamTalkTextMessageAssembler``.
 public enum TeamTalkTextMessageFactory {
     public static func messages(from message: TextMessage, content: String) -> [TextMessage] {
         var result = [TextMessage]()

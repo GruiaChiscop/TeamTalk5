@@ -1,7 +1,14 @@
 import Foundation
 import TeamTalkC
 
+// Like AudioCodec.swift, `AudioPreprocessor` is a tagged union
+// (`nPreprocessor` selects speexdsp/ttpreprocessor/webrtc); this namespace
+// builds one pre-populated with the SDK's own defaults for a given backend,
+// since the raw struct has no zero-initialized default that makes sense
+// (e.g. WebRTC's adaptive gain controller defaults to *enabled*).
 public enum TeamTalkAudioPreprocessor {
+    /// Upper bound on a channel's raw `audiocfg.nGainLevel`, used to
+    /// normalize that value to a 0–1 fraction.
     public static let channelAudioConfigMax = Int32(32000)
 
     public static func makeSpeexDSP() -> SpeexDSP {
