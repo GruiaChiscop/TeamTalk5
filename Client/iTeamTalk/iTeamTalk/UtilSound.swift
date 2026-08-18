@@ -164,6 +164,23 @@ func closeSoundDevices(session: TeamTalkSession) {
 }
 
 func setupSoundDevices(session: TeamTalkSession) {
+    // The native SDK's own mic-permission request is broken (wrong ObjC selector,
+    // so it never fires), and initializing the sound input device while the OS
+    // permission prompt is still unresolved leaves the input Audio Unit capturing
+    // silence even after the user grants access. Resolve permission here first.
+    switch AVAudioApplication.shared.recordPermission {
+    case .undetermined:
+        AVAudioApplication.requestRecordPermission { _ in
+            DispatchQueue.main.async {
+                performSoundDeviceSetup(session: session)
+            }
+        }
+    default:
+        performSoundDeviceSetup(session: session)
+    }
+}
+
+private func performSoundDeviceSetup(session: TeamTalkSession) {
 
     do {
         closeSoundDevices(session: session)
