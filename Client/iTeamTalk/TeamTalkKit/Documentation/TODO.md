@@ -18,7 +18,7 @@ Swift SDK.
 - [x] Vendor TeamTalk native SDK artifacts inside the Swift package.
 - [ ] Decide which APIs should be public compatibility APIs and which should be
   deprecated once the app migrates to the Swift model layer.
-- [ ] Add documentation comments to the public Swift API once the names settle.
+- [x] Add documentation comments to the public Swift API once the names settle.
 
 ## Wrapper Coverage Still Missing
 
