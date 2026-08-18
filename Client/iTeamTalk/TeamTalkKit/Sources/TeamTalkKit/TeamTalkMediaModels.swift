@@ -1,6 +1,9 @@
 import Foundation
 import TeamTalkC
 
+/// A raw PCM format request, e.g. for
+/// `TeamTalkClient.enableAudioBlockEvent(sourceID:streamTypes:audioFormat:enabled:)`
+/// to have the SDK resample/reformat delivered audio blocks.
 public struct TeamTalkAudioFormatConfiguration {
     public var format: TeamTalkAudioFileFormat
     public var sampleRate: Int32
@@ -37,6 +40,10 @@ public struct TeamTalkAudioFormatConfiguration {
     }
 }
 
+/// One chunk of raw PCM audio, delivered via
+/// `TeamTalkClient.acquireAudioBlock(sourceID:streamTypes:)` after enabling
+/// audio block events for a stream. Owns its samples as `Data`/`rawAudio`,
+/// safe to hold onto past the call that produced it.
 public struct TeamTalkAudioBlock {
     public let streamID: Int32
     public let sampleRate: Int32
@@ -135,6 +142,9 @@ public struct TeamTalkAudioBlock {
     }
 }
 
+/// A PCM format as actually reported back by the SDK (e.g. on a media
+/// file), as opposed to a format a caller is requesting — see
+/// ``TeamTalkAudioFormatConfiguration``.
 public struct TeamTalkAudioFormat {
     public let rawValue: AudioFormat
 
@@ -163,6 +173,8 @@ public struct TeamTalkAudioFormat {
     }
 }
 
+/// A resolution/frame-rate/pixel-format combination a video capture device
+/// or media file supports.
 public struct TeamTalkVideoFormat {
     public let rawValue: VideoFormat
 
@@ -199,6 +211,8 @@ public struct TeamTalkVideoFormat {
     }
 }
 
+/// Format/duration/playback-progress info for a local media file, from
+/// `TeamTalkClient.mediaFile(at:)`.
 public struct TeamTalkMediaFileInfo {
     public let rawValue: MediaFileInfo
 
@@ -239,6 +253,9 @@ public struct TeamTalkMediaFileInfo {
     }
 }
 
+/// Swift-native mirror of the Speex-based preprocessor's tunable fields (see
+/// TeamTalkConvenienceExtensions.swift's `SpeexDSP` extension for what each
+/// one configures), for use inside ``TeamTalkAudioPreprocessorConfiguration``.
 public struct TeamTalkSpeexDSPConfiguration: Hashable, Sendable {
     public var automaticGainControlEnabled: Bool
     public var gainLevel: Int32
@@ -280,6 +297,8 @@ public struct TeamTalkSpeexDSPConfiguration: Hashable, Sendable {
     }
 }
 
+/// Swift-native mirror of TeamTalk's own (non-Speex, non-WebRTC)
+/// preprocessor: just gain and per-speaker muting.
 public struct TeamTalkTTAudioPreprocessorConfiguration: Hashable, Sendable {
     public var gainLevel: Int32
     public var muteLeftSpeaker: Bool
@@ -300,6 +319,9 @@ public struct TeamTalkTTAudioPreprocessorConfiguration: Hashable, Sendable {
     }
 }
 
+/// Swift-native mirror of the WebRTC-based preprocessor's tunable fields
+/// (see TeamTalkConvenienceExtensions.swift's `WebRTCAudioPreprocessor`
+/// extension for what each one configures).
 public struct TeamTalkWebRTCAudioPreprocessorConfiguration: Hashable, Sendable {
     public var preamplifierEnabled: Bool
     public var preamplifierFixedGainFactor: Float
@@ -350,10 +372,16 @@ public struct TeamTalkWebRTCAudioPreprocessorConfiguration: Hashable, Sendable {
     }
 }
 
+/// Which audio preprocessor backend to use for sound input, and its
+/// settings — a type-safe union over the C SDK's single `AudioPreprocessor`
+/// struct, which otherwise only says which of its several embedded configs
+/// (Speex, TeamTalk, WebRTC) is actually meaningful via a separate `type` tag.
 public enum TeamTalkAudioPreprocessorConfiguration: Hashable, Sendable {
     case none
     case speexDSP(TeamTalkSpeexDSPConfiguration)
     case teamTalk(TeamTalkTTAudioPreprocessorConfiguration)
+    /// Decoded for compatibility with older configurations; not selectable
+    /// going forward — use ``webRTC(_:)`` instead.
     case obsoleteWebRTC
     case webRTC(TeamTalkWebRTCAudioPreprocessorConfiguration)
 
@@ -428,6 +456,9 @@ public enum TeamTalkAudioPreprocessorConfiguration: Hashable, Sendable {
     }
 }
 
+/// Playback state for a media file streamed via
+/// `TeamTalkClient.startStreamingMediaFileToChannel(from:playback:videoCodec:)`
+/// or played locally via `initLocalPlayback(from:playback:)`.
 public struct TeamTalkMediaFilePlayback {
     public let rawValue: MediaFilePlayback
 
@@ -460,6 +491,7 @@ public struct TeamTalkMediaFilePlayback {
     }
 }
 
+/// Mutable counterpart to ``TeamTalkMediaFilePlayback``.
 public struct TeamTalkMediaFilePlaybackConfiguration {
     public var offsetMilliseconds: UInt32?
     public var isPaused: Bool
@@ -497,6 +529,8 @@ public struct TeamTalkMediaFilePlaybackConfiguration {
     }
 }
 
+/// Parameters for `TeamTalkClient.setUserMediaStorage(for:configuration:)`,
+/// which auto-records a user's audio to per-user files as they speak.
 public struct TeamTalkUserMediaStorageConfiguration {
     public var directoryURL: URL?
     public var fileNamePattern: String
