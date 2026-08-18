@@ -21,6 +21,7 @@
  *
  */
 
+import PhotosUI
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -28,6 +29,7 @@ struct ChannelFilesView: View {
     @Bindable var model: ChannelFilesModel
     @State private var showingFileImporter = false
     @State private var showingDownloadFolderImporter = false
+    @State private var selectedPhotos: [PhotosPickerItem] = []
 
     var body: some View {
         List {
@@ -82,6 +84,12 @@ struct ChannelFilesView: View {
                         .accessibilityLabel("Refresh")
                 }
 
+                PhotosPicker(selection: $selectedPhotos, matching: .any(of: [.images, .videos])) {
+                    Image(systemName: "photo.on.rectangle")
+                        .accessibilityLabel("Upload from Photos")
+                }
+                .disabled(!model.canUploadFiles)
+
                 Button {
                     showingFileImporter = true
                 } label: {
@@ -113,6 +121,13 @@ struct ChannelFilesView: View {
         ) { result in
             model.downloadPendingFile(to: result)
         }
+        .onChange(of: selectedPhotos) { _, newItems in
+            guard !newItems.isEmpty else { return }
+            selectedPhotos = []
+            for item in newItems {
+                uploadPhoto(item)
+            }
+        }
         .confirmationDialog("Delete File",
             isPresented: $model.isPresentingDeleteConfirmation,
             presenting: model.filePendingDeletion
@@ -131,6 +146,14 @@ struct ChannelFilesView: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        .alert("Transfer Failed", isPresented: $model.isPresentingFailedTransfer, presenting: model.failedTransfer) { failedTransfer in
+            Button("Retry") {
+                failedTransfer.retry()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: { failedTransfer in
+            Text(failedTransfer.message)
+        }
         .onAppear {
             model.refresh()
         }
@@ -140,6 +163,21 @@ struct ChannelFilesView: View {
         model.requestDownload(file)
         if model.filePendingDownload != nil {
             showingDownloadFolderImporter = true
+        }
+    }
+
+    private func uploadPhoto(_ item: PhotosPickerItem) {
+        Task {
+            guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+            let ext = item.supportedContentTypes.first?.preferredFilenameExtension ?? "jpg"
+            let tempURL = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID().uuidString).\(ext)")
+            do {
+                try data.write(to: tempURL)
+                model.uploadFile(at: tempURL)
+                try? FileManager.default.removeItem(at: tempURL)
+            } catch {
+                model.errorMessage = error.localizedDescription
+            }
         }
     }
 }

@@ -121,6 +121,12 @@ struct FileTransferRow: Identifiable {
     }
 }
 
+struct FailedTransfer: Identifiable {
+    let id = UUID()
+    let message: String
+    let retry: () -> Void
+}
+
 struct DownloadedFileRow: Identifiable {
     let url: URL
 
@@ -144,6 +150,7 @@ final class ChannelFilesModel {
     var errorMessage: String?
     var filePendingDownload: ChannelFileRow?
     var filePendingDeletion: ChannelFileRow?
+    var failedTransfer: FailedTransfer?
 
     var isPresentingError: Bool {
         get { errorMessage != nil }
@@ -153,6 +160,11 @@ final class ChannelFilesModel {
     var isPresentingDeleteConfirmation: Bool {
         get { filePendingDeletion != nil }
         set { if !newValue { filePendingDeletion = nil } }
+    }
+
+    var isPresentingFailedTransfer: Bool {
+        get { failedTransfer != nil }
+        set { if !newValue { failedTransfer = nil } }
     }
 
     private var channelID: TeamTalkChannelID = .none
@@ -171,6 +183,37 @@ final class ChannelFilesModel {
     @MainActor
     private func presentError(_ message: String) {
         errorMessage = message
+    }
+
+    // Keeps the already-copied local file around (instead of deleting it on
+    // failure) so retry can just resubmit it, no need to re-pick it from Files.
+    @MainActor
+    private func presentUploadFailure(_ message: String, retryURL: URL, channel: TeamTalkChannel) {
+        failedTransfer = FailedTransfer(message: message) { [weak self] in
+            self?.retryUpload(from: retryURL, to: channel)
+        }
+    }
+
+    // Re-prompts for a destination folder rather than trying to remember the
+    // one from the failed attempt, whose security-scoped access was released
+    // once the failure was handled.
+    @MainActor
+    private func presentDownloadFailure(_ message: String, retryFile: ChannelFileRow) {
+        failedTransfer = FailedTransfer(message: message) { [weak self] in
+            self?.requestDownload(retryFile)
+        }
+    }
+
+    private func retryUpload(from localURL: URL, to channel: TeamTalkChannel) {
+        Task { [weak self, session] in
+            do {
+                _ = try await session.uploadFile(at: localURL, to: channel)
+            } catch {
+                if let self {
+                    await self.presentUploadFailure(error.localizedDescription, retryURL: localURL, channel: channel)
+                }
+            }
+        }
     }
 
     var canUploadFiles: Bool {
@@ -215,15 +258,13 @@ final class ChannelFilesModel {
 
         do {
             let localURL = try prepareUploadFile(from: url)
-            let fileManager = self.fileManager
 
             Task { [weak self, session] in
                 do {
                     _ = try await session.uploadFile(at: localURL, to: targetChannel)
                 } catch {
-                    try? fileManager.removeItem(at: localURL)
                     if let self {
-                        await self.presentError(error.localizedDescription)
+                        await self.presentUploadFailure(error.localizedDescription, retryURL: localURL, channel: targetChannel)
                     }
                 }
             }
@@ -281,7 +322,7 @@ final class ChannelFilesModel {
                     try? fileManager.removeItem(at: localURL)
                     if let self {
                         self.releaseDownloadSecurityScope(for: localURL)
-                        await self.presentError(error.localizedDescription)
+                        await self.presentDownloadFailure(error.localizedDescription, retryFile: file)
                     }
                 }
             }
@@ -387,21 +428,39 @@ final class ChannelFilesModel {
             } else {
                 transfers.append(row)
             }
-            announceDownloadProgressIfNeeded(for: row)
+            announceTransferProgressIfNeeded(for: row)
         case .finished:
             removeTransfer(id: row.id)
+            announcedDownloadProgress.removeValue(forKey: row.id)
             if row.isDownload, let localURL = row.localURL {
                 downloadedFiles.insert(DownloadedFileRow(url: localURL), at: 0)
-                announceDownloadComplete(for: row)
-                announcedDownloadProgress.removeValue(forKey: row.id)
             } else {
                 cleanupUploadCopy(for: row)
                 refresh()
             }
+            announceTransferComplete(for: row)
         case .error:
             removeTransfer(id: row.id)
-            cleanupTransferFile(for: row)
-            errorMessage = String(format: String(localized: "File transfer failed: %@", comment: "files"), row.remoteFileName)
+            let message = String(format: String(localized: "File transfer failed: %@", comment: "files"), row.remoteFileName)
+            if row.isDownload {
+                cleanupTransferFile(for: row)
+                if let originalFile = files.first(where: { $0.name == row.remoteFileName }) {
+                    Task { @MainActor [weak self] in
+                        self?.presentDownloadFailure(message, retryFile: originalFile)
+                    }
+                } else {
+                    errorMessage = message
+                }
+            } else if !row.localFilePath.isEmpty, let targetChannel = session.channel(id: channelID) {
+                // Keep the cached copy for retry - don't cleanupTransferFile() here.
+                let localURL = URL(fileURLWithPath: row.localFilePath)
+                Task { @MainActor [weak self] in
+                    self?.presentUploadFailure(message, retryURL: localURL, channel: targetChannel)
+                }
+            } else {
+                cleanupTransferFile(for: row)
+                errorMessage = message
+            }
         case .closed:
             removeTransfer(id: row.id)
             cleanupTransferFile(for: row)
@@ -436,8 +495,7 @@ final class ChannelFilesModel {
         transfers = []
     }
 
-    private func announceDownloadProgressIfNeeded(for transfer: FileTransferRow) {
-        guard transfer.isDownload else { return }
+    private func announceTransferProgressIfNeeded(for transfer: FileTransferRow) {
         guard transfer.transfer.fileSize > 0 else { return }
 
         let percent = Int(transfer.progress * 100)
@@ -450,21 +508,17 @@ final class ChannelFilesModel {
         for crossedThreshold in thresholds where crossedThreshold <= threshold {
             announcedDownloadProgress[transfer.id, default: []].insert(crossedThreshold)
         }
-        announceVoiceOver(
-            String(format: String(localized: "%@, %d%% downloaded", comment: "files"),
-                transfer.displayName,
-                threshold
-            )
-        )
+        let format = transfer.isDownload
+            ? String(localized: "%@, %d%% downloaded", comment: "files")
+            : String(localized: "%@, %d%% uploaded", comment: "files")
+        announceVoiceOver(String(format: format, transfer.displayName, threshold))
     }
 
-    private func announceDownloadComplete(for transfer: FileTransferRow) {
-        guard transfer.isDownload else { return }
-        announceVoiceOver(
-            String(format: String(localized: "Download complete: %@", comment: "files"),
-                transfer.displayName
-            )
-        )
+    private func announceTransferComplete(for transfer: FileTransferRow) {
+        let format = transfer.isDownload
+            ? String(localized: "Download complete: %@", comment: "files")
+            : String(localized: "Upload complete: %@", comment: "files")
+        announceVoiceOver(String(format: format, transfer.displayName))
     }
 
     private func announceVoiceOver(_ announcement: String) {
