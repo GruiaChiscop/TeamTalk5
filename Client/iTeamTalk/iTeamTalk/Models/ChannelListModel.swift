@@ -22,7 +22,6 @@
  */
 
 import AVFoundation
-import Observation
 import SwiftUI
 import TeamTalkKit
 
@@ -145,10 +144,7 @@ final class ChannelListModel {
         let subchans = childrenByParent[curchannel.channelID] ?? []
         let chanusers = usersByChannel[curchannel.channelID] ?? []
 
-        let settings = UserDefaults.standard
-        let chansort = settings.object(forKey: PREF_DISPLAY_SORTCHANNELS) == nil
-            ? ChanSort.ASCENDING.rawValue
-            : settings.integer(forKey: PREF_DISPLAY_SORTCHANNELS)
+        let chansort = Preferences.current.display.channelSortIndex
 
         switch chansort {
         case ChanSort.POPULARITY.rawValue:
@@ -638,8 +634,7 @@ final class ChannelListModel {
             } else if !rejoinchannel.name.isEmpty {
                 try await TeamTalkClient.shared.joinChannel(rejoinchannel)
             }
-        } else if UserDefaults.standard.object(forKey: PREF_JOINROOTCHANNEL) == nil
-            || UserDefaults.standard.bool(forKey: PREF_JOINROOTCHANNEL) {
+        } else if Preferences.current.connection.joinRootChannel {
             if let rootChannel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(TeamTalkClient.shared.rootChannelID)) {
                 try await TeamTalkClient.shared.joinChannel(rootChannel)
             }
@@ -661,6 +656,8 @@ final class ChannelListModel {
         } else {
             var ap = TeamTalkAudioPreprocessor.makeTeamTalkPreprocessor()
             TeamTalkClient.shared.setSoundInputPreprocess(&ap)
+            // Preferences.sound.microphoneGainPercent reflects the SDK's *live* volume
+            // (for the Preferences screen), not the persisted value being re-applied here.
             let vol = UserDefaults.standard.integer(forKey: PREF_MICROPHONE_GAIN)
             TeamTalkClient.shared.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
         }
@@ -734,8 +731,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             if !isProcessingCommand {
                 if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
                 if TeamTalkClient.shared.myUserIdentifier != user.userID {
-                    let defaults = UserDefaults.standard
-                    if defaults.object(forKey: PREF_TTSEVENT_USERLOGIN) != nil && defaults.bool(forKey: PREF_TTSEVENT_USERLOGIN) {
+                    if Preferences.current.textToSpeechEvents.userLoggedIn {
                         newUtterance(getDisplayName(user) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
                     }
                 }
@@ -747,8 +743,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             if !isProcessingCommand {
                 if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
                 if TeamTalkClient.shared.myUserIdentifier != user.userID {
-                    let defaults = UserDefaults.standard
-                    if defaults.object(forKey: PREF_TTSEVENT_USERLOGOUT) != nil && defaults.bool(forKey: PREF_TTSEVENT_USERLOGOUT) {
+                    if Preferences.current.textToSpeechEvents.userLoggedOut {
                         newUtterance(getDisplayName(user) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
                     }
                 }
@@ -768,8 +763,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             }
             if user.channelIdentifier == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.joined_CHAN)
-                let defaults = UserDefaults.standard
-                if defaults.object(forKey: PREF_TTSEVENT_JOINEDCHAN) == nil || defaults.bool(forKey: PREF_TTSEVENT_JOINEDCHAN) {
+                if Preferences.current.textToSpeechEvents.userJoinedChannel {
                     newUtterance(getDisplayName(user) + " " + String(localized: "has joined the channel", comment: "TTS EVENT"))
                 }
             }
@@ -791,8 +785,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             }
             if previousChannelID == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.left_CHAN)
-                let defaults = UserDefaults.standard
-                if defaults.object(forKey: PREF_TTSEVENT_LEFTCHAN) == nil || defaults.bool(forKey: PREF_TTSEVENT_LEFTCHAN) {
+                if Preferences.current.textToSpeechEvents.userLeftChannel {
                     newUtterance(getDisplayName(user) + " " + String(localized: "has left the channel", comment: "TTS EVENT"))
                 }
             }
@@ -800,7 +793,6 @@ extension ChannelListModel: TeamTalkEventObserver {
 
         case .textMessage(let message):
             if message.type == .user {
-                let settings = UserDefaults.standard
                 let fromUserID = message.fromUserIdentifier
                 if let user = users[fromUserID] {
                     let name = getDisplayName(user)
@@ -824,7 +816,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                 }
 
                 if let user = users[fromUserID],
-                   settings.object(forKey: PREF_DISPLAY_POPUPTXTMSG) == nil || settings.bool(forKey: PREF_DISPLAY_POPUPTXTMSG) {
+                   Preferences.current.display.popupTextMessages {
                     let model = makeTextMessageModel(for: user)
                     currentTextMessageModel = model
                     navigationPath.append(.textMessage(model))

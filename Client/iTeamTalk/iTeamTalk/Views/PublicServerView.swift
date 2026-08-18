@@ -67,20 +67,11 @@ private enum PublicServerRow: CaseIterable, Identifiable {
         }
     }
 
-    var defaultValue: Bool {
-        switch self {
-        case .official:
-            return true
-        case .unofficial:
-            return false
-        }
-    }
-
     var boolValue: Bool {
-        let settings = UserDefaults.standard
-        if settings.object(forKey: preferenceKey) == nil {
-            return defaultValue
+        let filters = Preferences.current.serverListFilters
+        switch self {
+        case .official: return filters.showOfficialServers
+        case .unofficial: return filters.showUnofficialServers
         }
-        return settings.bool(forKey: preferenceKey)
     }
 }

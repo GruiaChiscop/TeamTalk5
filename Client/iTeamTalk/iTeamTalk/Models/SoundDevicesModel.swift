@@ -104,7 +104,13 @@ final class SoundDevicesModel {
     }
 
     func preferenceValue(forKey key: String) -> Bool {
-        UserDefaults.standard.object(forKey: key) != nil && UserDefaults.standard.bool(forKey: key)
+        let soundDevice = Preferences.current.soundDevice
+        switch key {
+        case PREF_SPEAKER_OUTPUT: return soundDevice.speakerOutput
+        case PREF_VOICEPROCESSINGIO: return soundDevice.voicePreprocessing
+        case PREF_BLUETOOTH_A2DP: return soundDevice.bluetoothA2DP
+        default: return false
+        }
     }
 
     func setPreference(_ value: Bool, forKey key: String) {

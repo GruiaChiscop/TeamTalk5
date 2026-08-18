@@ -76,6 +76,8 @@ final class MainTabModel: TeamTalkEventObserver {
 
         setupSoundDevices()
 
+        // Reads the persisted values directly: Preferences.sound.* mirrors the SDK's
+        // *live* volume for the Preferences screen, not what should be re-applied here.
         let defaults = UserDefaults.standard
         if defaults.object(forKey: PREF_MASTER_VOLUME) != nil {
             let vol = defaults.integer(forKey: PREF_MASTER_VOLUME)
@@ -126,13 +128,11 @@ final class MainTabModel: TeamTalkEventObserver {
     }
 
     func onVisibleAppear() {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: PREF_DISPLAY_PROXIMITY) != nil &&
-            defaults.bool(forKey: PREF_DISPLAY_PROXIMITY) {
+        let preferences = Preferences.current
+        if preferences.display.proximitySensor {
             UIDevice.current.isProximityMonitoringEnabled = true
         }
-        if defaults.object(forKey: PREF_HEADSET_TXTOGGLE) != nil &&
-            defaults.bool(forKey: PREF_HEADSET_TXTOGGLE) {
+        if preferences.general.headsetTXToggle {
             UIApplication.shared.beginReceivingRemoteControlEvents()
         }
     }
@@ -233,9 +233,9 @@ final class MainTabModel: TeamTalkEventObserver {
             os_log("Connected to \(self.server.ipaddr)")
 
             if AppInfo.isBearWareWebLogin(self.server.username) {
-                let settings = UserDefaults.standard
-                let username = settings.string(forKey: PREF_GENERAL_BEARWARE_ID) ?? ""
-                let token = settings.string(forKey: PREF_GENERAL_BEARWARE_TOKEN) ?? ""
+                let webLogin = Preferences.current.webLogin
+                let username = webLogin.bearwareID ?? ""
+                let token = webLogin.bearwareToken ?? ""
                 let accesstoken = TeamTalkClient.shared.serverProperties()?.accessToken ?? ""
                 let url = AppInfo.getBearWareServerTokenURL(
                     username: username, token: token, accesstoken: accesstoken
@@ -263,8 +263,7 @@ final class MainTabModel: TeamTalkEventObserver {
             os_log("Connection to \(self.server.ipaddr) lost")
             TeamTalkClient.shared.disconnect()
             playSound(.srv_LOST)
-            if UserDefaults.standard.object(forKey: PREF_TTSEVENT_CONLOST) == nil ||
-                UserDefaults.standard.bool(forKey: PREF_TTSEVENT_CONLOST) {
+            if Preferences.current.textToSpeechEvents.connectionLost {
                 newUtterance(String(localized: "Connection lost", comment: "tts event"))
             }
             startReconnectTimer()
@@ -305,6 +304,9 @@ final class MainTabModel: TeamTalkEventObserver {
             syncToUserCache(user: user)
 
         case .userJoined(let user):
+            // Raw read, not Preferences.sound.mediaFileVolumePercent: this must stay
+            // unset (skip applying a volume) when the user never touched the slider,
+            // whereas Preferences always resolves a display default for that field.
             let defaults = UserDefaults.standard
             if let mfvol = defaults.object(forKey: PREF_MEDIAFILE_VOLUME) as? Double {
                 let vol = refVolume(100.0 * mfvol)
@@ -336,7 +338,7 @@ final class MainTabModel: TeamTalkEventObserver {
 
     private func login() {
         let nickname = server.nickname.isEmpty
-            ? (UserDefaults.standard.string(forKey: PREF_GENERAL_NICKNAME) ?? "")
+            ? Preferences.current.general.nickname
             : server.nickname
         reconnecttimer?.invalidate()
 
@@ -359,8 +361,7 @@ final class MainTabModel: TeamTalkEventObserver {
                     self.server.channel.removeAll()
                     self.server.chanpasswd.removeAll()
 
-                    let settings = UserDefaults.standard
-                    if settings.integer(forKey: PREF_GENERAL_GENDER) != 0 {
+                    if Preferences.current.general.genderIndex != 0 {
                         TeamTalkClient.shared.setStatus(mode: .female)
                     }
                 }

@@ -82,15 +82,12 @@ class MyCustomAction : UIAccessibilityCustomAction {
 }
 
 func hasPTTLock() -> Bool {
-    let defaults = UserDefaults.standard
-    return defaults.object(forKey: PREF_GENERAL_PTTLOCK) != nil && defaults.bool(forKey: PREF_GENERAL_PTTLOCK)
+    Preferences.current.general.pushToTalkLock
 }
 
 func limitText(_ s: String) -> String {
-    
-    let settings = UserDefaults.standard
-    let length = settings.object(forKey: PREF_DISPLAY_LIMITTEXT) == nil ? DEFAULT_LIMIT_TEXT : settings.integer(forKey: PREF_DISPLAY_LIMITTEXT)
-    
+    let length = Int(Preferences.current.display.limitText)
+
     if s.count > length {
         return String(s.prefix(length))
     }
@@ -107,8 +104,7 @@ func announceForAccessibility(_ message: String) {
 }
 
 private func getDisplayName(_ user: User) -> String {
-    let settings = UserDefaults.standard
-    if settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME) {
+    if Preferences.current.display.showUsername {
         return limitText(TeamTalkString.user(.username, from: user))
     }
 

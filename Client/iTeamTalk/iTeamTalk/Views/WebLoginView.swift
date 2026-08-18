@@ -76,8 +76,7 @@ struct WebLoginView: View {
     }
 
     private func loadWebLogin() {
-        let settings = UserDefaults.standard
-        let username = settings.string(forKey: PREF_GENERAL_BEARWARE_ID)
+        let username = Preferences.current.webLogin.bearwareID
         usernameText = username ?? ""
         passwordText = ""
         hasStoredUsername = username != nil

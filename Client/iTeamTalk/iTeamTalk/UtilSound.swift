@@ -67,90 +67,42 @@ enum Sounds : Int {
 var player : AVAudioPlayer?
 
 func getSoundFile(_ s: Sounds) -> String? {
-    
-    let settings = UserDefaults.standard
-    
+
+    let events = Preferences.current.soundEvents
+
     switch s {
     case .tx_ON:
-        if settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil ||
-           settings.bool(forKey: PREF_SNDEVENT_VOICETX) {
-            return "on.mp3"
-        }
+        if events.voiceTransmission { return "on.mp3" }
     case .tx_OFF:
-        if settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_VOICETX) {
-                return "off.mp3"
-        }
+        if events.voiceTransmission { return "off.mp3" }
     case .chan_MSG:
-        if settings.object(forKey: PREF_SNDEVENT_CHANMSG) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_CHANMSG) {
-                return "channel_message.mp3"
-        }
+        if events.channelMessage { return "channel_message.mp3" }
     case .user_MSG:
-        if settings.object(forKey: PREF_SNDEVENT_USERMSG) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_USERMSG) {
-                return "user_message.mp3"
-        }
+        if events.userMessage { return "user_message.mp3" }
     case .broadcast_MSG:
-        if settings.object(forKey: PREF_SNDEVENT_BCASTMSG) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_BCASTMSG) {
-            return "broadcast_message.mp3"
-        }
+        if events.broadcastMessage { return "broadcast_message.mp3" }
     case .srv_LOST:
-        if settings.object(forKey: PREF_SNDEVENT_SERVERLOST) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_SERVERLOST) {
-                return "serverlost.mp3"
-        }
+        if events.serverConnectionLost { return "serverlost.mp3" }
     case .joined_CHAN:
-        if settings.object(forKey: PREF_SNDEVENT_JOINEDCHAN) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_JOINEDCHAN) {
-                return "newuser.mp3"
-        }
+        if events.userJoinedChannel { return "newuser.mp3" }
     case .left_CHAN:
-        if settings.object(forKey: PREF_SNDEVENT_LEFTCHAN) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_LEFTCHAN) {
-                return "removeuser.mp3"
-        }
-    case .voxtriggered_ON :
-        if settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER) {
-            return "voiceact_on.mp3"
-        }
-    case .voxtriggered_OFF :
-        if settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER) {
-            return "voiceact_off.mp3"
-        }
-    case .transmit_ON :
-        if settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY) {
-            return "txqueue_start.mp3"
-        }
-    case .transmit_OFF :
-        if settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY) {
-            return "txqueue_stop.mp3"
-        }
-    case .logged_IN :
-        if settings.object(forKey: PREF_SNDEVENT_LOGGEDIN) != nil &&
-            settings.bool(forKey: PREF_SNDEVENT_LOGGEDIN) {
-            return "logged_on.mp3"
-        }
-    case .logged_OUT :
-        if settings.object(forKey: PREF_SNDEVENT_LOGGEDOUT) != nil &&
-            settings.bool(forKey: PREF_SNDEVENT_LOGGEDOUT) {
-            return "logged_off.mp3"
-        }
-    case .file_COMPLETE :
-        if settings.object(forKey: PREF_SNDEVENT_FILECOMPLETE) != nil &&
-            settings.bool(forKey: PREF_SNDEVENT_FILECOMPLETE) {
-            return "filetx_complete.wav"
-        }
-    case .file_UPDATE :
-        if settings.object(forKey: PREF_SNDEVENT_FILEUPDATE) != nil &&
-            settings.bool(forKey: PREF_SNDEVENT_FILEUPDATE) {
-            return "fileupdate.wav"
-        }
+        if events.userLeftChannel { return "removeuser.mp3" }
+    case .voxtriggered_ON:
+        if events.voiceActivationTriggered { return "voiceact_on.mp3" }
+    case .voxtriggered_OFF:
+        if events.voiceActivationTriggered { return "voiceact_off.mp3" }
+    case .transmit_ON:
+        if events.transmitReady { return "txqueue_start.mp3" }
+    case .transmit_OFF:
+        if events.transmitReady { return "txqueue_stop.mp3" }
+    case .logged_IN:
+        if events.userLoggedIn { return "logged_on.mp3" }
+    case .logged_OUT:
+        if events.userLoggedOut { return "logged_off.mp3" }
+    case .file_COMPLETE:
+        if events.fileTransferComplete { return "filetx_complete.wav" }
+    case .file_UPDATE:
+        if events.fileAddedOrRemoved { return "fileupdate.wav" }
     }
 
     return nil
@@ -185,6 +137,7 @@ func getCategory(_ opt: AVAudioSession.CategoryOptions) -> String {
     return str
 }
 
+// Keyed per hardware device UID, so this can't be a fixed field on Preferences.
 func getAudioPortDataSource(descr: AVAudioSessionPortDescription) -> NSNumber? {
     let defaults = UserDefaults.standard
     let prefname = PREF_SNDINPUT_PORT + "_" + descr.uid
@@ -219,11 +172,11 @@ func setupSoundDevices() {
 
         print("preset: " + session.mode.rawValue)
         
-        let defaults = UserDefaults.standard
-        let speaker = defaults.object(forKey: PREF_SPEAKER_OUTPUT) != nil && defaults.bool(forKey: PREF_SPEAKER_OUTPUT)
-        let preprocess = defaults.object(forKey: PREF_VOICEPROCESSINGIO) != nil && defaults.bool(forKey: PREF_VOICEPROCESSINGIO)
-        let a2dp = defaults.object(forKey: PREF_BLUETOOTH_A2DP) != nil && defaults.bool(forKey: PREF_BLUETOOTH_A2DP)
-        let headsettoggle = defaults.object(forKey: PREF_HEADSET_TXTOGGLE) != nil && defaults.bool(forKey: PREF_HEADSET_TXTOGGLE)
+        let preferences = Preferences.current
+        let speaker = preferences.soundDevice.speakerOutput
+        let preprocess = preferences.soundDevice.voicePreprocessing
+        let a2dp = preferences.soundDevice.bluetoothA2DP
+        let headsettoggle = preferences.general.headsetTXToggle
                 
         // In 'voiceChat' mode stereo cannot be enabled on input devices.
         try session.setMode(preprocess ? .voiceChat : .default)

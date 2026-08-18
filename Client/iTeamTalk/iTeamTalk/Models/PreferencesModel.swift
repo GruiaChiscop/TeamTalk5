@@ -27,38 +27,188 @@ import SwiftUI
 import TeamTalkKit
 import UIKit
 
-struct Preferences: Codable {
-    struct General: Codable {
-    static var nickname = ""
-        static var statusMessage = ""
-        static var statusMode = TeamTalkStatusMode.available
-        static var gender = TeamTalkStatusMode.female
-        static var sendOnReturn = true
-        static var ttLock = false
-        static var joinOnroot = true
+// In-memory snapshot of the settings shown on the Preferences screen. This is
+// the single source of truth PreferencesModel reads from and writes through;
+// persistence still goes to the same individual UserDefaults keys other parts
+// of the app (sound/TTS playback, channel defaults, server filtering, ...)
+// read directly, so those call sites don't need to know this struct exists.
+struct Preferences {
+    struct General {
+        var nickname = ""
+        var genderIndex = 0
+        var pushToTalkLock = false
+        var headsetTXToggle = false
+        var sendOnReturn = true
     }
-    struct Display: Codable {
-        static var showUsernames = false
-        static var useProximitySensor = false
-        static var sortChannels = ChanSort.POPULARITY
-        static var showPublicServers = true
-        static var showUnofficialServers = false
-        static var popUpTextMesage = true
-            }
-    struct Sound: Codable {
-        struct Events: Codable {
-            
+
+    struct Display {
+        var proximitySensor = false
+        var popupTextMessages = true
+        var limitText = Double(DEFAULT_LIMIT_TEXT)
+        var showUsername = false
+        var channelSortIndex = ChanSort.ASCENDING.rawValue
+    }
+
+    struct Sound {
+        var masterVolumePercent = 0.0
+        var mediaFileVolumePercent = Double(DEFAULT_MEDIAFILE_VOLUME * 100)
+        var microphoneGainPercent = 0.0
+        var voiceActivationLevel = Double(VOICEACT_DISABLED)
+    }
+
+    struct TextToSpeech {
+        var rate = Double(AVSpeechUtteranceDefaultSpeechRate)
+        var volume = Double(DEFAULT_TTS_VOL)
+    }
+
+    struct Connection {
+        var joinRootChannel = true
+    }
+
+    struct SoundEvents {
+        var voiceTransmission = true
+        var channelMessage = true
+        var userMessage = true
+        var broadcastMessage = true
+        var serverConnectionLost = true
+        var userJoinedChannel = true
+        var userLeftChannel = true
+        var voiceActivationTriggered = true
+        var transmitReady = true
+        var userLoggedIn = false
+        var userLoggedOut = false
+        var fileTransferComplete = true
+        var fileAddedOrRemoved = true
+    }
+
+    struct SoundDevice {
+        var speakerOutput = false
+        var voicePreprocessing = false
+        var bluetoothA2DP = false
+    }
+
+    struct TextToSpeechEvents {
+        var userLoggedIn = false
+        var userLoggedOut = false
+        var userJoinedChannel = true
+        var userLeftChannel = true
+        var connectionLost = true
+        var privateTextMessage = false
+        var channelTextMessage = false
+        var voiceIdentifier: String?
+        var voiceLanguage: String?
+    }
+
+    struct ServerListFilters {
+        var showOfficialServers = true
+        var showPublicServers = true
+        var showUnofficialServers = false
+    }
+
+    struct WebLogin {
+        var bearwareID: String?
+        var bearwareToken: String?
+    }
+
+    var general = General()
+    var display = Display()
+    var sound = Sound()
+    var textToSpeech = TextToSpeech()
+    var connection = Connection()
+    var soundEvents = SoundEvents()
+    var soundDevice = SoundDevice()
+    var textToSpeechEvents = TextToSpeechEvents()
+    var serverListFilters = ServerListFilters()
+    var webLogin = WebLogin()
+    var defaultSubscriptions: Subscriptions = SUBSCRIBE_CUSTOM_MSG.rawValue
+
+    // Fresh, on-demand read of every key, for call sites that don't hold a
+    // long-lived PreferencesModel (free functions, other model classes).
+    static var current: Preferences {
+        loaded()
+    }
+
+    static func loaded() -> Preferences {
+        let settings = UserDefaults.standard
+        var preferences = Preferences()
+
+        preferences.general.nickname = settings.string(forKey: PREF_GENERAL_NICKNAME) ?? ""
+        preferences.general.genderIndex = settings.integer(forKey: PREF_GENERAL_GENDER)
+        preferences.general.pushToTalkLock = settings.object(forKey: PREF_GENERAL_PTTLOCK) != nil && settings.bool(forKey: PREF_GENERAL_PTTLOCK)
+        preferences.general.headsetTXToggle = settings.object(forKey: PREF_HEADSET_TXTOGGLE) != nil && settings.bool(forKey: PREF_HEADSET_TXTOGGLE)
+        preferences.general.sendOnReturn = settings.object(forKey: PREF_GENERAL_SENDONRETURN) == nil || settings.bool(forKey: PREF_GENERAL_SENDONRETURN)
+
+        preferences.display.proximitySensor = settings.object(forKey: PREF_DISPLAY_PROXIMITY) != nil && settings.bool(forKey: PREF_DISPLAY_PROXIMITY)
+        preferences.display.popupTextMessages = settings.object(forKey: PREF_DISPLAY_POPUPTXTMSG) == nil || settings.bool(forKey: PREF_DISPLAY_POPUPTXTMSG)
+        preferences.display.limitText = Double(settings.object(forKey: PREF_DISPLAY_LIMITTEXT) == nil ? DEFAULT_LIMIT_TEXT : settings.integer(forKey: PREF_DISPLAY_LIMITTEXT))
+        preferences.display.showUsername = settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME)
+        preferences.display.channelSortIndex = settings.object(forKey: PREF_DISPLAY_SORTCHANNELS) == nil ? ChanSort.ASCENDING.rawValue : settings.integer(forKey: PREF_DISPLAY_SORTCHANNELS)
+
+        preferences.sound.masterVolumePercent = Double(refVolumeToPercent(Int(TeamTalkClient.shared.soundOutputVolume)))
+        var mediaVolume = DEFAULT_MEDIAFILE_VOLUME
+        if settings.value(forKey: PREF_MEDIAFILE_VOLUME) != nil {
+            mediaVolume = settings.float(forKey: PREF_MEDIAFILE_VOLUME)
         }
-    }
-    struct Speech: Codable {
-        struct Events: Codable {
-            
+        preferences.sound.mediaFileVolumePercent = Double(mediaVolume * 100)
+        preferences.sound.microphoneGainPercent = Double(refVolumeToPercent(Int(TeamTalkClient.shared.soundInputGainLevel)))
+        var voiceActivation = VOICEACT_DISABLED
+        if settings.object(forKey: PREF_VOICEACTIVATION) != nil {
+            voiceActivation = settings.integer(forKey: PREF_VOICEACTIVATION)
         }
+        preferences.sound.voiceActivationLevel = Double(voiceActivation)
+
+        var storedTTSRate = AVSpeechUtteranceDefaultSpeechRate
+        if settings.value(forKey: PREF_TTSEVENT_RATE) != nil {
+            storedTTSRate = settings.float(forKey: PREF_TTSEVENT_RATE)
+        }
+        preferences.textToSpeech.rate = Double(storedTTSRate)
+        var storedTTSVolume = DEFAULT_TTS_VOL
+        if settings.value(forKey: PREF_TTSEVENT_VOL) != nil {
+            storedTTSVolume = settings.float(forKey: PREF_TTSEVENT_VOL)
+        }
+        preferences.textToSpeech.volume = Double(storedTTSVolume)
+
+        preferences.connection.joinRootChannel = settings.object(forKey: PREF_JOINROOTCHANNEL) == nil || settings.bool(forKey: PREF_JOINROOTCHANNEL)
+
+        preferences.soundEvents.voiceTransmission = settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil || settings.bool(forKey: PREF_SNDEVENT_VOICETX)
+        preferences.soundEvents.channelMessage = settings.object(forKey: PREF_SNDEVENT_CHANMSG) == nil || settings.bool(forKey: PREF_SNDEVENT_CHANMSG)
+        preferences.soundEvents.userMessage = settings.object(forKey: PREF_SNDEVENT_USERMSG) == nil || settings.bool(forKey: PREF_SNDEVENT_USERMSG)
+        preferences.soundEvents.broadcastMessage = settings.object(forKey: PREF_SNDEVENT_BCASTMSG) == nil || settings.bool(forKey: PREF_SNDEVENT_BCASTMSG)
+        preferences.soundEvents.serverConnectionLost = settings.object(forKey: PREF_SNDEVENT_SERVERLOST) == nil || settings.bool(forKey: PREF_SNDEVENT_SERVERLOST)
+        preferences.soundEvents.userJoinedChannel = settings.object(forKey: PREF_SNDEVENT_JOINEDCHAN) == nil || settings.bool(forKey: PREF_SNDEVENT_JOINEDCHAN)
+        preferences.soundEvents.userLeftChannel = settings.object(forKey: PREF_SNDEVENT_LEFTCHAN) == nil || settings.bool(forKey: PREF_SNDEVENT_LEFTCHAN)
+        preferences.soundEvents.voiceActivationTriggered = settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil || settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER)
+        preferences.soundEvents.transmitReady = settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil || settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY)
+        preferences.soundEvents.userLoggedIn = settings.object(forKey: PREF_SNDEVENT_LOGGEDIN) != nil && settings.bool(forKey: PREF_SNDEVENT_LOGGEDIN)
+        preferences.soundEvents.userLoggedOut = settings.object(forKey: PREF_SNDEVENT_LOGGEDOUT) != nil && settings.bool(forKey: PREF_SNDEVENT_LOGGEDOUT)
+        preferences.soundEvents.fileTransferComplete = settings.object(forKey: PREF_SNDEVENT_FILECOMPLETE) != nil && settings.bool(forKey: PREF_SNDEVENT_FILECOMPLETE)
+        preferences.soundEvents.fileAddedOrRemoved = settings.object(forKey: PREF_SNDEVENT_FILEUPDATE) != nil && settings.bool(forKey: PREF_SNDEVENT_FILEUPDATE)
+
+        preferences.soundDevice.speakerOutput = settings.object(forKey: PREF_SPEAKER_OUTPUT) != nil && settings.bool(forKey: PREF_SPEAKER_OUTPUT)
+        preferences.soundDevice.voicePreprocessing = settings.object(forKey: PREF_VOICEPROCESSINGIO) != nil && settings.bool(forKey: PREF_VOICEPROCESSINGIO)
+        preferences.soundDevice.bluetoothA2DP = settings.object(forKey: PREF_BLUETOOTH_A2DP) != nil && settings.bool(forKey: PREF_BLUETOOTH_A2DP)
+
+        preferences.textToSpeechEvents.userLoggedIn = settings.object(forKey: PREF_TTSEVENT_USERLOGIN) != nil && settings.bool(forKey: PREF_TTSEVENT_USERLOGIN)
+        preferences.textToSpeechEvents.userLoggedOut = settings.object(forKey: PREF_TTSEVENT_USERLOGOUT) != nil && settings.bool(forKey: PREF_TTSEVENT_USERLOGOUT)
+        preferences.textToSpeechEvents.userJoinedChannel = settings.object(forKey: PREF_TTSEVENT_JOINEDCHAN) == nil || settings.bool(forKey: PREF_TTSEVENT_JOINEDCHAN)
+        preferences.textToSpeechEvents.userLeftChannel = settings.object(forKey: PREF_TTSEVENT_LEFTCHAN) == nil || settings.bool(forKey: PREF_TTSEVENT_LEFTCHAN)
+        preferences.textToSpeechEvents.connectionLost = settings.object(forKey: PREF_TTSEVENT_CONLOST) == nil || settings.bool(forKey: PREF_TTSEVENT_CONLOST)
+        preferences.textToSpeechEvents.privateTextMessage = settings.object(forKey: PREF_TTSEVENT_TEXTMSG) != nil && settings.bool(forKey: PREF_TTSEVENT_TEXTMSG)
+        preferences.textToSpeechEvents.channelTextMessage = settings.object(forKey: PREF_TTSEVENT_CHANTEXTMSG) != nil && settings.bool(forKey: PREF_TTSEVENT_CHANTEXTMSG)
+        preferences.textToSpeechEvents.voiceIdentifier = settings.string(forKey: PREF_TTSEVENT_VOICEID)
+        preferences.textToSpeechEvents.voiceLanguage = settings.string(forKey: PREF_TTSEVENT_VOICELANG)
+
+        preferences.serverListFilters.showOfficialServers = settings.object(forKey: PREF_DISPLAY_OFFICIALSERVERS) == nil || settings.bool(forKey: PREF_DISPLAY_OFFICIALSERVERS)
+        preferences.serverListFilters.showPublicServers = settings.object(forKey: PREF_DISPLAY_PUBLICSERVERS) == nil || settings.bool(forKey: PREF_DISPLAY_PUBLICSERVERS)
+        preferences.serverListFilters.showUnofficialServers = settings.object(forKey: PREF_DISPLAY_UNOFFICIALSERVERS) != nil && settings.bool(forKey: PREF_DISPLAY_UNOFFICIALSERVERS)
+
+        preferences.webLogin.bearwareID = settings.string(forKey: PREF_GENERAL_BEARWARE_ID)
+        preferences.webLogin.bearwareToken = settings.string(forKey: PREF_GENERAL_BEARWARE_TOKEN)
+
+        preferences.defaultSubscriptions = getDefaultSubscriptions()
+
+        return preferences
     }
-    struct Subscriptions: Codable {
-        
-    }
-    var version: String
 }
 
 let PREF_GENERAL_NICKNAME = "nickname_preference"
@@ -226,24 +376,7 @@ final class PreferencesModel {
         }
     }
 
-    var nicknameText: String
-    var genderIndex: Int
-    var pushToTalkLock: Bool
-    var headsetTXToggle: Bool
-    var sendOnReturn: Bool
-    var proximitySensor: Bool
-    var popupTextMessages: Bool
-    var limitText: Double
-    var showUsername: Bool
-    var channelSortIndex: Int
-    var joinRoot: Bool
-    var defaultSubscriptions: Subscriptions
-    var masterVolumePercent: Double
-    var mediaFileVolumePercent: Double
-    var microphoneGainPercent: Double
-    var voiceActivationLevel: Double
-    var ttsRate: Double
-    var ttsVolume: Double
+    var preferences = Preferences.loaded()
 
     var users = Set<INT32>()
 
@@ -251,49 +384,6 @@ final class PreferencesModel {
     let versionRows: [VersionRow]
 
     init() {
-        let settings = UserDefaults.standard
-
-        nicknameText = settings.string(forKey: PREF_GENERAL_NICKNAME) ?? ""
-        genderIndex = settings.integer(forKey: PREF_GENERAL_GENDER)
-        pushToTalkLock = settings.object(forKey: PREF_GENERAL_PTTLOCK) != nil && settings.bool(forKey: PREF_GENERAL_PTTLOCK)
-        headsetTXToggle = settings.object(forKey: PREF_HEADSET_TXTOGGLE) != nil && settings.bool(forKey: PREF_HEADSET_TXTOGGLE)
-        sendOnReturn = settings.object(forKey: PREF_GENERAL_SENDONRETURN) == nil || settings.bool(forKey: PREF_GENERAL_SENDONRETURN)
-        proximitySensor = settings.object(forKey: PREF_DISPLAY_PROXIMITY) != nil && settings.bool(forKey: PREF_DISPLAY_PROXIMITY)
-        popupTextMessages = settings.object(forKey: PREF_DISPLAY_POPUPTXTMSG) == nil || settings.bool(forKey: PREF_DISPLAY_POPUPTXTMSG)
-        limitText = Double(settings.object(forKey: PREF_DISPLAY_LIMITTEXT) == nil ? DEFAULT_LIMIT_TEXT : settings.integer(forKey: PREF_DISPLAY_LIMITTEXT))
-        showUsername = settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME)
-        channelSortIndex = settings.object(forKey: PREF_DISPLAY_SORTCHANNELS) == nil ? ChanSort.ASCENDING.rawValue : settings.integer(forKey: PREF_DISPLAY_SORTCHANNELS)
-        joinRoot = settings.object(forKey: PREF_JOINROOTCHANNEL) == nil || settings.bool(forKey: PREF_JOINROOTCHANNEL)
-        defaultSubscriptions = getDefaultSubscriptions()
-
-        masterVolumePercent = Double(refVolumeToPercent(Int(TeamTalkClient.shared.soundOutputVolume)))
-
-        var mediaVolume = DEFAULT_MEDIAFILE_VOLUME
-        if settings.value(forKey: PREF_MEDIAFILE_VOLUME) != nil {
-            mediaVolume = settings.float(forKey: PREF_MEDIAFILE_VOLUME)
-        }
-        mediaFileVolumePercent = Double(mediaVolume * 100)
-
-        microphoneGainPercent = Double(refVolumeToPercent(Int(TeamTalkClient.shared.soundInputGainLevel)))
-
-        var voiceActivation = VOICEACT_DISABLED
-        if settings.object(forKey: PREF_VOICEACTIVATION) != nil {
-            voiceActivation = settings.integer(forKey: PREF_VOICEACTIVATION)
-        }
-        voiceActivationLevel = Double(voiceActivation)
-
-        var storedTTSRate = AVSpeechUtteranceDefaultSpeechRate
-        if settings.value(forKey: PREF_TTSEVENT_RATE) != nil {
-            storedTTSRate = settings.float(forKey: PREF_TTSEVENT_RATE)
-        }
-        ttsRate = Double(storedTTSRate)
-
-        var storedTTSVolume = DEFAULT_TTS_VOL
-        if settings.value(forKey: PREF_TTSEVENT_VOL) != nil {
-            storedTTSVolume = settings.float(forKey: PREF_TTSEVENT_VOL)
-        }
-        ttsVolume = Double(storedTTSVolume)
-
         subscriptionRows = [
             SubscriptionRow(title: String(localized: "User Messages", comment: "preferences"), subtitle: String(localized: "Receive text messages by default", comment: "preferences"), type: SUBSCRIBE_USER_MSG, key: PREF_SUB_USERMSG),
             SubscriptionRow(title: String(localized: "Channel Messages", comment: "preferences"), subtitle: String(localized: "Receive channel messages by default", comment: "preferences"), type: SUBSCRIBE_CHANNEL_MSG, key: PREF_SUB_CHANMSG),
@@ -318,13 +408,13 @@ final class PreferencesModel {
     }
 
     func nicknameChanged(_ nickname: String) {
-        nicknameText = nickname
+        preferences.general.nickname = nickname
         TeamTalkClient.shared.setNickname(nickname)
         UserDefaults.standard.set(nickname, forKey: PREF_GENERAL_NICKNAME)
     }
 
     func genderChanged(_ index: Int) {
-        genderIndex = index
+        preferences.general.genderIndex = index
         UserDefaults.standard.set(index, forKey: PREF_GENERAL_GENDER)
 
         let mode: TeamTalkStatusMode = index != 0 ? .female : .available
@@ -332,17 +422,17 @@ final class PreferencesModel {
     }
 
     func pttlockChanged(_ enabled: Bool) {
-        pushToTalkLock = enabled
+        preferences.general.pushToTalkLock = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_GENERAL_PTTLOCK)
     }
 
     func sendonenterChanged(_ enabled: Bool) {
-        sendOnReturn = enabled
+        preferences.general.sendOnReturn = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_GENERAL_SENDONRETURN)
     }
 
     func headsetTxToggleChanged(_ enabled: Bool) {
-        headsetTXToggle = enabled
+        preferences.general.headsetTXToggle = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_HEADSET_TXTOGGLE)
 
         if enabled {
@@ -355,55 +445,55 @@ final class PreferencesModel {
     }
 
     func showtextmessagesChanged(_ enabled: Bool) {
-        popupTextMessages = enabled
+        preferences.display.popupTextMessages = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_DISPLAY_POPUPTXTMSG)
     }
 
     func proximityChanged(_ enabled: Bool) {
-        proximitySensor = enabled
+        preferences.display.proximitySensor = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_DISPLAY_PROXIMITY)
         UIDevice.current.isProximityMonitoringEnabled = enabled
     }
 
     func limittextChanged(_ value: Double) {
-        limitText = value
+        preferences.display.limitText = value
         UserDefaults.standard.set(Int(value), forKey: PREF_DISPLAY_LIMITTEXT)
     }
 
     func showusernameChanged(_ enabled: Bool) {
-        showUsername = enabled
+        preferences.display.showUsername = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_DISPLAY_SHOWUSERNAME)
     }
 
     func channelSortChanged(_ index: Int) {
-        channelSortIndex = index
+        preferences.display.channelSortIndex = index
         UserDefaults.standard.set(index == 0 ? ChanSort.ASCENDING.rawValue : ChanSort.POPULARITY.rawValue, forKey: PREF_DISPLAY_SORTCHANNELS)
     }
 
     func joinrootChanged(_ enabled: Bool) {
-        joinRoot = enabled
+        preferences.connection.joinRootChannel = enabled
         UserDefaults.standard.set(enabled, forKey: PREF_JOINROOTCHANNEL)
     }
 
     func subscriptionChanged(_ enabled: Bool, row: SubscriptionRow) {
         if enabled {
-            defaultSubscriptions |= row.type.rawValue
+            preferences.defaultSubscriptions |= row.type.rawValue
         } else {
-            defaultSubscriptions &= ~row.type.rawValue
+            preferences.defaultSubscriptions &= ~row.type.rawValue
         }
         UserDefaults.standard.set(enabled, forKey: row.key)
     }
 
     func masterVolumeChanged(_ percent: Double) {
         let roundedPercent = Double(Int(percent / 10.0) * 10)
-        masterVolumePercent = roundedPercent
+        preferences.sound.masterVolumePercent = roundedPercent
         let vol = refVolume(roundedPercent)
         TeamTalkClient.shared.setSoundOutputVolume(INT32(vol))
         UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MASTER_VOLUME)
     }
 
     func mediafileVolumeChanged(_ percent: Double) {
-        mediaFileVolumePercent = percent
+        preferences.sound.mediaFileVolumePercent = percent
         let normalized = Float(percent / 100.0)
         UserDefaults.standard.set(normalized, forKey: PREF_MEDIAFILE_VOLUME)
 
@@ -417,7 +507,7 @@ final class PreferencesModel {
 
     func microphoneGainChanged(_ percent: Double) {
         let roundedPercent = Double(Int(percent / 10.0) * 10)
-        microphoneGainPercent = roundedPercent
+        preferences.sound.microphoneGainPercent = roundedPercent
         let vol = refVolume(roundedPercent)
         TeamTalkClient.shared.setSoundInputGainLevel(INT32(vol))
         UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MICROPHONE_GAIN)
@@ -425,7 +515,7 @@ final class PreferencesModel {
 
     func voiceactlevelChanged(_ levelValue: Double) {
         let level = Int(levelValue)
-        voiceActivationLevel = Double(level)
+        preferences.sound.voiceActivationLevel = Double(level)
 
         if level == VOICEACT_DISABLED {
             TeamTalkClient.shared.enableVoiceActivation(false)
@@ -437,17 +527,17 @@ final class PreferencesModel {
     }
 
     func ttsrateChanged(_ value: Double) {
-        ttsRate = value
+        preferences.textToSpeech.rate = value
         UserDefaults.standard.set(Float(value), forKey: PREF_TTSEVENT_RATE)
     }
 
     func ttsvolChanged(_ value: Double) {
-        ttsVolume = value
+        preferences.textToSpeech.volume = value
         UserDefaults.standard.set(Float(value), forKey: PREF_TTSEVENT_VOL)
     }
 
     func isSubscribed(to row: SubscriptionRow) -> Bool {
-        (defaultSubscriptions & row.type.rawValue) != 0
+        (preferences.defaultSubscriptions & row.type.rawValue) != 0
     }
 
     func percentSubtitle(_ value: Double) -> String {

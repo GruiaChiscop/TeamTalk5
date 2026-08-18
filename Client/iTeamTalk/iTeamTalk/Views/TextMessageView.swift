@@ -94,9 +94,7 @@ struct TextMessageView: View {
     }
 
     private func sendOnReturnIfNeeded(_ text: String) {
-        let defaults = UserDefaults.standard
-        let sendOnReturn = defaults.object(forKey: PREF_GENERAL_SENDONRETURN) == nil || defaults.bool(forKey: PREF_GENERAL_SENDONRETURN)
-        guard sendOnReturn, text.contains("\n") else { return }
+        guard Preferences.current.general.sendOnReturn, text.contains("\n") else { return }
         model.composedText = text.replacingOccurrences(of: "\n", with: "")
         model.sendMessage()
     }

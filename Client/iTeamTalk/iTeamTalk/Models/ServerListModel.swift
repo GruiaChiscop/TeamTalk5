@@ -176,10 +176,10 @@ final class ServerListModel {
     func onAppear() {
         servers = loadLocalServers()
 
-        let defaults = UserDefaults.standard
-        let downloadOfficial = defaults.object(forKey: PREF_DISPLAY_OFFICIALSERVERS) == nil || defaults.bool(forKey: PREF_DISPLAY_OFFICIALSERVERS)
-        let downloadPublic = defaults.object(forKey: PREF_DISPLAY_PUBLICSERVERS) == nil || defaults.bool(forKey: PREF_DISPLAY_PUBLICSERVERS)
-        let downloadUnofficial = defaults.object(forKey: PREF_DISPLAY_UNOFFICIALSERVERS) != nil && defaults.bool(forKey: PREF_DISPLAY_UNOFFICIALSERVERS)
+        let filters = Preferences.current.serverListFilters
+        let downloadOfficial = filters.showOfficialServers
+        let downloadPublic = filters.showPublicServers
+        let downloadUnofficial = filters.showUnofficialServers
 
         if downloadOfficial || downloadPublic || downloadUnofficial {
             Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
@@ -337,9 +337,9 @@ final class ServerListModel {
     }
 
     func downloadServerList() {
-        let defaults = UserDefaults.standard
-        let official = defaults.object(forKey: PREF_DISPLAY_OFFICIALSERVERS) == nil || defaults.bool(forKey: PREF_DISPLAY_OFFICIALSERVERS)
-        let unofficial = defaults.object(forKey: PREF_DISPLAY_UNOFFICIALSERVERS) != nil && defaults.bool(forKey: PREF_DISPLAY_UNOFFICIALSERVERS)
+        let filters = Preferences.current.serverListFilters
+        let official = filters.showOfficialServers
+        let unofficial = filters.showUnofficialServers
 
         guard let url = URL(string: AppInfo.getServersURL(officialservers: official, unofficialservers: unofficial)) else { return }
         let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
