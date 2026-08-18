@@ -75,6 +75,11 @@ final class MainTabModel: TeamTalkEventObserver {
     deinit {
         session.disconnect()
         closeSoundDevices(session: session)
+        // closeSoundDevices() only closes the individual input/output devices;
+        // the native SDK only deactivates the OS audio session when its audio
+        // subsystem singleton is destructed, which doesn't happen until process
+        // exit. Deactivate it here so leaving a server actually releases it.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         print("Destroyed main view controller")
     }
 
