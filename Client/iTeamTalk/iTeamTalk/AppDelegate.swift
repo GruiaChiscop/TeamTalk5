@@ -21,6 +21,7 @@
  *
  */
 
+import AVFoundation
 import UIKit
 import TeamTalkKit
 
@@ -40,7 +41,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Override point for customization after application launch.
 
         session.start(licenseName: REGISTRATION_NAME, licenseKey: REGISTRATION_KEY)
-        
+
+        // session.start() constructs the native client, which as a side effect
+        // grabs the platform audio subsystem singleton and immediately activates
+        // the OS audio session (earpiece-style routing, ignoring the Speaker
+        // preference) - before the user has connected to any server. Deactivate
+        // it here; setupSoundDevices() activates it correctly once a connection
+        // actually starts.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+
         // Default values are not set in Settings bundle, so we need to load them manually
         let defaults = UserDefaults.standard
         defaults.synchronize()
