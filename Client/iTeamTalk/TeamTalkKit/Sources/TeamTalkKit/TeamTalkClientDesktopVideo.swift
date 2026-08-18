@@ -2,6 +2,8 @@ import Foundation
 import TeamTalkC
 
 extension TeamTalkClient {
+/// Transmits a captured screen/window image as this client's desktop share,
+/// starting or updating the desktop stream everyone else in the channel sees.
 public func sendDesktopWindow(
     _ desktopWindow: DesktopWindow,
     convertTo bitmapFormat: TeamTalkBitmapFormat = .none
@@ -38,6 +40,7 @@ public func closeDesktopWindow() -> Bool {
     return TT_CloseDesktopWindow(instance) != 0
 }
 
+/// Updates the cursor position overlaid on this client's desktop share.
 @discardableResult
 public func sendDesktopCursorPosition(x: UInt16, y: UInt16) -> Bool {
     guard let instance else {
@@ -61,6 +64,8 @@ internal func sendDesktopInput(userID: Int32, inputs: [DesktopInput]) -> Bool {
     }
 }
 
+/// Remote-controls `user`'s shared desktop by forwarding synthetic
+/// keyboard/mouse input, if that user has granted desktop-input access.
 @discardableResult
 public func sendDesktopInput(_ inputs: [TeamTalkDesktopInput], to user: TeamTalkUser) -> Bool {
     sendDesktopInput(userID: user.userID.cValue, inputs: inputs.map(\.cValue))
@@ -110,6 +115,8 @@ public func withAcquiredDesktopWindow<Result>(
     try withAcquiredDesktopWindow(userID: user.userID.cValue, convertTo: bitmapFormat, body)
 }
 
+/// The latest desktop-share frame `user` has sent, copied into a safe,
+/// owned value.
 public func acquireDesktopWindow(for user: TeamTalkUser) -> TeamTalkDesktopWindow? {
     withAcquiredDesktopWindow(userID: user.userID.cValue) { TeamTalkDesktopWindow($0) }
 }
@@ -121,6 +128,8 @@ public func acquireDesktopWindow(
     withAcquiredDesktopWindow(userID: user.userID.cValue, convertTo: bitmapFormat) { TeamTalkDesktopWindow($0) }
 }
 
+/// All webcams/capture devices currently visible to the OS, in raw SDK form.
+/// Prefer ``videoCaptureDevices()``.
 public func videoCaptureDevicesInfo() -> [VideoCaptureDevice] {
     var count: Int32 = 0
     guard TT_GetVideoCaptureDevices(nil, &count) != 0, count > 0 else {
@@ -143,6 +152,7 @@ public func videoCaptureDevicesInfo() -> [VideoCaptureDevice] {
     return devices
 }
 
+/// All webcams/capture devices currently visible to the OS.
 public func videoCaptureDevices() -> [TeamTalkVideoCaptureDevice] {
     videoCaptureDevicesInfo().map(TeamTalkVideoCaptureDevice.init)
 }

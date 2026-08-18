@@ -4,10 +4,17 @@ import Combine
 #endif
 import TeamTalkC
 
+/// Receives raw `TTMessage` values as they're polled off the client's message
+/// queue. Most callers want ``TeamTalkEventObserver`` instead, which decodes
+/// messages into typed ``TeamTalkEvent`` cases.
 public protocol TeamTalkMessageObserver: AnyObject {
     func handleTeamTalkMessage(_ message: TTMessage)
 }
 
+/// Receives decoded ``TeamTalkEvent`` values. Register with
+/// `TeamTalkClient.shared.addEventObserver(_:)` and unregister with
+/// `removeEventObserver(_:)` to stop receiving callbacks. Observers are held
+/// weakly, so there's no need to unregister purely to break a retain cycle.
 public protocol TeamTalkEventObserver: AnyObject {
     func handleTeamTalkEvent(_ event: TeamTalkEvent)
 }
@@ -77,6 +84,8 @@ func withOptionalAudioFormatPointer<Result>(
     }
 }
 
+/// Snapshot of the client's connection/transmission state, mirroring the
+/// SDK's `CLIENT_*` flags. Read via ``TeamTalkClient/flags``.
 public struct TeamTalkClientFlags: OptionSet {
     public let rawValue: UInt32
 
@@ -92,6 +101,9 @@ public struct TeamTalkClientFlags: OptionSet {
     public static let voiceActive = TeamTalkClientFlags(rawValue: CLIENT_SNDINPUT_VOICEACTIVE.rawValue)
 }
 
+/// TLS material for an encrypted connection. Pass to `configureEncryption(_:)`
+/// before connecting; leave fields empty to use the system trust store with
+/// no client certificate.
 public struct TeamTalkEncryptionConfiguration {
     public var caCertificate: String
     public var certificate: String
@@ -111,7 +123,15 @@ public struct TeamTalkEncryptionConfiguration {
     }
 }
 
+/// The app's single connection to a TeamTalk server, wrapping one native SDK
+/// instance. Most of the public API lives in extensions across the package
+/// (commands, events, audio, media, desktop/video, server state); this file
+/// holds the instance itself and the small set of always-available
+/// properties. There is exactly one instance per process — see ``shared``.
 public final class TeamTalkClient {
+    /// The process-wide client instance. The underlying native SDK is a
+    /// single global handle, so there is no supported way to run two
+    /// independent sessions in one process.
     public static let shared = TeamTalkClient()
 
     var instance: UnsafeMutableRawPointer?
@@ -128,12 +148,18 @@ public final class TeamTalkClient {
 
     private init() {}
 
+    /// Whether a repeating timer is currently polling the SDK's message queue.
+    /// See ``startEventDispatching(pollInterval:)``.
     public var isEventDispatching: Bool {
         eventLoopLock.lock()
         defer { eventLoopLock.unlock() }
         return eventLoopTimer != nil
     }
 
+    /// Starts a repeating timer that drains the SDK's message queue and
+    /// delivers decoded events to registered ``TeamTalkEventObserver``s.
+    /// Idempotent: calling this again while already dispatching is a no-op.
+    /// - Parameter pollInterval: How often to poll, in seconds.
     public func startEventDispatching(pollInterval: TimeInterval = 0.1) {
         eventLoopLock.lock()
         if eventLoopTimer != nil {
@@ -152,6 +178,8 @@ public final class TeamTalkClient {
         timer.resume()
     }
 
+    /// Stops the polling timer started by ``startEventDispatching(pollInterval:)``.
+    /// Safe to call even if dispatching was never started.
     public func stopEventDispatching() {
         eventLoopLock.lock()
         let timer = eventLoopTimer
@@ -166,6 +194,10 @@ public final class TeamTalkClient {
         startEventDispatching()
     }
 
+    /// Never actually runs (the `TT_GetRootChannelID(nil) == 1` guard is
+    /// always false): this exists purely so the linker sees every native SDK
+    /// symbol referenced, keeping them from being dead-stripped out of test
+    /// builds that never call them directly.
     public static func touchLinkerSymbolsForTests() {
         if TT_GetRootChannelID(nil) == 1 {
             TT_CloseSoundOutputDevice(nil)
@@ -254,58 +286,78 @@ public final class TeamTalkClient {
         }
     }
 
+    /// The client's current connection/transmission state.
     public var flags: TeamTalkClientFlags {
         TeamTalkClientFlags(rawValue: TT_GetFlags(instance))
     }
 
+    /// Whether the TCP control connection to the server is currently up.
+    /// Does not by itself mean login succeeded — see ``isAuthorized``.
     public var isConnected: Bool {
         flags.contains(.connected)
     }
 
+    /// Whether a sound input device has been successfully opened for capture.
     public var isSoundInputReady: Bool {
         flags.contains(.soundInputReady)
     }
 
+    /// Whether the server has accepted this client's login.
     public var isAuthorized: Bool {
         flags.contains(.authorized)
     }
 
+    /// Whether this client is currently transmitting voice.
     public var isVoiceTransmitting: Bool {
         isTransmitting(STREAMTYPE_VOICE)
     }
 
+    /// The server-assigned user ID for this client's own login. Prefer
+    /// `myUserIdentifier` (``TeamTalkUserID``) where a typed ID is expected.
     public var myUserID: Int32 {
         TT_GetMyUserID(instance)
     }
 
+    /// The channel ID this client currently occupies. Prefer
+    /// `myChannelIdentifier` (``TeamTalkChannelID``) where a typed ID is expected.
     public var myChannelID: Int32 {
         TT_GetMyChannelID(instance)
     }
 
+    /// This client's effective user rights as a raw `USERRIGHT_*` bitmask.
+    /// Prefer `myRights` (``TeamTalkUserRights``) for `.contains(_:)` checks.
     public var myUserRights: UInt32 {
         TT_GetMyUserRights(instance)
     }
 
+    /// This client's account type (e.g. regular vs. admin).
     public var myTypes: TeamTalkUserTypes {
         TeamTalkUserTypes(cValue: TT_GetMyUserType(instance))
     }
 
+    /// The opaque `nUserData` value associated with this client's own account.
     public var myUserData: Int32 {
         TT_GetMyUserData(instance)
     }
 
+    /// The server's root channel ID.
     public var rootChannelID: Int32 {
         TT_GetRootChannelID(instance)
     }
 
+    /// Master output volume, in the SDK's internal volume units (see
+    /// `SOUND_VOLUME_MIN`/`MAX`/`DEFAULT`), not a 0–100 percentage.
     public var soundOutputVolume: Int32 {
         TT_GetSoundOutputVolume(instance)
     }
 
+    /// Microphone gain level, in the SDK's internal volume units, not a
+    /// 0–100 percentage.
     public var soundInputGainLevel: Int32 {
         TT_GetSoundInputGainLevel(instance)
     }
 
+    /// The native TeamTalk SDK's version string.
     public var version: String {
         String(cString: TT_GetVersion())
     }

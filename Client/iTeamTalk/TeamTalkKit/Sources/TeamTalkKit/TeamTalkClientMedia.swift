@@ -35,6 +35,9 @@ internal func setUserMediaStorage(
     ) != 0
 }
 
+/// Starts (or, with `directoryURL: nil`, stops) auto-recording `user`'s
+/// audio to individual files on disk as they speak. See
+/// ``disableUserMediaStorage(for:)`` for the common stop case.
 @discardableResult
 public func setUserMediaStorage(
     for user: TeamTalkUser,
@@ -71,6 +74,9 @@ public func disableUserMediaStorage(for user: TeamTalkUser) -> Bool {
     setUserMediaStorage(userID: user.userID.cValue, directoryURL: nil, audioFileFormat: .none)
 }
 
+/// Starts recording every stream this client can hear, mixed down into a
+/// single local audio file, re-encoded with `codec`. Stop with
+/// ``stopRecordingMuxedAudioFile()``.
 @discardableResult
 public func startRecordingMuxedAudioFile(
     codec: AudioCodec,
@@ -107,6 +113,9 @@ public func startRecordingMuxedAudioFile(
     startRecordingMuxedAudioFile(channelID: channel.channelID.cValue, to: fileURL, audioFileFormat: audioFileFormat)
 }
 
+/// Like ``startRecordingMuxedAudioFile(codec:to:audioFileFormat:)``, but
+/// mixing only the given `streamTypes` (e.g. voice only, excluding media
+/// file playback) rather than everything audible.
 @discardableResult
 public func startRecordingMuxedStreams(
     _ streamTypes: TeamTalkStreamTypes,
@@ -151,6 +160,9 @@ public func stopRecordingMuxedAudioFile(in channel: TeamTalkChannel) -> Bool {
     stopRecordingMuxedAudioFile(channelID: channel.channelID.cValue)
 }
 
+/// Subscribes (or, with `enabled: false`, unsubscribes) to raw PCM audio
+/// block callbacks for one stream source, optionally resampled/reformatted
+/// to `audioFormat`. Pull the delivered blocks with ``acquireAudioBlock(sourceID:streamTypes:)``.
 @discardableResult
 public func enableAudioBlockEvent(
     sourceID: Int32,
@@ -234,6 +246,12 @@ public func disableAudioBlockEvent(
     disableAudioBlockEvent(sourceID: sourceID.cValue, streamTypes: streamTypes)
 }
 
+/// Pulls the latest audio block delivered for `sourceID` (see
+/// ``enableAudioBlockEvent(sourceID:streamTypes:audioFormat:enabled:)``) and
+/// hands the raw C `AudioBlock` to `body`, releasing it automatically
+/// afterward. Prefer ``acquireAudioBlock(sourceID:streamTypes:)`` unless
+/// `body` needs the raw struct itself (e.g. to pass into another C call);
+/// that variant copies the samples into a safe, owned ``TeamTalkAudioBlock``.
 public func withAcquiredAudioBlock<Result>(
     sourceID: Int32,
     streamTypes: TeamTalkStreamTypes,
@@ -257,6 +275,8 @@ public func withAcquiredAudioBlock<Result>(
     try withAcquiredAudioBlock(sourceID: sourceID.cValue, streamTypes: streamTypes, body)
 }
 
+/// The latest audio block delivered for `sourceID`, copied into a safe,
+/// owned value.
 public func acquireAudioBlock(
     sourceID: Int32,
     streamTypes: TeamTalkStreamTypes
@@ -271,6 +291,9 @@ public func acquireAudioBlock(
     acquireAudioBlock(sourceID: sourceID.cValue, streamTypes: streamTypes)
 }
 
+/// Injects a synthesized audio block as if it were captured from the sound
+/// input device — used to feed custom/virtual audio sources into a client
+/// that isn't using a real microphone.
 @discardableResult
 public func insertAudioBlock(_ audioBlock: AudioBlock?) -> Bool {
     guard let instance else {
@@ -299,6 +322,8 @@ public func insertAudioBlock(_ audioBlock: TeamTalkAudioBlock?) -> Bool {
     }
 }
 
+/// Probes a local media file's format/duration without playing it. Prefer
+/// ``mediaFile(at:)``.
 public func mediaFileInfo(at localURL: URL) -> MediaFileInfo? {
     var mediaFileInfo = MediaFileInfo()
     guard TT_GetMediaFileInfo(localURL.path, &mediaFileInfo) != 0 else {
@@ -311,6 +336,11 @@ public func mediaFile(at localURL: URL) -> TeamTalkMediaFileInfo? {
     mediaFileInfo(at: localURL).map(TeamTalkMediaFileInfo.init)
 }
 
+/// Streams a local media file into the current channel as if this client
+/// were transmitting it live, audible/visible to everyone else in the
+/// channel. For playback only this client can hear, use
+/// `initLocalPlayback(from:playback:)` instead. Stop with
+/// ``stopStreamingMediaFileToChannel()``.
 @discardableResult
 public func startStreamingMediaFileToChannel(from localURL: URL, videoCodec: VideoCodec? = nil) -> Bool {
     guard let instance else {
@@ -396,6 +426,9 @@ public func stopStreamingMediaFileToChannel() -> Bool {
     return TT_StopStreamingMediaFileToChannel(instance) != 0
 }
 
+/// Plays a local media file for this client only — not streamed to anyone
+/// else in the channel. Returns the raw session ID (`-1` on failure); prefer
+/// the `TeamTalkPlaybackSessionID`-returning overload. Stop with `stopLocalPlayback(sessionID:)`.
 @discardableResult
 public func initLocalPlayback(from localURL: URL, playback: MediaFilePlayback) -> Int32 {
     guard let instance else {

@@ -27,48 +27,65 @@ public extension TeamTalkClientFlags {
 }
 
 public extension TeamTalkAudioCodec {
+    /// A default raw `AudioCodec` configuration for `codec`, ready to pass
+    /// into a C-level call or wrap in a ``TeamTalkAudioCodecConfiguration``.
     static func makeAudioCodec(_ codec: TeamTalkCodec) -> AudioCodec {
         makeAudioCodec(codec.cValue)
     }
 }
 
 public extension TeamTalkAudioPreprocessor {
+    /// A default raw `AudioPreprocessor` configuration for `preprocessor`,
+    /// ready to pass into a C-level call or wrap in a
+    /// ``TeamTalkAudioPreprocessorConfiguration``.
     static func makeAudioPreprocessor(_ preprocessor: TeamTalkAudioPreprocessorType) -> AudioPreprocessor {
         makeAudioPreprocessor(preprocessor.cValue)
     }
 }
 
 public extension TeamTalkClient {
+    /// This client's own user ID, typed. See ``TeamTalkClient/myUserID``.
     var myUserIdentifier: TeamTalkUserID {
         TeamTalkUserID(myUserID)
     }
 
+    /// The channel this client currently occupies, typed. See ``TeamTalkClient/myChannelID``.
     var myChannelIdentifier: TeamTalkChannelID {
         TeamTalkChannelID(myChannelID)
     }
 
+    /// The server's root channel ID, typed. See ``TeamTalkClient/rootChannelID``.
     var rootChannelIdentifier: TeamTalkChannelID {
         TeamTalkChannelID(rootChannelID)
     }
 
+    /// This client's effective user rights, typed for `.contains(_:)` checks.
+    /// See ``TeamTalkClient/myUserRights``.
     var myRights: TeamTalkUserRights {
         TeamTalkUserRights(cValue: myUserRights)
     }
 
+    /// Whether this client currently holds `right`.
     func getUserRight(_ right: TeamTalkUserRights) -> Bool {
         myRights.contains(right)
     }
 
+    /// Alias for ``getUserRight(_:)``.
     func hasUserRight(_ right: TeamTalkUserRights) -> Bool {
         getUserRight(right)
     }
 
+    /// Sets this client's presence (available/away/...) and optional status
+    /// message, visible to other users.
     @discardableResult
     func changeStatus(mode: TeamTalkStatusMode, message: String = "") -> Int32 {
         changeStatus(mode: mode.rawValue, message: message)
     }
 }
 
+// Bridges raw C struct fields to Swift-friendly Bool/enum types with the
+// SDK's own naming (nGainLevel, bEnableAGC, ...); names below mirror the
+// underlying DSP concept each field configures.
 public extension AudioCodec {
     var type: TeamTalkCodec {
         get { TeamTalkCodec(cValue: nCodec) }

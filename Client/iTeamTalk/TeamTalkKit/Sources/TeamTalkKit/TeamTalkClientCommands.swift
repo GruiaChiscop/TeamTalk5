@@ -1,6 +1,12 @@
 import Foundation
 import TeamTalkC
 
+// Fire-and-forget commands: each sends a request to the server and returns
+// immediately with a `TeamTalkCommandID`. Success/failure arrives later as a
+// `TeamTalkEvent.Kind.commandSucceeded`/`.commandError` carrying that same ID
+// (or as a more specific event, e.g. `.channelCreated`), not through this
+// call. For a `try await` alternative that resolves once the matching event
+// arrives, see the wrappers in TeamTalkClientAsyncCommands.swift.
 extension TeamTalkClient {
 @discardableResult
 public func ping() -> TeamTalkCommandID {
@@ -102,6 +108,10 @@ public func reply(to message: TeamTalkTextMessage, content: String) -> [TeamTalk
     sendTextMessage(.reply(to: message, content: content))
 }
 
+// Plain overload: only works if this client is already an operator of
+// `channel` (or has the server-wide right). Use the `operatorPassword:`
+// overload below to claim operator status with the channel's op password
+// instead.
 @discardableResult
 public func setChannelOperator(_ user: TeamTalkUser, in channel: TeamTalkChannel, enabled: Bool) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoChannelOp(instance, user.userID.cValue, channel.channelID.cValue, enabled ? 1 : 0))
@@ -127,11 +137,16 @@ public func banUser(_ user: TeamTalkUser, from channel: TeamTalkChannel? = nil) 
     TeamTalkCommandID(banUser(id: user.userID.cValue, fromChannelID: channel?.channelID.cValue ?? 0))
 }
 
+// Bans by channel, IP, and/or username, per `types`, instead of the plain
+// `banUser(_:from:)` overload's default (IP-based channel ban).
 @discardableResult
 public func banUser(_ user: TeamTalkUser, types: TeamTalkBanTypes) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoBanUserEx(instance, user.userID.cValue, types.cValue))
 }
 
+/// Bans an address/account that isn't necessarily an online user right now,
+/// via a fully-specified ``TeamTalkBanConfiguration`` rather than an existing
+/// ``TeamTalkUser``.
 @discardableResult
 public func ban(_ configuration: TeamTalkBanConfiguration) -> TeamTalkCommandID {
     var bannedUser = configuration.cValue
@@ -154,6 +169,9 @@ public func unban(_ configuration: TeamTalkBanConfiguration) -> TeamTalkCommandI
     return TeamTalkCommandID(TT_DoUnBanUserEx(instance, &bannedUser))
 }
 
+/// Requests a page of ban entries; pass `nil` for `channel` to list
+/// server-wide bans instead of one channel's. Results arrive as a series of
+/// `TeamTalkEvent.Kind.bannedUser` events tagged with this command's ID.
 @discardableResult
 public func listBans(in channel: TeamTalkChannel? = nil, startingAt index: Int32 = 0, count: Int32 = 100) -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoListBans(instance, channel?.channelID.cValue ?? 0, index, count))
@@ -179,6 +197,9 @@ public func deleteFile(_ file: TeamTalkRemoteFile) -> TeamTalkCommandID {
     TeamTalkCommandID(deleteFile(channelID: file.channelIdentifier.cValue, fileID: file.fileID.cValue))
 }
 
+// Unlike the rest of this file, file transfers are tracked locally by the
+// SDK rather than round-tripped to the server, so these resolve synchronously
+// (`Bool`/an optional snapshot) instead of returning a `TeamTalkCommandID`.
 @discardableResult
 public func cancelFileTransfer(_ transfer: TeamTalkFileTransfer) -> Bool {
     cancelFileTransfer(id: transfer.transferID.cValue)
