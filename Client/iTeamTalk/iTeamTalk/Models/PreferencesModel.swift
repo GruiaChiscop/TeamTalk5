@@ -83,6 +83,7 @@ struct Preferences {
         var speakerOutput = false
         var voicePreprocessing = false
         var bluetoothA2DP = false
+        var proximitySwitching = true
     }
 
     struct TextToSpeechEvents {
@@ -194,6 +195,7 @@ struct Preferences {
         preferences.soundDevice.speakerOutput = settings.object(forKey: PREF_SPEAKER_OUTPUT) != nil && settings.bool(forKey: PREF_SPEAKER_OUTPUT)
         preferences.soundDevice.voicePreprocessing = settings.object(forKey: PREF_VOICEPROCESSINGIO) != nil && settings.bool(forKey: PREF_VOICEPROCESSINGIO)
         preferences.soundDevice.bluetoothA2DP = settings.object(forKey: PREF_BLUETOOTH_A2DP) != nil && settings.bool(forKey: PREF_BLUETOOTH_A2DP)
+        preferences.soundDevice.proximitySwitching = settings.object(forKey: PREF_PROXIMITY_AUDIOSWITCH) == nil || settings.bool(forKey: PREF_PROXIMITY_AUDIOSWITCH)
 
         preferences.textToSpeechEvents.userLoggedIn = settings.object(forKey: PREF_TTSEVENT_USERLOGIN) != nil && settings.bool(forKey: PREF_TTSEVENT_USERLOGIN)
         preferences.textToSpeechEvents.userLoggedOut = settings.object(forKey: PREF_TTSEVENT_USERLOGOUT) != nil && settings.bool(forKey: PREF_TTSEVENT_USERLOGOUT)
@@ -239,11 +241,13 @@ let PREF_MASTER_VOLUME = "mastervolume_preference"
 let PREF_MICROPHONE_GAIN = "microphonegain_preference"
 let PREF_SPEAKER_OUTPUT = "speakeroutput_preference"
 let PREF_BLUETOOTH_A2DP = "bluetooth_a2dp_preference"
+let PREF_PROXIMITY_AUDIOSWITCH = "proximity_audioswitch_preference"
 let PREF_VOICEACTIVATION = "voiceactivationlevel_preference"
 let PREF_MEDIAFILE_VOLUME = "mediafile_volume_preference"
 let PREF_HEADSET_TXTOGGLE = "headset_tx_preference"
 let PREF_VOICEPROCESSINGIO = "voiceprocessing_preference"
 let PREF_SNDINPUT_PORT = "sndinput_port_preference"
+let PREF_SNDINPUT_UID = "sndinput_uid_preference"
 
 let PREF_SNDEVENT_SERVERLOST = "snd_srvlost_preference"
 let PREF_SNDEVENT_VOICETX = "snd_voicetx_preference"

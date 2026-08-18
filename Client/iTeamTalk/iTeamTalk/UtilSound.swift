@@ -159,6 +159,17 @@ func removeAudioPortDataSource(descr: AVAudioSessionPortDescription) {
     defaults.removeObject(forKey: prefname)
 }
 
+// Which input port to prefer even when it has no specific data source chosen
+// (i.e. "Default" was picked for it) - a per-port data source preference alone
+// doesn't say which of several available *ports* should be active.
+func getPreferredInputUID() -> String? {
+    UserDefaults.standard.string(forKey: PREF_SNDINPUT_UID)
+}
+
+func setPreferredInputUID(_ uid: String) {
+    UserDefaults.standard.set(uid, forKey: PREF_SNDINPUT_UID)
+}
+
 func closeSoundDevices(session: TeamTalkSession) {
     session.closeSoundDevices()
 }
@@ -253,10 +264,18 @@ private func performSoundDeviceSetup(session: TeamTalkSession) {
         // Restore the previously chosen input port + data source. Only the one
         // data source matching what was saved should be applied - not whichever
         // one happened to be last in the list - and the port itself needs to be
-        // made preferred too, or iOS falls back to its own default input.
+        // made preferred too, or iOS falls back to its own default input. A port
+        // chosen with no specific data source (i.e. "Default") has nothing in
+        // getAudioPortDataSource, so it's matched separately, by uid.
+        let preferredInputUID = getPreferredInputUID()
         for input in audioSession.availableInputs ?? [] {
             guard let dataSourceID = getAudioPortDataSource(descr: input),
-                  let dataSource = input.dataSources?.first(where: { $0.dataSourceID == dataSourceID }) else { continue }
+                  let dataSource = input.dataSources?.first(where: { $0.dataSourceID == dataSourceID }) else {
+                if input.uid == preferredInputUID {
+                    try audioSession.setPreferredInput(input)
+                }
+                continue
+            }
 
             if dataSource.supportedPolarPatterns?.contains(.stereo) == true {
                 try dataSource.setPreferredPolarPattern(.stereo)

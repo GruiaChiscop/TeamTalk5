@@ -223,7 +223,14 @@ final class MainTabModel: TeamTalkEventObserver {
         }
     }
 
-    @objc private func proximityChanged(_ notification: Notification) {}
+    @objc private func proximityChanged(_ notification: Notification) {
+        // Route to the earpiece while the phone is held to the ear, like a
+        // regular phone call; restore the user's actual preference once moved away.
+        let soundDevice = Preferences.current.soundDevice
+        guard soundDevice.proximitySwitching else { return }
+        let nearEar = UIDevice.current.proximityState
+        try? AVAudioSession.sharedInstance().overrideOutputAudioPort(nearEar ? .none : (soundDevice.speakerOutput ? .speaker : .none))
+    }
 
     @objc private func audioRouteChange(_ notification: Notification) {
         guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
@@ -238,10 +245,21 @@ final class MainTabModel: TeamTalkEventObserver {
     }
 
     @objc private func audioInterruption(_ notification: Notification) {
-        guard let optionValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
-        let options = AVAudioSession.InterruptionOptions(rawValue: optionValue)
-        if options.contains(.shouldResume) {
-            setupSoundDevices(session: session)
+        guard let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+        switch type {
+        case .began:
+            // Something else (a phone call, Siri, ...) just took the audio
+            // session away - stop transmitting so the UI doesn't keep showing
+            // "transmitting" while the mic isn't actually being captured.
+            channelListModel.pushToTalk.enableVoiceTx(false)
+        case .ended:
+            guard let optionValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
+            if AVAudioSession.InterruptionOptions(rawValue: optionValue).contains(.shouldResume) {
+                setupSoundDevices(session: session)
+            }
+        @unknown default:
+            break
         }
     }
 

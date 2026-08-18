@@ -64,6 +64,12 @@ final class SoundDevicesModel {
             title: String(localized: "Bluetooth A2DP Playback", comment: "Sound Devices"),
             subtitle: String(localized: "Bluetooth playback should use Advanced Audio Distribution Profile", comment: "Sound Devices"),
             preferenceKey: PREF_BLUETOOTH_A2DP
+        ),
+        ToggleRow(
+            id: PREF_PROXIMITY_AUDIOSWITCH,
+            title: String(localized: "Proximity Switching", comment: "Sound Devices"),
+            subtitle: String(localized: "Route to earpiece automatically when phone is held to ear", comment: "Sound Devices"),
+            preferenceKey: PREF_PROXIMITY_AUDIOSWITCH
         )
     ]
 
@@ -112,6 +118,7 @@ final class SoundDevicesModel {
         case PREF_SPEAKER_OUTPUT: return soundDevice.speakerOutput
         case PREF_VOICEPROCESSINGIO: return soundDevice.voicePreprocessing
         case PREF_BLUETOOTH_A2DP: return soundDevice.bluetoothA2DP
+        case PREF_PROXIMITY_AUDIOSWITCH: return soundDevice.proximitySwitching
         default: return false
         }
     }
@@ -169,6 +176,7 @@ final class SoundDevicesModel {
                 try audioSession.setPreferredInput(input)
                 removeAudioPortDataSource(descr: input)
             }
+            setPreferredInputUID(input.uid)
 
             print(audioSession.currentRoute)
         } catch {
