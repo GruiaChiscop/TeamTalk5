@@ -1,6 +1,16 @@
 import Foundation
 import TeamTalkC
 
+// Every ID type below wraps the SDK's raw Int32 IDs with a type that can't
+// be mixed up with an ID of a different kind. They share a convention:
+// `.none` (0) means "no ID"/unset, `.invalid` (-1) is the SDK's own failure
+// sentinel, and `isValid` is true for anything greater than zero — treat a
+// non-`isValid` ID as unusable rather than switching on `.none`/`.invalid`
+// specifically.
+
+/// Identifies one asynchronous command sent to the server. Delivered by
+/// every `TeamTalkClient` command method and echoed back in the matching
+/// `TeamTalkEvent.Kind.commandSucceeded`/`.commandError`.
 public struct TeamTalkCommandID: RawRepresentable, Hashable, Sendable, ExpressibleByIntegerLiteral, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -32,6 +42,7 @@ public struct TeamTalkCommandID: RawRepresentable, Hashable, Sendable, Expressib
     public static let invalid = TeamTalkCommandID(rawValue: -1)
 }
 
+/// Identifies one logged-in user session.
 public struct TeamTalkUserID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -59,6 +70,7 @@ public struct TeamTalkUserID: RawRepresentable, Hashable, Sendable, CustomString
     public static let invalid = TeamTalkUserID(rawValue: -1)
 }
 
+/// Identifies one channel.
 public struct TeamTalkChannelID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -86,6 +98,9 @@ public struct TeamTalkChannelID: RawRepresentable, Hashable, Sendable, CustomStr
     public static let invalid = TeamTalkChannelID(rawValue: -1)
 }
 
+/// One segment of a ``TeamTalkChannelPath`` (a channel's own name, not the
+/// full path to it). `/` characters are stripped on construction, since
+/// they'd otherwise be mistaken for path separators.
 public struct TeamTalkChannelPathComponent: RawRepresentable, Hashable, Sendable, CustomStringConvertible, ExpressibleByStringLiteral {
     public let rawValue: String
 
@@ -110,6 +125,9 @@ public struct TeamTalkChannelPathComponent: RawRepresentable, Hashable, Sendable
     }
 }
 
+/// A slash-separated channel path (e.g. `"/Games/Chess"`), always
+/// normalized: no trailing slash, no empty/repeated segments. Resolve to an
+/// ID with `TeamTalkClient.channelIdentifier(from:)`.
 public struct TeamTalkChannelPath: RawRepresentable, Hashable, Sendable, CustomStringConvertible, ExpressibleByStringLiteral {
     public let rawValue: String
 
@@ -198,6 +216,7 @@ public struct TeamTalkChannelPath: RawRepresentable, Hashable, Sendable, CustomS
     }
 }
 
+/// Identifies one file in a channel's file storage.
 public struct TeamTalkFileID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -225,6 +244,7 @@ public struct TeamTalkFileID: RawRepresentable, Hashable, Sendable, CustomString
     public static let invalid = TeamTalkFileID(rawValue: -1)
 }
 
+/// Identifies one upload/download in progress.
 public struct TeamTalkTransferID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -252,6 +272,7 @@ public struct TeamTalkTransferID: RawRepresentable, Hashable, Sendable, CustomSt
     public static let invalid = TeamTalkTransferID(rawValue: -1)
 }
 
+/// Identifies one `initLocalPlayback(from:playback:)` session.
 public struct TeamTalkPlaybackSessionID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -279,6 +300,7 @@ public struct TeamTalkPlaybackSessionID: RawRepresentable, Hashable, Sendable, C
     public static let invalid = TeamTalkPlaybackSessionID(rawValue: -1)
 }
 
+/// Identifies one user's desktop-share stream.
 public struct TeamTalkDesktopSessionID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -306,6 +328,7 @@ public struct TeamTalkDesktopSessionID: RawRepresentable, Hashable, Sendable, Cu
     public static let invalid = TeamTalkDesktopSessionID(rawValue: -1)
 }
 
+/// Identifies one media stream (voice, video capture, media file video, ...).
 public struct TeamTalkMediaStreamID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -333,6 +356,9 @@ public struct TeamTalkMediaStreamID: RawRepresentable, Hashable, Sendable, Custo
     public static let invalid = TeamTalkMediaStreamID(rawValue: -1)
 }
 
+/// Identifies where an audio block (see ``TeamTalkAudioBlock``) came from:
+/// usually a specific ``TeamTalkUserID``/``TeamTalkPlaybackSessionID``, or
+/// one of the special sources below (``isSpecialSource``).
 public struct TeamTalkAudioBlockSourceID: RawRepresentable, Hashable, Sendable, CustomStringConvertible {
     public let rawValue: Int32
 
@@ -364,7 +390,10 @@ public struct TeamTalkAudioBlockSourceID: RawRepresentable, Hashable, Sendable, 
         String(rawValue)
     }
 
+    /// This client's own captured microphone input, before any processing.
     public static let localUser = TeamTalkAudioBlockSourceID(rawValue: TT_LOCAL_USERID)
+    /// This client's own audio as actually transmitted, after preprocessing.
     public static let localTransmission = TeamTalkAudioBlockSourceID(rawValue: TT_LOCAL_TX_USERID)
+    /// Every incoming stream mixed together, as heard through the speaker.
     public static let muxed = TeamTalkAudioBlockSourceID(rawValue: TT_MUXED_USERID)
 }
