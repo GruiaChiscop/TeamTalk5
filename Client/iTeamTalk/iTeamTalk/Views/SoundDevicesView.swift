@@ -35,10 +35,7 @@ struct SoundDevicesView: View {
         Form {
             Section("General") {
                 ForEach(model.toggleRows) { row in
-                    Toggle(isOn: Binding(
-                        get: { model.preferenceValue(forKey: row.preferenceKey) },
-                        set: { model.setPreference($0, forKey: row.preferenceKey) }
-                    )) {
+                    Toggle(isOn: model.binding(forKey: row.preferenceKey)) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(row.title)
                             Text(row.subtitle)

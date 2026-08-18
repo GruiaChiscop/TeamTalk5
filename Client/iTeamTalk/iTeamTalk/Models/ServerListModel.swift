@@ -170,6 +170,11 @@ final class ServerListModel {
     // Error alert
     var errorMessage: String?
 
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
+
     var nextappupdate = Date()
 
     init(session: TeamTalkSession) {

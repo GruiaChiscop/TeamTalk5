@@ -122,6 +122,13 @@ final class SoundDevicesModel {
         reload()
     }
 
+    func binding(forKey key: String) -> Binding<Bool> {
+        Binding(
+            get: { self.preferenceValue(forKey: key) },
+            set: { self.setPreference($0, forKey: key) }
+        )
+    }
+
     func title(for dataSources: [AVAudioSessionDataSourceDescription?],
                at index: Int,
                input: AVAudioSessionPortDescription) -> String {

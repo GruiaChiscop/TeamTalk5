@@ -48,12 +48,15 @@ struct TextToSpeechEventsView: View {
 
 private struct TextToSpeechEventToggle: View {
     let row: TextToSpeechEventRow
+    @AppStorage private var isOn: Bool
+
+    init(row: TextToSpeechEventRow) {
+        self.row = row
+        _isOn = AppStorage(wrappedValue: Preferences.TextToSpeechEvents()[keyPath: row.keyPath], row.preferenceKey)
+    }
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { Preferences.current.textToSpeechEvents[keyPath: row.keyPath] },
-            set: { UserDefaults.standard.set($0, forKey: row.preferenceKey) }
-        )) {
+        Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
                 Text(row.subtitle)

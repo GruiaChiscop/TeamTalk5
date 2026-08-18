@@ -96,17 +96,17 @@ struct AudioCodecView: View {
                     Text("\(Int(model.opusBitrate.rounded())) KB/s")
                         .font(.body.monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
                 Slider(value: $model.opusBitrate,
                        in: Double(OPUS_MIN_BITRATE) / 1000.0...Double(OPUS_MAX_BITRATE) / 1000.0,
-                       step: 1)
+                       step: 1) {
+                    Text("Bitrate")
+                }
             }
             Toggle("Variable Bitrate", isOn: $model.opusVBR)
             Toggle("DTX", isOn: $model.opusDTX)
-            Stepper(value: Binding(
-                get: { model.opusFrameSize },
-                set: { model.opusFrameSizeChanged($0) }
-            ), in: 0...Double(OPUS_REALMAX_FRAMESIZE), step: 5) {
+            Stepper(value: $model.opusFrameSize, in: 0...Double(OPUS_REALMAX_FRAMESIZE), step: 5) {
                 HStack(spacing: 12) {
                     Text("Frame Size")
                     Spacer(minLength: 16)
@@ -115,10 +115,7 @@ struct AudioCodecView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Stepper(value: Binding(
-                get: { model.opusTransmitInterval },
-                set: { model.opusTransmitIntervalChanged($0) }
-            ), in: 20...500, step: 20) {
+            Stepper(value: $model.opusTransmitInterval, in: 20...500, step: 20) {
                 HStack(spacing: 12) {
                     Text("Transmit Interval")
                     Spacer(minLength: 16)
@@ -146,8 +143,11 @@ struct AudioCodecView: View {
                     Text("\(Int(model.speexQuality.rounded()))")
                         .font(.body.monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
-                Slider(value: $model.speexQuality, in: 0...10, step: 1)
+                Slider(value: $model.speexQuality, in: 0...10, step: 1) {
+                    Text("Quality")
+                }
             }
             Stepper(value: $model.speexTransmitInterval, in: 20...500, step: 20) {
                 HStack(spacing: 12) {
@@ -177,8 +177,11 @@ struct AudioCodecView: View {
                     Text("\(Int(model.speexVBRQuality.rounded()))")
                         .font(.body.monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
-                Slider(value: $model.speexVBRQuality, in: 0...10, step: 1)
+                Slider(value: $model.speexVBRQuality, in: 0...10, step: 1) {
+                    Text("Quality")
+                }
             }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
@@ -187,10 +190,13 @@ struct AudioCodecView: View {
                     Text("\(Int(model.speexVBRBitrate.rounded())) KB/s")
                         .font(.body.monospacedDigit())
                         .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
                 }
                 Slider(value: $model.speexVBRBitrate,
                        in: 0...Double(SPEEX_UWB_MAX_BITRATE) / 1000.0,
-                       step: 1)
+                       step: 1) {
+                    Text("Bitrate")
+                }
             }
             Toggle("DTX", isOn: $model.speexVBRDTX)
             Stepper(value: $model.speexVBRTransmitInterval, in: 20...500, step: 20) {

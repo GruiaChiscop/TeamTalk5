@@ -30,14 +30,25 @@ struct PublicServerView: View {
         Form {
             Section("Show in Server List") {
                 ForEach(rows) { row in
-                    Toggle(row.title, isOn: Binding(
-                        get: { row.boolValue },
-                        set: { UserDefaults.standard.set($0, forKey: row.preferenceKey) }
-                    ))
+                    PublicServerToggle(row: row)
                 }
             }
         }
         .navigationTitle("Filter Server List")
+    }
+}
+
+private struct PublicServerToggle: View {
+    let row: PublicServerRow
+    @AppStorage private var isOn: Bool
+
+    init(row: PublicServerRow) {
+        self.row = row
+        _isOn = AppStorage(wrappedValue: row.defaultValue, row.preferenceKey)
+    }
+
+    var body: some View {
+        Toggle(row.title, isOn: $isOn)
     }
 }
 
@@ -67,11 +78,11 @@ private enum PublicServerRow: CaseIterable, Identifiable {
         }
     }
 
-    var boolValue: Bool {
-        let filters = Preferences.current.serverListFilters
+    var defaultValue: Bool {
+        let defaults = Preferences.ServerListFilters()
         switch self {
-        case .official: return filters.showOfficialServers
-        case .unofficial: return filters.showUnofficialServers
+        case .official: return defaults.showOfficialServers
+        case .unofficial: return defaults.showUnofficialServers
         }
     }
 }

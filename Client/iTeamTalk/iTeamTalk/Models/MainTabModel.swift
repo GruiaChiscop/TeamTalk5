@@ -44,6 +44,16 @@ final class MainTabModel: TeamTalkEventObserver {
     var fatalAlertMessage: String?   // dismisses the view when OK tapped
     var showSaveAlert = false
 
+    var isPresentingAlert: Bool {
+        get { alertMessage != nil }
+        set { if !newValue { alertMessage = nil } }
+    }
+
+    var isPresentingFatalAlert: Bool {
+        get { fatalAlertMessage != nil }
+        set { if !newValue { fatalAlertMessage = nil } }
+    }
+
     private var pendingDismiss: (() -> Void)?
     private var reconnecttimer: Timer?
     private var didSetup = false

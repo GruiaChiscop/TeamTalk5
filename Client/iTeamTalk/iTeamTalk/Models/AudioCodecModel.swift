@@ -68,7 +68,15 @@ final class AudioCodecModel {
     var opusVBR: Bool
     var opusDTX: Bool
     var opusFrameSize: Double
-    var opusTransmitInterval: Double
+    var opusTransmitInterval: Double {
+        didSet {
+            if opusFrameSize == 0 && INT32(opusTransmitInterval) > OPUS_REALMAX_FRAMESIZE {
+                opusFrameSize = Double(OPUS_REALMAX_FRAMESIZE)
+            } else if opusFrameSize >= opusTransmitInterval {
+                opusFrameSize = 0
+            }
+        }
+    }
 
     var speexSampleRateIndex: Int
     var speexQuality: Double
@@ -161,18 +169,5 @@ final class AudioCodecModel {
             return title + " " + String(localized: "(Active)", comment: "codec detail")
         }
         return title
-    }
-
-    func opusFrameSizeChanged(_ value: Double) {
-        opusFrameSize = value
-    }
-
-    func opusTransmitIntervalChanged(_ value: Double) {
-        opusTransmitInterval = value
-        if opusFrameSize == 0 && INT32(value) > OPUS_REALMAX_FRAMESIZE {
-            opusFrameSize = Double(OPUS_REALMAX_FRAMESIZE)
-        } else if opusFrameSize >= value {
-            opusFrameSize = 0
-        }
     }
 }

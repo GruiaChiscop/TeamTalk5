@@ -73,21 +73,12 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkRemoteControl)) { notification in
             model.remoteControl(notification.object as? UIEvent)
         }
-        .alert("Error",
-               isPresented: Binding(
-                get: { model.alertMessage != nil },
-                set: { if !$0 { model.alertMessage = nil } }
-               )) {
+        .alert("Error", isPresented: $model.isPresentingAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.alertMessage ?? "")
         }
-        .alert("Connect to Server",
-            isPresented: Binding(
-                get: { model.fatalAlertMessage != nil },
-                set: { if !$0 { model.fatalAlertMessage = nil } }
-            )
-        ) {
+        .alert("Connect to Server", isPresented: $model.isPresentingFatalAlert) {
             Button("OK", role: .cancel) {
                 close()
             }
@@ -162,17 +153,14 @@ private struct ChannelsTabView: View {
 // MARK: - Channel detail sheet
 
 private struct ChannelDetailSheetView: View {
-    let model: ChannelDetailModel
+    @Bindable var model: ChannelDetailModel
 
     var body: some View {
         NavigationStack {
             ChannelDetailView(model: model, setupCodec: {
                 model.audioCodecModel = model.makeAudioCodecModel()
             })
-            .navigationDestination(isPresented: Binding(
-                get: { model.audioCodecModel != nil },
-                set: { if !$0 { model.audioCodecModel = nil } }
-            )) {
+            .navigationDestination(isPresented: $model.isShowingAudioCodec) {
                 if let codecModel = model.audioCodecModel {
                     AudioCodecView(model: codecModel, performAction: { action in
                         model.applyCodecAction(action, codecModel: codecModel)

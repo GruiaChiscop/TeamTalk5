@@ -64,8 +64,11 @@ struct UserDetailView: View {
                         Text("\(Int(model.voiceVolume.rounded()))")
                             .font(.body.monospacedDigit())
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                     }
-                    Slider(value: $model.voiceVolume, in: 0...100, step: 1)
+                    Slider(value: $model.voiceVolume, in: 0...100, step: 1) {
+                        Text("Voice Volume")
+                    }
                 }
                 Toggle("Mute Voice", isOn: $model.isVoiceMuted)
                 VStack(alignment: .leading, spacing: 8) {
@@ -75,8 +78,11 @@ struct UserDetailView: View {
                         Text("\(Int(model.mediaVolume.rounded()))")
                             .font(.body.monospacedDigit())
                             .foregroundStyle(.secondary)
+                            .accessibilityHidden(true)
                     }
-                    Slider(value: $model.mediaVolume, in: 0...100, step: 1)
+                    Slider(value: $model.mediaVolume, in: 0...100, step: 1) {
+                        Text("Media File Volume")
+                    }
                 }
                 Toggle("Mute Media File", isOn: $model.isMediaMuted)
             }

@@ -137,12 +137,7 @@ struct ServerListView: View {
             } message: {
                 Text("Enter Join Code")
             }
-            .alert("Connect to Server",
-                isPresented: Binding(
-                    get: { model.errorMessage != nil },
-                    set: { if !$0 { model.errorMessage = nil } }
-                )
-            ) {
+            .alert("Connect to Server", isPresented: $model.isPresentingError) {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text(model.errorMessage ?? "")

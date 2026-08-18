@@ -47,6 +47,16 @@ final class ChannelDetailModel {
     var joinPassword = ""
     var audioCodecModel: AudioCodecModel?
 
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
+
+    var isShowingAudioCodec: Bool {
+        get { audioCodecModel != nil }
+        set { if !newValue { audioCodecModel = nil } }
+    }
+
     init(channel: TeamTalkChannel, session: TeamTalkSession) {
         self.session = session
         var rawChannel = channel.cValue

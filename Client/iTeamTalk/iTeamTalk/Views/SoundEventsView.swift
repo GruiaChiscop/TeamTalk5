@@ -54,22 +54,25 @@ struct SoundEventsView: View {
 
 private struct SoundEventToggle: View {
     let row: SoundEventRow
+    @AppStorage private var isOn: Bool
+
+    init(row: SoundEventRow) {
+        self.row = row
+        _isOn = AppStorage(wrappedValue: Preferences.SoundEvents()[keyPath: row.keyPath], row.preferenceKey)
+    }
 
     var body: some View {
-        Toggle(isOn: Binding(
-            get: { Preferences.current.soundEvents[keyPath: row.keyPath] },
-            set: { newValue in
-                UserDefaults.standard.set(newValue, forKey: row.preferenceKey)
-                if newValue {
-                    playSound(row.sound)
-                }
-            }
-        )) {
+        Toggle(isOn: $isOn) {
             VStack(alignment: .leading, spacing: 2) {
                 Text(row.title)
                 Text(row.subtitle)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
+            }
+        }
+        .onChange(of: isOn) { _, newValue in
+            if newValue {
+                playSound(row.sound)
             }
         }
     }

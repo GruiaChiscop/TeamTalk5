@@ -90,6 +90,11 @@ final class ChannelListModel {
     var joinPassword = ""
     var errorMessage: String?
 
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
+
     // MARK: Server / channel state
     var channels = [TeamTalkChannelID: TeamTalkChannel]()
     var chanpasswds = [TeamTalkChannelID: String]()

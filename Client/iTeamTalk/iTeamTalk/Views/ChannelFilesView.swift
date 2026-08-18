@@ -25,7 +25,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ChannelFilesView: View {
-    let model: ChannelFilesModel
+    @Bindable var model: ChannelFilesModel
     @State private var showingFileImporter = false
     @State private var showingDownloadFolderImporter = false
 
@@ -114,10 +114,7 @@ struct ChannelFilesView: View {
             model.downloadPendingFile(to: result)
         }
         .confirmationDialog("Delete File",
-            isPresented: Binding(
-                get: { model.filePendingDeletion != nil },
-                set: { if !$0 { model.filePendingDeletion = nil } }
-            ),
+            isPresented: $model.isPresentingDeleteConfirmation,
             presenting: model.filePendingDeletion
         ) { file in
             Button("Delete", role: .destructive) {
@@ -129,12 +126,7 @@ struct ChannelFilesView: View {
         } message: { file in
             Text(String(format: String(localized: "Delete %@?"), file.name))
         }
-        .alert("Error",
-            isPresented: Binding(
-                get: { model.errorMessage != nil },
-                set: { if !$0 { model.errorMessage = nil } }
-            )
-        ) {
+        .alert("Error", isPresented: $model.isPresentingError) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.errorMessage ?? "")

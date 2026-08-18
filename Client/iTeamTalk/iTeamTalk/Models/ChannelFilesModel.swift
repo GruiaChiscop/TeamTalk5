@@ -145,6 +145,16 @@ final class ChannelFilesModel {
     var filePendingDownload: ChannelFileRow?
     var filePendingDeletion: ChannelFileRow?
 
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
+
+    var isPresentingDeleteConfirmation: Bool {
+        get { filePendingDeletion != nil }
+        set { if !newValue { filePendingDeletion = nil } }
+    }
+
     private var channelID: TeamTalkChannelID = .none
     private var announcedDownloadProgress = [TeamTalkTransferID: Set<Int>]()
     private var downloadSecurityScopes = [String: URL]()

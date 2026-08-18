@@ -341,8 +341,11 @@ struct PreferenceSlider: View {
                 Text(valueText(value))
                     .font(.body.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
             }
-            Slider(value: $value, in: range, step: step)
+            Slider(value: $value, in: range, step: step) {
+                Text(title)
+            }
         }
     }
 }
