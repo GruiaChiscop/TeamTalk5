@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct UserDetailView: View {
-    let model: UserDetailModel
+    @Bindable var model: UserDetailModel
     var body: some View {
         Form {
             Section("General") {
@@ -65,13 +65,9 @@ struct UserDetailView: View {
                             .font(.body.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
-                    Slider(value: Binding(get: { model.voiceVolume }, set: { model.voiceVolumeChanged($0) }),
-                           in: 0...100, step: 1)
+                    Slider(value: $model.voiceVolume, in: 0...100, step: 1)
                 }
-                Toggle("Mute Voice", isOn: Binding(
-                    get: { model.isVoiceMuted },
-                    set: { model.muteVoice($0) }
-                ))
+                Toggle("Mute Voice", isOn: $model.isVoiceMuted)
                 VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 12) {
                         Text("Media File Volume")
@@ -80,21 +76,14 @@ struct UserDetailView: View {
                             .font(.body.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
-                    Slider(value: Binding(get: { model.mediaVolume }, set: { model.mediaVolumeChanged($0) }),
-                           in: 0...100, step: 1)
+                    Slider(value: $model.mediaVolume, in: 0...100, step: 1)
                 }
-                Toggle("Mute Media File", isOn: Binding(
-                    get: { model.isMediaMuted },
-                    set: { model.muteMediaStream($0) }
-                ))
+                Toggle("Mute Media File", isOn: $model.isMediaMuted)
             }
 
             Section("Subscriptions") {
                 ForEach(model.subscriptionRows) { row in
-                    Toggle(row.title, isOn: Binding(
-                        get: { model.isSubscribed(to: row.type) },
-                        set: { model.setSubscription(row.type, enabled: $0) }
-                    ))
+                    Toggle(row.title, isOn: model.subscriptionBinding(for: row.type))
                 }
             }
 
@@ -110,10 +99,7 @@ struct UserDetailView: View {
             }
         }
         .navigationTitle(model.displayName)
-        .alert("Error", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) {
+        .alert("Error", isPresented: $model.isPresentingError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(model.errorMessage ?? "")

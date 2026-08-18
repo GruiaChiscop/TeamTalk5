@@ -45,11 +45,32 @@ final class UserDetailModel {
 
     var errorMessage: String?
     var usernameText: String
-    var voiceVolume: Double
-    var mediaVolume: Double
-    var isVoiceMuted: Bool
-    var isMediaMuted: Bool
+    var voiceVolume: Double {
+        didSet {
+            session.setUserVolume(currentUser, stream: .voice, volume: INT32(refVolume(voiceVolume)))
+        }
+    }
+    var mediaVolume: Double {
+        didSet {
+            session.setUserVolume(currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(mediaVolume)))
+        }
+    }
+    var isVoiceMuted: Bool {
+        didSet {
+            session.setUserMute(currentUser, stream: .voice, muted: isVoiceMuted)
+        }
+    }
+    var isMediaMuted: Bool {
+        didSet {
+            session.setUserMute(currentUser, stream: .mediaFileAudio, muted: isMediaMuted)
+        }
+    }
     private var subscriptions: TeamTalkSubscriptions
+
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
 
     init(user: TeamTalkUser, session: TeamTalkSession) {
         self.session = session
@@ -101,34 +122,19 @@ final class UserDetailModel {
         subscriptions.contains(subscription)
     }
 
-    func voiceVolumeChanged(_ value: Double) {
-        voiceVolume = value
-        session.setUserVolume(currentUser, stream: .voice, volume: INT32(refVolume(value)))
-    }
-
-    func mediaVolumeChanged(_ value: Double) {
-        mediaVolume = value
-        session.setUserVolume(currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(value)))
-    }
-
-    func muteVoice(_ muted: Bool) {
-        isVoiceMuted = muted
-        session.setUserMute(currentUser, stream: .voice, muted: muted)
-    }
-
-    func muteMediaStream(_ muted: Bool) {
-        isMediaMuted = muted
-        session.setUserMute(currentUser, stream: .mediaFileAudio, muted: muted)
-    }
-
-    func setSubscription(_ subscription: TeamTalkSubscriptions, enabled: Bool) {
-        if enabled {
-            subscriptions.insert(subscription)
-            session.subscribe(subscription, to: currentUser)
-        } else {
-            subscriptions.remove(subscription)
-            session.unsubscribe(subscription, from: currentUser)
-        }
+    func subscriptionBinding(for subscription: TeamTalkSubscriptions) -> Binding<Bool> {
+        Binding(
+            get: { self.isSubscribed(to: subscription) },
+            set: { enabled in
+                if enabled {
+                    self.subscriptions.insert(subscription)
+                    self.session.subscribe(subscription, to: self.currentUser)
+                } else {
+                    self.subscriptions.remove(subscription)
+                    self.session.unsubscribe(subscription, from: self.currentUser)
+                }
+            }
+        )
     }
 
     func kickUser() {

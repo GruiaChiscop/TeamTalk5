@@ -26,7 +26,7 @@ import SwiftUI
 import TeamTalkKit
 
 struct PreferencesView: View {
-    let model: PreferencesModel
+    @Bindable var model: PreferencesModel
 
     var body: some View {
         Form {
@@ -46,14 +46,11 @@ struct PreferencesView: View {
         Section("General") {
             VStack(alignment: .leading, spacing: 4) {
                 LabeledContent {
-                    TextField("", text: Binding(
-                        get: { model.preferences.general.nickname },
-                        set: { model.nicknameChanged($0) }
-                    ))
-                    .frame(maxWidth: .infinity, alignment: .trailing)
-                    .multilineTextAlignment(.trailing)
-                    .autocorrectionDisabled()
-                    .accessibilityLabel(Text("Nickname"))
+                    TextField("", text: $model.nickname)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .multilineTextAlignment(.trailing)
+                        .autocorrectionDisabled()
+                        .accessibilityLabel(Text("Nickname"))
                 } label: {
                     Text("Nickname")
                         .accessibilityHidden(true)
@@ -64,10 +61,7 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 4) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Gender")
-                    Picker("Gender", selection: Binding(
-                        get: { model.preferences.general.genderIndex },
-                        set: { model.genderChanged($0) }
-                    )) {
+                    Picker("Gender", selection: $model.genderIndex) {
                         Text("Male").tag(0)
                         Text("Female").tag(1)
                     }
@@ -87,7 +81,7 @@ struct PreferencesView: View {
                 }
             }
 
-            Toggle(isOn: Binding(get: { model.preferences.general.pushToTalkLock }, set: { model.pttlockChanged($0) })) {
+            Toggle(isOn: $model.pushToTalkLock) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Push To Talk Lock")
                     Text("Double tap to lock TX button")
@@ -95,7 +89,7 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Toggle(isOn: Binding(get: { model.preferences.general.headsetTXToggle }, set: { model.headsetTxToggleChanged($0) })) {
+            Toggle(isOn: $model.headsetTXToggle) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Headset TX Toggle")
                     Text("Toggle voice transmission using headset")
@@ -103,7 +97,7 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Toggle(isOn: Binding(get: { model.preferences.general.sendOnReturn }, set: { model.sendonenterChanged($0) })) {
+            Toggle(isOn: $model.sendOnReturn) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Return Sends Message")
                     Text("Pressing Return-key sends text message")
@@ -116,7 +110,7 @@ struct PreferencesView: View {
 
     private var displaySection: some View {
         Section("Display") {
-            Toggle(isOn: Binding(get: { model.preferences.display.proximitySensor }, set: { model.proximityChanged($0) })) {
+            Toggle(isOn: $model.proximitySensor) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Proximity Sensor")
                     Text("Turn off screen when holding phone near ear")
@@ -124,7 +118,7 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Toggle(isOn: Binding(get: { model.preferences.display.popupTextMessages }, set: { model.showtextmessagesChanged($0) })) {
+            Toggle(isOn: $model.popupTextMessages) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Show Text Messages Instantly")
                     Text("Pop up text message when new messages are received")
@@ -133,12 +127,11 @@ struct PreferencesView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
-                Stepper(value: Binding(get: { model.preferences.display.limitText }, set: { model.limittextChanged($0) }),
-                        in: 1...Double(TT_STRLEN - 1), step: 1) {
+                Stepper(value: $model.limitText, in: 1...Double(TT_STRLEN - 1), step: 1) {
                     HStack(spacing: 12) {
                         Text("Maximum Text Length")
                         Spacer(minLength: 16)
-                        Text("\(Int(model.preferences.display.limitText.rounded()))")
+                        Text("\(Int(model.limitText.rounded()))")
                             .font(.body.monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
@@ -154,7 +147,7 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            Toggle(isOn: Binding(get: { model.preferences.display.showUsername }, set: { model.showusernameChanged($0) })) {
+            Toggle(isOn: $model.showUsername) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Show Usernames")
                     Text("Show usernames instead of nicknames")
@@ -165,10 +158,7 @@ struct PreferencesView: View {
             VStack(alignment: .leading, spacing: 4) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Sort Channels")
-                    Picker("Sort Channels", selection: Binding(
-                        get: { model.preferences.display.channelSortIndex },
-                        set: { model.channelSortChanged($0) }
-                    )) {
+                    Picker("Sort Channels", selection: $model.channelSortIndex) {
                         Text("Ascending").tag(0)
                         Text("Popularity").tag(1)
                     }
@@ -182,28 +172,28 @@ struct PreferencesView: View {
         Section("Sound System") {
             PreferenceSlider(
                 title: "Master Volume",
-                value: Binding(get: { model.preferences.sound.masterVolumePercent }, set: { model.masterVolumeChanged($0) }),
+                value: $model.masterVolumePercent,
                 range: 0...100,
                 step: 10,
                 valueText: { model.percentText($0) }
             )
             PreferenceSlider(
                 title: "Media File Volume",
-                value: Binding(get: { model.preferences.sound.mediaFileVolumePercent }, set: { model.mediafileVolumeChanged($0) }),
+                value: $model.mediaFileVolumePercent,
                 range: 0...100,
                 step: 1,
                 valueText: { "\(Int($0.rounded())) %" }
             )
             PreferenceSlider(
                 title: "Microphone Gain",
-                value: Binding(get: { model.preferences.sound.microphoneGainPercent }, set: { model.microphoneGainChanged($0) }),
+                value: $model.microphoneGainPercent,
                 range: 0...100,
                 step: 10,
                 valueText: { model.percentText($0) }
             )
             PreferenceSlider(
                 title: "Voice Activation Level",
-                value: Binding(get: { model.preferences.sound.voiceActivationLevel }, set: { model.voiceactlevelChanged($0) }),
+                value: $model.voiceActivationLevel,
                 range: 0...Double(VOICEACT_DISABLED),
                 step: 1,
                 valueText: { model.voiceActivationValueText($0) }
@@ -250,14 +240,14 @@ struct PreferencesView: View {
             }
             PreferenceSlider(
                 title: "Speech Rate",
-                value: Binding(get: { model.preferences.textToSpeech.rate }, set: { model.ttsrateChanged($0) }),
+                value: $model.ttsRate,
                 range: Double(AVSpeechUtteranceMinimumSpeechRate)...Double(AVSpeechUtteranceMaximumSpeechRate),
                 step: 0.1,
                 valueText: { String(format: "%.1f", $0) }
             )
             PreferenceSlider(
                 title: "Speech Volume",
-                value: Binding(get: { model.preferences.textToSpeech.volume }, set: { model.ttsvolChanged($0) }),
+                value: $model.ttsVolume,
                 range: 0...1,
                 step: 0.1,
                 valueText: { String(format: "%.1f", $0) }
@@ -277,7 +267,7 @@ struct PreferencesView: View {
 
     private var connectionSection: some View {
         Section("Connection") {
-            Toggle(isOn: Binding(get: { model.preferences.connection.joinRootChannel }, set: { model.joinrootChanged($0) })) {
+            Toggle(isOn: $model.joinRootChannel) {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Join Root Channel")
                     Text("Join root channel after login")
@@ -291,10 +281,7 @@ struct PreferencesView: View {
     private var subscriptionsSection: some View {
         Section("Default Subscriptions") {
             ForEach(model.subscriptionRows) { row in
-                Toggle(isOn: Binding(
-                    get: { model.isSubscribed(to: row) },
-                    set: { model.subscriptionChanged($0, row: row) }
-                )) {
+                Toggle(isOn: model.subscriptionBinding(for: row)) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(row.title)
                         Text(row.subtitle)

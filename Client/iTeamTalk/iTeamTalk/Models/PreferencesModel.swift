@@ -418,137 +418,193 @@ final class PreferencesModel {
         ]
     }
 
-    func nicknameChanged(_ nickname: String) {
-        preferences.general.nickname = nickname
-        session.setNickname(nickname)
-        UserDefaults.standard.set(nickname, forKey: PREF_GENERAL_NICKNAME)
-    }
-
-    func genderChanged(_ index: Int) {
-        preferences.general.genderIndex = index
-        UserDefaults.standard.set(index, forKey: PREF_GENERAL_GENDER)
-
-        let mode: TeamTalkStatusMode = index != 0 ? .female : .available
-        session.setStatus(mode: mode)
-    }
-
-    func pttlockChanged(_ enabled: Bool) {
-        preferences.general.pushToTalkLock = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_GENERAL_PTTLOCK)
-    }
-
-    func sendonenterChanged(_ enabled: Bool) {
-        preferences.general.sendOnReturn = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_GENERAL_SENDONRETURN)
-    }
-
-    func headsetTxToggleChanged(_ enabled: Bool) {
-        preferences.general.headsetTXToggle = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_HEADSET_TXTOGGLE)
-
-        if enabled {
-            UIApplication.shared.beginReceivingRemoteControlEvents()
-        } else {
-            UIApplication.shared.endReceivingRemoteControlEvents()
+    var nickname: String {
+        get { preferences.general.nickname }
+        set {
+            preferences.general.nickname = newValue
+            session.setNickname(newValue)
+            UserDefaults.standard.set(newValue, forKey: PREF_GENERAL_NICKNAME)
         }
-
-        setupSoundDevices(session: session)
     }
 
-    func showtextmessagesChanged(_ enabled: Bool) {
-        preferences.display.popupTextMessages = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_DISPLAY_POPUPTXTMSG)
-    }
+    var genderIndex: Int {
+        get { preferences.general.genderIndex }
+        set {
+            preferences.general.genderIndex = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_GENERAL_GENDER)
 
-    func proximityChanged(_ enabled: Bool) {
-        preferences.display.proximitySensor = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_DISPLAY_PROXIMITY)
-        UIDevice.current.isProximityMonitoringEnabled = enabled
-    }
-
-    func limittextChanged(_ value: Double) {
-        preferences.display.limitText = value
-        UserDefaults.standard.set(Int(value), forKey: PREF_DISPLAY_LIMITTEXT)
-    }
-
-    func showusernameChanged(_ enabled: Bool) {
-        preferences.display.showUsername = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_DISPLAY_SHOWUSERNAME)
-    }
-
-    func channelSortChanged(_ index: Int) {
-        preferences.display.channelSortIndex = index
-        UserDefaults.standard.set(index == 0 ? ChanSort.ASCENDING.rawValue : ChanSort.POPULARITY.rawValue, forKey: PREF_DISPLAY_SORTCHANNELS)
-    }
-
-    func joinrootChanged(_ enabled: Bool) {
-        preferences.connection.joinRootChannel = enabled
-        UserDefaults.standard.set(enabled, forKey: PREF_JOINROOTCHANNEL)
-    }
-
-    func subscriptionChanged(_ enabled: Bool, row: SubscriptionRow) {
-        if enabled {
-            preferences.defaultSubscriptions.insert(row.type)
-        } else {
-            preferences.defaultSubscriptions.remove(row.type)
+            let mode: TeamTalkStatusMode = newValue != 0 ? .female : .available
+            session.setStatus(mode: mode)
         }
-        UserDefaults.standard.set(enabled, forKey: row.key)
     }
 
-    func masterVolumeChanged(_ percent: Double) {
-        let roundedPercent = Double(Int(percent / 10.0) * 10)
-        preferences.sound.masterVolumePercent = roundedPercent
-        let vol = refVolume(roundedPercent)
-        session.setSoundOutputVolume(INT32(vol))
-        UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MASTER_VOLUME)
+    var pushToTalkLock: Bool {
+        get { preferences.general.pushToTalkLock }
+        set {
+            preferences.general.pushToTalkLock = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_GENERAL_PTTLOCK)
+        }
     }
 
-    func mediafileVolumeChanged(_ percent: Double) {
-        preferences.sound.mediaFileVolumePercent = percent
-        let normalized = Float(percent / 100.0)
-        UserDefaults.standard.set(normalized, forKey: PREF_MEDIAFILE_VOLUME)
+    var sendOnReturn: Bool {
+        get { preferences.general.sendOnReturn }
+        set {
+            preferences.general.sendOnReturn = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_GENERAL_SENDONRETURN)
+        }
+    }
 
-        let vol = refVolume(percent)
-        for userID in users {
-            if let user = session.user(id: TeamTalkUserID(userID)) {
-                session.setUserVolume(user, stream: .mediaFileAudio, volume: INT32(vol))
+    var headsetTXToggle: Bool {
+        get { preferences.general.headsetTXToggle }
+        set {
+            preferences.general.headsetTXToggle = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_HEADSET_TXTOGGLE)
+
+            if newValue {
+                UIApplication.shared.beginReceivingRemoteControlEvents()
+            } else {
+                UIApplication.shared.endReceivingRemoteControlEvents()
+            }
+
+            setupSoundDevices(session: session)
+        }
+    }
+
+    var popupTextMessages: Bool {
+        get { preferences.display.popupTextMessages }
+        set {
+            preferences.display.popupTextMessages = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_DISPLAY_POPUPTXTMSG)
+        }
+    }
+
+    var proximitySensor: Bool {
+        get { preferences.display.proximitySensor }
+        set {
+            preferences.display.proximitySensor = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_DISPLAY_PROXIMITY)
+            UIDevice.current.isProximityMonitoringEnabled = newValue
+        }
+    }
+
+    var limitText: Double {
+        get { preferences.display.limitText }
+        set {
+            preferences.display.limitText = newValue
+            UserDefaults.standard.set(Int(newValue), forKey: PREF_DISPLAY_LIMITTEXT)
+        }
+    }
+
+    var showUsername: Bool {
+        get { preferences.display.showUsername }
+        set {
+            preferences.display.showUsername = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_DISPLAY_SHOWUSERNAME)
+        }
+    }
+
+    var channelSortIndex: Int {
+        get { preferences.display.channelSortIndex }
+        set {
+            preferences.display.channelSortIndex = newValue
+            UserDefaults.standard.set(newValue == 0 ? ChanSort.ASCENDING.rawValue : ChanSort.POPULARITY.rawValue, forKey: PREF_DISPLAY_SORTCHANNELS)
+        }
+    }
+
+    var joinRootChannel: Bool {
+        get { preferences.connection.joinRootChannel }
+        set {
+            preferences.connection.joinRootChannel = newValue
+            UserDefaults.standard.set(newValue, forKey: PREF_JOINROOTCHANNEL)
+        }
+    }
+
+    var masterVolumePercent: Double {
+        get { preferences.sound.masterVolumePercent }
+        set {
+            let roundedPercent = Double(Int(newValue / 10.0) * 10)
+            preferences.sound.masterVolumePercent = roundedPercent
+            let vol = refVolume(roundedPercent)
+            session.setSoundOutputVolume(INT32(vol))
+            UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MASTER_VOLUME)
+        }
+    }
+
+    var mediaFileVolumePercent: Double {
+        get { preferences.sound.mediaFileVolumePercent }
+        set {
+            preferences.sound.mediaFileVolumePercent = newValue
+            let normalized = Float(newValue / 100.0)
+            UserDefaults.standard.set(normalized, forKey: PREF_MEDIAFILE_VOLUME)
+
+            let vol = refVolume(newValue)
+            for userID in users {
+                if let user = session.user(id: TeamTalkUserID(userID)) {
+                    session.setUserVolume(user, stream: .mediaFileAudio, volume: INT32(vol))
+                }
             }
         }
     }
 
-    func microphoneGainChanged(_ percent: Double) {
-        let roundedPercent = Double(Int(percent / 10.0) * 10)
-        preferences.sound.microphoneGainPercent = roundedPercent
-        let vol = refVolume(roundedPercent)
-        session.setSoundInputGainLevel(INT32(vol))
-        UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MICROPHONE_GAIN)
-    }
-
-    func voiceactlevelChanged(_ levelValue: Double) {
-        let level = Int(levelValue)
-        preferences.sound.voiceActivationLevel = Double(level)
-
-        if level == VOICEACT_DISABLED {
-            session.enableVoiceActivation(false)
-        } else {
-            session.enableVoiceActivation(true)
-            session.setVoiceActivationLevel(INT32(level))
+    var microphoneGainPercent: Double {
+        get { preferences.sound.microphoneGainPercent }
+        set {
+            let roundedPercent = Double(Int(newValue / 10.0) * 10)
+            preferences.sound.microphoneGainPercent = roundedPercent
+            let vol = refVolume(roundedPercent)
+            session.setSoundInputGainLevel(INT32(vol))
+            UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MICROPHONE_GAIN)
         }
-        UserDefaults.standard.set(level, forKey: PREF_VOICEACTIVATION)
     }
 
-    func ttsrateChanged(_ value: Double) {
-        preferences.textToSpeech.rate = value
-        UserDefaults.standard.set(Float(value), forKey: PREF_TTSEVENT_RATE)
+    var voiceActivationLevel: Double {
+        get { preferences.sound.voiceActivationLevel }
+        set {
+            let level = Int(newValue)
+            preferences.sound.voiceActivationLevel = Double(level)
+
+            if level == VOICEACT_DISABLED {
+                session.enableVoiceActivation(false)
+            } else {
+                session.enableVoiceActivation(true)
+                session.setVoiceActivationLevel(INT32(level))
+            }
+            UserDefaults.standard.set(level, forKey: PREF_VOICEACTIVATION)
+        }
     }
 
-    func ttsvolChanged(_ value: Double) {
-        preferences.textToSpeech.volume = value
-        UserDefaults.standard.set(Float(value), forKey: PREF_TTSEVENT_VOL)
+    var ttsRate: Double {
+        get { preferences.textToSpeech.rate }
+        set {
+            preferences.textToSpeech.rate = newValue
+            UserDefaults.standard.set(Float(newValue), forKey: PREF_TTSEVENT_RATE)
+        }
+    }
+
+    var ttsVolume: Double {
+        get { preferences.textToSpeech.volume }
+        set {
+            preferences.textToSpeech.volume = newValue
+            UserDefaults.standard.set(Float(newValue), forKey: PREF_TTSEVENT_VOL)
+        }
     }
 
     func isSubscribed(to row: SubscriptionRow) -> Bool {
         preferences.defaultSubscriptions.contains(row.type)
+    }
+
+    func subscriptionBinding(for row: SubscriptionRow) -> Binding<Bool> {
+        Binding(
+            get: { self.isSubscribed(to: row) },
+            set: { enabled in
+                if enabled {
+                    self.preferences.defaultSubscriptions.insert(row.type)
+                } else {
+                    self.preferences.defaultSubscriptions.remove(row.type)
+                }
+                UserDefaults.standard.set(enabled, forKey: row.key)
+            }
+        )
     }
 
     func percentText(_ value: Double) -> String {
