@@ -1,6 +1,8 @@
 import Foundation
 import TeamTalkC
 
+/// Progress/state for one upload or download in flight, from
+/// `TeamTalkClient.uploadFile(at:to:)`/`downloadFile(_:to:)`.
 public struct TeamTalkFileTransfer: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: FileTransfer
 
@@ -60,11 +62,14 @@ public struct TeamTalkFileTransfer: Identifiable, Equatable, Hashable, Sendable 
         rawValue.isDownload
     }
 
+    /// `transferredBytes / fileSize`, from `0.0` to `1.0`.
     public var progress: Double {
         rawValue.progress
     }
 }
 
+/// One text message as delivered by the SDK. May be only a fragment of a
+/// longer message — see ``hasMoreContent`` and ``TeamTalkTextMessageAssembler``.
 public struct TeamTalkTextMessage: Equatable, Hashable, Sendable {
     public let rawValue: TextMessage
 
@@ -116,11 +121,16 @@ public struct TeamTalkTextMessage: Equatable, Hashable, Sendable {
         rawValue.content
     }
 
+    /// Whether more fragments of this same logical message follow. The SDK
+    /// splits long messages across multiple `TeamTalkTextMessage` values;
+    /// feed them through ``TeamTalkTextMessageAssembler`` to reassemble.
     public var hasMoreContent: Bool {
         rawValue.bMore != 0
     }
 }
 
+/// Identifies which in-flight multipart message a fragment belongs to, for
+/// ``TeamTalkTextMessageAssembler``.
 public struct TeamTalkTextMessageMultipartKey: Hashable, Sendable {
     public let type: TeamTalkTextMessageType
     public let fromUserID: TeamTalkUserID
@@ -135,11 +145,18 @@ public struct TeamTalkTextMessageMultipartKey: Hashable, Sendable {
     }
 }
 
+/// Reassembles multipart ``TeamTalkTextMessage`` sequences into complete
+/// message text. Fragments are buffered per `(type, sender)` key, so a
+/// single assembler can track several senders' in-progress messages at
+/// once — feed it every incoming message, in order per sender.
 public struct TeamTalkTextMessageAssembler {
     private var messageFragments = [TeamTalkTextMessageMultipartKey: [String]]()
 
     public init() {}
 
+    /// Feeds one message in. Returns the complete text once the final
+    /// fragment (`hasMoreContent == false`) arrives, `nil` while still
+    /// buffering.
     public mutating func append(_ message: TeamTalkTextMessage) -> String? {
         let key = TeamTalkTextMessageMultipartKey(message)
 
@@ -166,6 +183,9 @@ public struct TeamTalkTextMessageAssembler {
     }
 }
 
+/// A message to send via `TeamTalkClient.sendTextMessage(_:)`. Prefer the
+/// `user(to:content:)`/`channel(_:content:)`/`broadcast(content:)`/
+/// `reply(to:content:)` factory methods over the raw ID-based initializer.
 public struct TeamTalkOutgoingTextMessage {
     public var type: TeamTalkTextMessageType
     public var toUserID: Int32
@@ -228,6 +248,8 @@ public struct TeamTalkOutgoingTextMessage {
     }
 }
 
+/// Wraps a raw SDK error message with a typed ``errorCode`` and a
+/// human-readable ``message``.
 public struct TeamTalkClientError {
     public let rawValue: ClientErrorMsg
 

@@ -1,6 +1,9 @@
 import Foundation
 import TeamTalkC
 
+/// A channel's configuration as currently known to this client. See
+/// TeamTalkModels.swift for the snapshot/configuration naming convention
+/// this type and ``TeamTalkChannelConfiguration`` follow.
 public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: Channel
 
@@ -48,6 +51,9 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
         rawValue.password
     }
 
+    /// Lets a user claim operator status in this channel by supplying this
+    /// password, via `TeamTalkClient.setChannelOperator(_:in:operatorPassword:enabled:)`,
+    /// without already holding the right.
     public var operatorPassword: String {
         rawValue.operatorPassword
     }
@@ -72,22 +78,34 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
         rawValue.audioCodecType
     }
 
+    /// Users currently allowed to transmit at once in this channel — how
+    /// many depends on the channel's transmit mode (e.g. "No Interruptions"
+    /// channels typically allow just one).
     public var transmitUsers: [TeamTalkChannelTransmitUser] {
         rawValue.transmitUserList
     }
 
+    /// Users waiting their turn to transmit, in order; the first entry is
+    /// next up once a current transmitter yields. Empty in channels that
+    /// don't queue (e.g. normal free-for-all channels).
     public var transmitUsersQueue: [TeamTalkUserID] {
         rawValue.transmitQueueUsers
     }
 
+    /// How long the channel waits after a transmitter stops before handing
+    /// off to the next queued user.
     public var transmitUsersQueueDelayMilliseconds: Int32 {
         rawValue.transmitQueueDelayMilliseconds
     }
 
+    /// How long a user may hold voice transmission in this channel before
+    /// being cut off; `0` means unlimited.
     public var voiceTimeoutMilliseconds: Int32 {
         rawValue.voiceTimeoutMilliseconds
     }
 
+    /// Like ``voiceTimeoutMilliseconds``, for media file playback streamed
+    /// into the channel.
     public var mediaFileTimeoutMilliseconds: Int32 {
         rawValue.mediaFileTimeoutMilliseconds
     }
@@ -101,6 +119,8 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
+/// Mutable counterpart to ``TeamTalkChannel`` for
+/// `TeamTalkClient.createChannel(_:)`/`updateChannel(_:)`/`joinChannel(_:password:)`.
 public struct TeamTalkChannelConfiguration {
     public var id: Int32
     public var parentID: Int32

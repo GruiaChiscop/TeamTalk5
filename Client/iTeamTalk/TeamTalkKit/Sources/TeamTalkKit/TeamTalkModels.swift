@@ -1,6 +1,19 @@
 import Foundation
 import TeamTalkC
 
+// Model files in this package generally come in two shapes:
+// - `TeamTalkX`: a read-only snapshot wrapping the SDK's raw `X` struct
+//   (exposed as `rawValue`/`cValue`), returned by queries and events.
+// - `TeamTalkXConfiguration`: a plain mutable struct used to build a
+//   command's payload (`cValue` converts it back to the raw C struct);
+//   pass one to the matching `create`/`update` command.
+// Equatable/Hashable snapshots compare/hash the raw struct byte-for-byte
+// (see TeamTalkSnapshotEquatable.swift), so equality tracks every field the
+// SDK reports, not just the ones this wrapper exposes accessors for.
+
+/// A live user session: who's logged in, in which channel, with what
+/// status. Contrast with ``TeamTalkUserAccount``, which is the persistent
+/// account data (rights, password, ...) behind a login.
 public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: User
 
@@ -60,10 +73,13 @@ public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
         rawValue.types
     }
 
+    /// What this client receives from `user` (set via
+    /// `TeamTalkClient.subscribe(_:to:)`/`unsubscribe(_:from:)`).
     public var localSubscriptions: TeamTalkSubscriptions {
         rawValue.localSubscriptions
     }
 
+    /// What `user` receives from this client.
     public var peerSubscriptions: TeamTalkSubscriptions {
         rawValue.peerSubscriptions
     }
@@ -80,11 +96,15 @@ public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
         rawValue.isAdministrator
     }
 
+    /// Whether `channelID`/`channelIdentifier` currently point at a real
+    /// channel, e.g. `false` right after logging in before joining anywhere.
     public var isInChannel: Bool {
         rawValue.isInChannel
     }
 }
 
+/// Server-side rate limiting for one user account: how many commands are
+/// allowed per interval before the server starts rejecting them.
 public struct TeamTalkAbusePrevention {
     public let rawValue: AbusePrevention
 
@@ -109,6 +129,9 @@ public struct TeamTalkAbusePrevention {
     }
 }
 
+/// Mutable counterpart to ``TeamTalkAbusePrevention`` for building a
+/// `TeamTalkUserAccountConfiguration`. A limit of `0` for either field
+/// disables rate limiting (see ``isDisabled``).
 public struct TeamTalkAbusePreventionConfiguration {
     public var commandLimit: Int32
     public var commandIntervalMilliseconds: Int32
@@ -140,6 +163,9 @@ public struct TeamTalkAbusePreventionConfiguration {
     }
 }
 
+/// A server account's persistent data: credentials, granted rights, and
+/// defaults applied on login. Contrast with ``TeamTalkUser``, the live
+/// session data visible while that account is logged in.
 public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
     public let rawValue: UserAccount
 
@@ -163,6 +189,9 @@ public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
         rawValue.username
     }
 
+    /// Slash-separated channel path this account is placed into
+    /// automatically on login (see `TeamTalkClient.channel(path:)`), or
+    /// empty for the server's default.
     public var initialChannel: String {
         rawValue.initialChannel
     }
@@ -199,6 +228,8 @@ public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
         rawValue.nAudioCodecBpsLimit
     }
 
+    /// Channels this account is automatically made an operator of on
+    /// joining.
     public var autoOperatorChannelIDs: [Int32] {
         rawValue.autoOperatorChannelIDs
     }
@@ -224,6 +255,8 @@ public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
     }
 }
 
+/// Mutable counterpart to ``TeamTalkUserAccount`` for
+/// `TeamTalkClient.createUserAccount(_:)`/updates.
 public struct TeamTalkUserAccountConfiguration {
     public var username: String
     public var password: String

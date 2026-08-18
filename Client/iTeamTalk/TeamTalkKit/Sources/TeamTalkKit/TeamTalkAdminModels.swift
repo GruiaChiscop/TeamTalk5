@@ -1,6 +1,7 @@
 import Foundation
 import TeamTalkC
 
+/// A file uploaded to a channel's server-side file storage.
 public struct TeamTalkRemoteFile: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: RemoteFile
 
@@ -53,6 +54,9 @@ public struct TeamTalkRemoteFile: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
+/// One ban entry, as returned by `TeamTalkClient.listBans(in:startingAt:count:)`.
+/// Has no single server-assigned ID; ``id`` is synthesized from its fields
+/// for `Identifiable` conformance.
 public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: BannedUser
 
@@ -80,6 +84,7 @@ public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
         rawValue.ipAddress
     }
 
+    /// Empty for a ban that isn't scoped to one channel (see ``isLoginBan``).
     public var channelPath: String {
         rawValue.channelPath
     }
@@ -96,6 +101,7 @@ public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
         rawValue.username
     }
 
+    /// Username of the operator who issued this ban.
     public var owner: String {
         rawValue.owner
     }
@@ -112,6 +118,8 @@ public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
         rawValue.isChannelBan
     }
 
+    /// A ban that isn't scoped to one channel, i.e. blocks logging into the
+    /// server at all rather than just joining a specific channel.
     public var isLoginBan: Bool {
         rawValue.isLoginBan
     }
@@ -125,6 +133,8 @@ public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
+/// Describes a ban to create via `TeamTalkClient.ban(_:)`/remove via
+/// `unban(_:)`, independent of any currently-online ``TeamTalkUser``.
 public struct TeamTalkBanConfiguration {
     public var ipAddress: String
     public var channelPath: String
