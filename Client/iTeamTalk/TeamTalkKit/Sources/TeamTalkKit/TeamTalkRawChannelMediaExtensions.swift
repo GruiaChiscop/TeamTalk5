@@ -2,6 +2,10 @@ import Foundation
 import TeamTalkC
 
 
+// Each extension below bridges one raw C struct's fixed-size buffers and
+// int/bit fields to Swift-friendly accessors. The corresponding `TeamTalkX`
+// wrapper type (documented in the model files) wraps this extension rather
+// than duplicating it, so see those for what each field means.
 public extension Channel {
     var id: Int32 {
         nChannelID

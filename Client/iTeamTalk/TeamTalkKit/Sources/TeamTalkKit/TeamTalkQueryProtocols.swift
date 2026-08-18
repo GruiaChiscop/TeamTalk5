@@ -1,6 +1,11 @@
 import Foundation
 import TeamTalkC
 
+// Each protocol below adds one `hasX(_:)`/`getX(_:)` OptionSet-membership
+// check, then both the raw C struct and its `TeamTalkX` wrapper conform to
+// it at the bottom of this file — so the check is written once and works
+// identically on `Channel`/`TeamTalkChannel`, `User`/`TeamTalkUser`, etc.,
+// instead of each model duplicating its own `.contains(_:)` wrapper.
 public protocol TeamTalkUserTypeContaining {
     var types: TeamTalkUserTypes { get }
 }

@@ -39,6 +39,9 @@ func teamTalkPCM16Samples(from rawAudio: UnsafeRawPointer?, sampleCount: Int) ->
     return Array(UnsafeBufferPointer(start: buffer, count: sampleCount))
 }
 
+// Bridges the raw `SoundDevice` C struct's fixed-size buffers (device name,
+// sample-rate list, ...) to Swift-friendly String/[Int32]/Bool accessors.
+// ``TeamTalkSoundDevice`` wraps this extension rather than duplicating it.
 public extension SoundDevice {
     var id: Int32 {
         nDeviceID
@@ -123,6 +126,9 @@ public extension SoundDevice {
     }
 }
 
+/// Bridges the raw `SoundDeviceEffects` C struct's `bEnable*` int flags to
+/// Bool accessors. ``TeamTalkSoundDeviceEffects`` wraps this extension
+/// rather than duplicating it.
 public extension SoundDeviceEffects {
     var automaticGainControlEnabled: Bool {
         get { bEnableAGC != 0 }
