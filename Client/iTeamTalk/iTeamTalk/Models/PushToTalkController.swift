@@ -29,21 +29,26 @@ import TeamTalkKit
 @Observable
 final class PushToTalkController {
     weak var owner: ChannelListModel?
+    let session: TeamTalkSession
 
     var isTransmitting = false
     var pttHint = String(localized: "Toggle to enable/disable transmission", comment: "channel list")
     private var pttLockTimeout = Date()
 
+    init(session: TeamTalkSession) {
+        self.session = session
+    }
+
     func txBtnDown() {
         if hasPTTLock() {
             enableVoiceTx(true)
         } else {
-            enableVoiceTx(!TeamTalkClient.shared.isVoiceTransmitting)
+            enableVoiceTx(!session.isVoiceTransmitting)
         }
     }
 
     func enableVoiceTx(_ enable: Bool) {
-        TeamTalkClient.shared.enableVoiceTransmission(enable)
+        session.enableVoiceTransmission(enable)
         playSound(enable ? .tx_ON : .tx_OFF)
         updateTX()
     }
@@ -61,11 +66,11 @@ final class PushToTalkController {
     }
 
     func txBtnAccessibilityAction() {
-        enableVoiceTx(!TeamTalkClient.shared.isVoiceTransmitting)
+        enableVoiceTx(!session.isVoiceTransmitting)
     }
 
     func updateTX() {
-        isTransmitting = TeamTalkClient.shared.isVoiceTransmitting
+        isTransmitting = session.isVoiceTransmitting
         pttHint = hasPTTLock()
             ? String(localized: "Double tap and hold to transmit. Triple tap fast to lock transmission.", comment: "channel list")
             : String(localized: "Toggle to enable/disable transmission", comment: "channel list")

@@ -126,7 +126,12 @@ struct Preferences {
         loaded()
     }
 
-    static func loaded() -> Preferences {
+    // Only PreferencesModel (which holds a session) ever needs the two live-SDK
+    // fields below populated accurately; every other call site reads a section
+    // that comes straight from UserDefaults, so `session` defaults to nil and
+    // those fields stay at the struct's own defaults (0.0) rather than forcing
+    // a session through 25+ unrelated call sites across the app.
+    static func loaded(session: TeamTalkSession? = nil) -> Preferences {
         let settings = UserDefaults.standard
         var preferences = Preferences()
 
@@ -142,13 +147,17 @@ struct Preferences {
         preferences.display.showUsername = settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME)
         preferences.display.channelSortIndex = settings.object(forKey: PREF_DISPLAY_SORTCHANNELS) == nil ? ChanSort.ASCENDING.rawValue : settings.integer(forKey: PREF_DISPLAY_SORTCHANNELS)
 
-        preferences.sound.masterVolumePercent = Double(refVolumeToPercent(Int(TeamTalkClient.shared.soundOutputVolume)))
+        if let session {
+            preferences.sound.masterVolumePercent = Double(refVolumeToPercent(Int(session.soundOutputVolume)))
+        }
         var mediaVolume = DEFAULT_MEDIAFILE_VOLUME
         if settings.value(forKey: PREF_MEDIAFILE_VOLUME) != nil {
             mediaVolume = settings.float(forKey: PREF_MEDIAFILE_VOLUME)
         }
         preferences.sound.mediaFileVolumePercent = Double(mediaVolume * 100)
-        preferences.sound.microphoneGainPercent = Double(refVolumeToPercent(Int(TeamTalkClient.shared.soundInputGainLevel)))
+        if let session {
+            preferences.sound.microphoneGainPercent = Double(refVolumeToPercent(Int(session.soundInputGainLevel)))
+        }
         var voiceActivation = VOICEACT_DISABLED
         if settings.object(forKey: PREF_VOICEACTIVATION) != nil {
             voiceActivation = settings.integer(forKey: PREF_VOICEACTIVATION)
@@ -374,14 +383,18 @@ final class PreferencesModel {
         }
     }
 
-    var preferences = Preferences.loaded()
+    let session: TeamTalkSession
+
+    var preferences: Preferences
 
     var users = Set<INT32>()
 
     let subscriptionRows: [SubscriptionRow]
     let versionRows: [VersionRow]
 
-    init() {
+    init(session: TeamTalkSession) {
+        self.session = session
+        preferences = Preferences.loaded(session: session)
         subscriptionRows = [
             SubscriptionRow(title: String(localized: "User Messages", comment: "preferences"), subtitle: String(localized: "Receive text messages by default", comment: "preferences"), type: .userMessages, key: PREF_SUB_USERMSG),
             SubscriptionRow(title: String(localized: "Channel Messages", comment: "preferences"), subtitle: String(localized: "Receive channel messages by default", comment: "preferences"), type: .channelMessages, key: PREF_SUB_CHANMSG),
@@ -392,7 +405,7 @@ final class PreferencesModel {
             SubscriptionRow(title: String(localized: "Desktop", comment: "preferences"), subtitle: String(localized: "Receive desktop sessions by default", comment: "preferences"), type: .desktop, key: PREF_SUB_DESKTOP)
         ]
 
-        let version = TeamTalkClient.shared.version
+        let version = session.version
         versionRows = [
             VersionRow(
                 title: String(localized: "Translator", comment: "preferences"),
@@ -407,7 +420,7 @@ final class PreferencesModel {
 
     func nicknameChanged(_ nickname: String) {
         preferences.general.nickname = nickname
-        TeamTalkClient.shared.setNickname(nickname)
+        session.setNickname(nickname)
         UserDefaults.standard.set(nickname, forKey: PREF_GENERAL_NICKNAME)
     }
 
@@ -416,7 +429,7 @@ final class PreferencesModel {
         UserDefaults.standard.set(index, forKey: PREF_GENERAL_GENDER)
 
         let mode: TeamTalkStatusMode = index != 0 ? .female : .available
-        TeamTalkClient.shared.setStatus(mode: mode)
+        session.setStatus(mode: mode)
     }
 
     func pttlockChanged(_ enabled: Bool) {
@@ -439,7 +452,7 @@ final class PreferencesModel {
             UIApplication.shared.endReceivingRemoteControlEvents()
         }
 
-        setupSoundDevices()
+        setupSoundDevices(session: session)
     }
 
     func showtextmessagesChanged(_ enabled: Bool) {
@@ -486,7 +499,7 @@ final class PreferencesModel {
         let roundedPercent = Double(Int(percent / 10.0) * 10)
         preferences.sound.masterVolumePercent = roundedPercent
         let vol = refVolume(roundedPercent)
-        TeamTalkClient.shared.setSoundOutputVolume(INT32(vol))
+        session.setSoundOutputVolume(INT32(vol))
         UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MASTER_VOLUME)
     }
 
@@ -497,8 +510,8 @@ final class PreferencesModel {
 
         let vol = refVolume(percent)
         for userID in users {
-            if let user = TeamTalkClient.shared.user(id: TeamTalkUserID(userID)) {
-                TeamTalkClient.shared.setUserVolume(user, stream: .mediaFileAudio, volume: INT32(vol))
+            if let user = session.user(id: TeamTalkUserID(userID)) {
+                session.setUserVolume(user, stream: .mediaFileAudio, volume: INT32(vol))
             }
         }
     }
@@ -507,7 +520,7 @@ final class PreferencesModel {
         let roundedPercent = Double(Int(percent / 10.0) * 10)
         preferences.sound.microphoneGainPercent = roundedPercent
         let vol = refVolume(roundedPercent)
-        TeamTalkClient.shared.setSoundInputGainLevel(INT32(vol))
+        session.setSoundInputGainLevel(INT32(vol))
         UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MICROPHONE_GAIN)
     }
 
@@ -516,10 +529,10 @@ final class PreferencesModel {
         preferences.sound.voiceActivationLevel = Double(level)
 
         if level == VOICEACT_DISABLED {
-            TeamTalkClient.shared.enableVoiceActivation(false)
+            session.enableVoiceActivation(false)
         } else {
-            TeamTalkClient.shared.enableVoiceActivation(true)
-            TeamTalkClient.shared.setVoiceActivationLevel(INT32(level))
+            session.enableVoiceActivation(true)
+            session.setVoiceActivationLevel(INT32(level))
         }
         UserDefaults.standard.set(level, forKey: PREF_VOICEACTIVATION)
     }

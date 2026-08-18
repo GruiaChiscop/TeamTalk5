@@ -30,17 +30,22 @@ import TeamTalkKit
 @Observable
 final class ChannelModerationActions {
     weak var owner: ChannelListModel?
+    let session: TeamTalkSession
 
     var moveusers = Set<TeamTalkUserID>()
 
+    init(session: TeamTalkSession) {
+        self.session = session
+    }
+
     func muteUser(userID: TeamTalkUserID) {
         guard let owner, let user = owner.users[userID] else { return }
-        TeamTalkClient.shared.setUserMute(
+        session.setUserMute(
             user,
             stream: .mediaFileAudio,
             muted: !user.states.contains(.mediaFileMuted)
         )
-        TeamTalkClient.shared.setUserMute(
+        session.setUserMute(
             user,
             stream: .voice,
             muted: !user.states.contains(.voiceMuted)
@@ -70,15 +75,15 @@ final class ChannelModerationActions {
 
     func kickUser(userID: TeamTalkUserID) {
         guard let owner else { return }
-        let op = TeamTalkClient.shared.isChannelOperator(in: owner.curchannel)
+        let op = session.isChannelOperator(in: owner.curchannel)
         guard owner.effectiveUserRights.contains(.canKickUsers) || op else { return }
         guard let user = owner.users[userID] else { return }
         let channel = owner.curchannel.channelID.isValid ? owner.curchannel : nil
 
-        Task { [weak owner] in
+        Task { [weak owner, session] in
             guard let owner else { return }
             do {
-                try await TeamTalkClient.shared.kickUser(user, from: channel)
+                try await session.kickUser(user, from: channel)
             } catch {
                 await owner.presentError(error.localizedDescription)
             }
@@ -87,16 +92,16 @@ final class ChannelModerationActions {
 
     func banUser(userID: TeamTalkUserID) {
         guard let owner else { return }
-        let op = TeamTalkClient.shared.isChannelOperator(in: owner.curchannel)
+        let op = session.isChannelOperator(in: owner.curchannel)
         guard owner.effectiveUserRights.contains(.canBanUsers) || op else { return }
         guard let user = owner.users[userID] else { return }
         let channel = owner.curchannel.channelID.isValid ? owner.curchannel : nil
 
-        Task { [weak owner] in
+        Task { [weak owner, session] in
             guard let owner else { return }
             do {
-                try await TeamTalkClient.shared.banUser(user, from: channel)
-                try await TeamTalkClient.shared.kickUser(user, from: channel)
+                try await session.banUser(user, from: channel)
+                try await session.kickUser(user, from: channel)
             } catch {
                 await owner.presentError(error.localizedDescription)
             }
@@ -115,13 +120,13 @@ final class ChannelModerationActions {
         moveusers.removeAll()
         owner.refreshChannelList()
 
-        Task { [weak owner] in
+        Task { [weak owner, session] in
             guard let owner else { return }
             var firstError: Error?
 
             for user in selectedUsers {
                 do {
-                    try await TeamTalkClient.shared.moveUser(user, to: destinationChannel)
+                    try await session.moveUser(user, to: destinationChannel)
                 } catch {
                     if firstError == nil {
                         firstError = error

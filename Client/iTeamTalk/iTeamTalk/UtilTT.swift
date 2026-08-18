@@ -9,19 +9,19 @@
 import Foundation
 import TeamTalkKit
 
-func addToTeamTalkEvents(_ observer: TeamTalkEventObserver) {
-    TeamTalkClient.shared.addEventObserver(observer)
+func addToTeamTalkEvents(_ observer: TeamTalkEventObserver, on session: TeamTalkSession) {
+    session.addEventObserver(observer)
 }
 
-func removeFromTeamTalkEvents(_ observer: TeamTalkEventObserver) {
-    TeamTalkClient.shared.removeEventObserver(observer)
+func removeFromTeamTalkEvents(_ observer: TeamTalkEventObserver, from session: TeamTalkSession) {
+    session.removeEventObserver(observer)
 }
 
-func setupEncryption(server: Server) -> Bool {
+func setupEncryption(server: Server, session: TeamTalkSession) -> Bool {
     if server.encrypted == false {
         return true
     }
-    
+
     do {
         let configuration = TeamTalkEncryptionConfiguration(
             caCertificate: server.cacertdata,
@@ -29,7 +29,7 @@ func setupEncryption(server: Server) -> Bool {
             privateKey: server.certprivkeydata,
             verifyPeer: server.certverifypeer
         )
-        let result = try TeamTalkClient.shared.configureEncryption(configuration)
+        let result = try session.configureEncryption(configuration)
         if result {
            print("Encryption activated")
         }
@@ -127,28 +127,28 @@ class UserCached {
         mediaRightSpeaker = user.rawValue.stereoPlaybackMediaFile.1
     }
 
-    func sync(user: TeamTalkUser) {
-        TeamTalkClient.shared.setUserMute(user, stream: .voice, muted: voiceMute)
-        TeamTalkClient.shared.setUserMute(user, stream: .mediaFileAudio, muted: mediaMute)
-        TeamTalkClient.shared.setUserVolume(user, stream: .voice, volume: voiceVolume)
-        TeamTalkClient.shared.setUserVolume(user, stream: .mediaFileAudio, volume: mediaVolume)
-        TeamTalkClient.shared.setUserStereo(user, stream: .voice, leftSpeaker: voiceLeftSpeaker != 0, rightSpeaker: voiceRightSpeaker != 0)
-        TeamTalkClient.shared.setUserStereo(user, stream: .mediaFileAudio, leftSpeaker: mediaLeftSpeaker != 0, rightSpeaker: mediaRightSpeaker != 0)
+    func sync(user: TeamTalkUser, session: TeamTalkSession) {
+        session.setUserMute(user, stream: .voice, muted: voiceMute)
+        session.setUserMute(user, stream: .mediaFileAudio, muted: mediaMute)
+        session.setUserVolume(user, stream: .voice, volume: voiceVolume)
+        session.setUserVolume(user, stream: .mediaFileAudio, volume: mediaVolume)
+        session.setUserStereo(user, stream: .voice, leftSpeaker: voiceLeftSpeaker != 0, rightSpeaker: voiceRightSpeaker != 0)
+        session.setUserStereo(user, stream: .mediaFileAudio, leftSpeaker: mediaLeftSpeaker != 0, rightSpeaker: mediaRightSpeaker != 0)
         if subscriptions != user.localSubscriptions {
             let diff = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
-            TeamTalkClient.shared.unsubscribe(diff, from: user)
-            TeamTalkClient.shared.subscribe(subscriptions, to: user)
+            session.unsubscribe(diff, from: user)
+            session.subscribe(subscriptions, to: user)
         }
     }
 }
 
 var userCache = [String: UserCached]()
 
-func syncFromUserCache(user: TeamTalkUser) {
+func syncFromUserCache(user: TeamTalkUser, session: TeamTalkSession) {
     let cacheid = userCacheID(user: user)
     if cacheid.isEmpty == false {
         if let cache = userCache[cacheid] {
-            cache.sync(user: user)
+            cache.sync(user: user, session: session)
         }
     }
 }

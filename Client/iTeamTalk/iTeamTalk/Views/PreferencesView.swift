@@ -214,7 +214,7 @@ struct PreferencesView: View {
                 displayValue: { model.voiceActivationValueText($0) }
             )
             NavigationLink {
-                SoundDevicesView()
+                SoundDevicesView(session: model.session)
             } label: {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Setup Sound Devices")

@@ -135,6 +135,8 @@ struct DownloadedFileRow: Identifiable {
 
 @Observable
 final class ChannelFilesModel {
+    let session: TeamTalkSession
+
     var files = [ChannelFileRow]()
     var transfers = [FileTransferRow]()
     var downloadedFiles = [DownloadedFileRow]()
@@ -148,6 +150,10 @@ final class ChannelFilesModel {
     private var downloadSecurityScopes = [String: URL]()
     private let fileManager = FileManager.default
 
+    init(session: TeamTalkSession) {
+        self.session = session
+    }
+
     deinit {
         releaseAllDownloadSecurityScopes()
     }
@@ -158,11 +164,11 @@ final class ChannelFilesModel {
     }
 
     var canUploadFiles: Bool {
-        channelID.isValid && TeamTalkClient.shared.hasUserRight(.canUploadFiles)
+        channelID.isValid && session.hasUserRight(.canUploadFiles)
     }
 
     var canDownloadFiles: Bool {
-        channelID.isValid && TeamTalkClient.shared.hasUserRight(.canDownloadFiles)
+        channelID.isValid && session.hasUserRight(.canDownloadFiles)
     }
 
     var hasCurrentChannel: Bool {
@@ -170,16 +176,16 @@ final class ChannelFilesModel {
     }
 
     func refresh() {
-        channelID = TeamTalkClient.shared.myChannelIdentifier
+        channelID = session.myChannelIdentifier
         updateChannelTitle()
 
-        guard channelID.isValid, let channel = TeamTalkClient.shared.channel(id: channelID) else {
+        guard channelID.isValid, let channel = session.channel(id: channelID) else {
             files = []
             transfers = []
             return
         }
 
-        files = TeamTalkClient.shared.remoteFiles(in: channel)
+        files = session.remoteFiles(in: channel)
             .map(ChannelFileRow.init)
             .sorted {
                 $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
@@ -192,7 +198,7 @@ final class ChannelFilesModel {
             return
         }
 
-        guard let targetChannel = TeamTalkClient.shared.channel(id: channelID) else {
+        guard let targetChannel = session.channel(id: channelID) else {
             errorMessage = String(localized: "Current channel is unavailable.", comment: "files")
             return
         }
@@ -201,9 +207,9 @@ final class ChannelFilesModel {
             let localURL = try prepareUploadFile(from: url)
             let fileManager = self.fileManager
 
-            Task { [weak self] in
+            Task { [weak self, session] in
                 do {
-                    _ = try await TeamTalkClient.shared.uploadFile(at: localURL, to: targetChannel)
+                    _ = try await session.uploadFile(at: localURL, to: targetChannel)
                 } catch {
                     try? fileManager.removeItem(at: localURL)
                     if let self {
@@ -258,9 +264,9 @@ final class ChannelFilesModel {
             }
             let fileManager = self.fileManager
 
-            Task { [weak self] in
+            Task { [weak self, session] in
                 do {
-                    try await TeamTalkClient.shared.downloadFile(file.file, to: localURL)
+                    try await session.downloadFile(file.file, to: localURL)
                 } catch {
                     try? fileManager.removeItem(at: localURL)
                     if let self {
@@ -287,7 +293,7 @@ final class ChannelFilesModel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await TeamTalkClient.shared.deleteFile(file.file)
+                try await self.session.deleteFile(file.file)
             } catch {
                 await self.presentError(error.localizedDescription)
             }
@@ -295,7 +301,7 @@ final class ChannelFilesModel {
     }
 
     func cancelTransfer(_ transfer: FileTransferRow) {
-        if TeamTalkClient.shared.cancelFileTransfer(transfer.transfer) {
+        if session.cancelFileTransfer(transfer.transfer) {
             removeTransfer(id: transfer.id)
             announcedDownloadProgress.removeValue(forKey: transfer.id)
             if transfer.isDownload, let localURL = transfer.localURL {
@@ -306,7 +312,7 @@ final class ChannelFilesModel {
     }
 
     private func updateChannelTitle() {
-        guard channelID.isValid, let channel = TeamTalkClient.shared.channel(id: channelID) else {
+        guard channelID.isValid, let channel = session.channel(id: channelID) else {
             channelTitle = String(localized: "Files", comment: "files")
             return
         }
@@ -491,12 +497,12 @@ extension ChannelFilesModel: TeamTalkEventObserver {
             updateChannelTitle()
 
         case .userJoined(let user):
-            if user.userID == TeamTalkClient.shared.myUserIdentifier {
+            if user.userID == session.myUserIdentifier {
                 refresh()
             }
 
         case .userLeft(_, let user):
-            if user.userID == TeamTalkClient.shared.myUserIdentifier {
+            if user.userID == session.myUserIdentifier {
                 channelID = .none
                 files = []
                 cleanupActiveTransfers()

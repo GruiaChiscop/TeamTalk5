@@ -22,9 +22,14 @@
  */
 
 import SwiftUI
+import TeamTalkKit
 
 struct SoundDevicesView: View {
-    @State private var model = SoundDevicesModel()
+    @State private var model: SoundDevicesModel
+
+    init(session: TeamTalkSession) {
+        _model = State(initialValue: SoundDevicesModel(session: session))
+    }
 
     var body: some View {
         Form {

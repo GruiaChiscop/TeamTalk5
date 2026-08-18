@@ -27,6 +27,7 @@ import TeamTalkKit
 
 @Observable
 final class ChannelDetailModel {
+    let session: TeamTalkSession
     private var configuration: TeamTalkChannelConfiguration
     private let isPasswordProtected: Bool
     let isExistingChannel: Bool
@@ -46,7 +47,8 @@ final class ChannelDetailModel {
     var joinPassword = ""
     var audioCodecModel: AudioCodecModel?
 
-    init(channel: TeamTalkChannel) {
+    init(channel: TeamTalkChannel, session: TeamTalkSession) {
+        self.session = session
         var rawChannel = channel.cValue
         var configuration = TeamTalkChannelConfiguration(channel)
 
@@ -90,9 +92,9 @@ final class ChannelDetailModel {
 
             do {
                 if configuration.id == 0 {
-                    try await TeamTalkClient.shared.joinChannel(configuration)
+                    try await self.session.joinChannel(configuration)
                 } else {
-                    try await TeamTalkClient.shared.updateChannel(configuration)
+                    try await self.session.updateChannel(configuration)
                 }
 
                 await MainActor.run {
@@ -111,7 +113,7 @@ final class ChannelDetailModel {
             //joinPassword = passwordText
             showingJoinAlert = true
         } else {
-            guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {
+            guard let channel = session.channel(id: TeamTalkChannelID(configuration.id)) else {
                 self.errorMessage = "Channel not found"
                 return
             }
@@ -120,7 +122,7 @@ final class ChannelDetailModel {
                 guard let self else { return }
 
                 do {
-                    try await TeamTalkClient.shared.joinChannel(channel)
+                    try await self.session.joinChannel(channel)
                     await MainActor.run {
                         self.shouldDismiss = true
                     }
@@ -134,7 +136,7 @@ final class ChannelDetailModel {
     }
 
     func joinWithPassword() {
-        guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {
+        guard let channel = session.channel(id: TeamTalkChannelID(configuration.id)) else {
             self.errorMessage = "Channel not found"
             return
         }
@@ -144,7 +146,7 @@ final class ChannelDetailModel {
             guard let self else { return }
 
             do {
-                try await TeamTalkClient.shared.joinChannel(channel, password: password)
+                try await self.session.joinChannel(channel, password: password)
                 await MainActor.run {
                     self.shouldDismiss = true
                 }
@@ -157,7 +159,7 @@ final class ChannelDetailModel {
     }
 
     func deleteChannel() {
-        guard let channel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(configuration.id)) else {
+        guard let channel = session.channel(id: TeamTalkChannelID(configuration.id)) else {
             self.errorMessage = "Channel not found"
             return
         }
@@ -166,7 +168,7 @@ final class ChannelDetailModel {
             guard let self else { return }
 
             do {
-                try await TeamTalkClient.shared.removeChannel(channel)
+                try await self.session.removeChannel(channel)
                 await MainActor.run {
                     self.shouldDismiss = true
                 }

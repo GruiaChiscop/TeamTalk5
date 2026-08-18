@@ -23,6 +23,7 @@
 
 import Observation
 import SwiftUI
+import TeamTalkKit
 import UIKit
 
 enum ServerType {
@@ -155,6 +156,8 @@ enum ServerListDestination: Hashable {
 
 @Observable
 final class ServerListModel {
+    let session: TeamTalkSession
+
     var servers: [Server] = []
     var navigationPath: [ServerListDestination] = []
     var activeMainTabModel: MainTabModel?
@@ -169,7 +172,9 @@ final class ServerListModel {
 
     var nextappupdate = Date()
 
-    init() {}
+    init(session: TeamTalkSession) {
+        self.session = session
+    }
 
     // MARK: - On-appear lifecycle
 
@@ -197,7 +202,7 @@ final class ServerListModel {
     // MARK: - Navigation actions
 
     func openPreferences() {
-        navigationPath.append(.preferences(PreferencesModel()))
+        navigationPath.append(.preferences(PreferencesModel(session: session)))
     }
 
     func addServer() {
@@ -210,7 +215,7 @@ final class ServerListModel {
 
     func connect(to server: Server) {
         navigationPath.removeAll()
-        activeMainTabModel = MainTabModel(server: server)
+        activeMainTabModel = MainTabModel(server: server, session: session)
     }
 
     func closeActiveServer() {

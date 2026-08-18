@@ -159,27 +159,27 @@ func removeAudioPortDataSource(descr: AVAudioSessionPortDescription) {
     defaults.removeObject(forKey: prefname)
 }
 
-func closeSoundDevices() {
-    TeamTalkClient.shared.closeSoundDevices()
+func closeSoundDevices(session: TeamTalkSession) {
+    session.closeSoundDevices()
 }
 
-func setupSoundDevices() {
-    
-    do {
-        closeSoundDevices()
-        
-        let session = AVAudioSession.sharedInstance()
+func setupSoundDevices(session: TeamTalkSession) {
 
-        print("preset: " + session.mode.rawValue)
-        
+    do {
+        closeSoundDevices(session: session)
+
+        let audioSession = AVAudioSession.sharedInstance()
+
+        print("preset: " + audioSession.mode.rawValue)
+
         let preferences = Preferences.current
         let speaker = preferences.soundDevice.speakerOutput
         let preprocess = preferences.soundDevice.voicePreprocessing
         let a2dp = preferences.soundDevice.bluetoothA2DP
         let headsettoggle = preferences.general.headsetTXToggle
-                
+
         // In 'voiceChat' mode stereo cannot be enabled on input devices.
-        try session.setMode(preprocess ? .voiceChat : .default)
+        try audioSession.setMode(preprocess ? .voiceChat : .default)
 
         var catoptions : AVAudioSession.CategoryOptions
         
@@ -204,27 +204,27 @@ func setupSoundDevices() {
             catoptions.update(with: .mixWithOthers)
         }
         
-        try session.setCategory(.playAndRecord, options: catoptions)
+        try audioSession.setCategory(.playAndRecord, options: catoptions)
 
         // Note that Voice Preprocessing IO will disable ability to select
         // stereo microphone sources
         let sndid = preprocess ? TeamTalkSoundDeviceID.voiceProcessingIO : TeamTalkSoundDeviceID.remoteIO
-        if !TeamTalkClient.shared.initSoundInputDevice(id: sndid) {
+        if !session.initSoundInputDevice(id: sndid) {
             print("Failed to initialize sound input device: \(sndid)")
         }
         else {
             print("Using sound input device: \(sndid)")
         }
-        if !TeamTalkClient.shared.initSoundOutputDevice(id: sndid) {
+        if !session.initSoundOutputDevice(id: sndid) {
             print("Failed to initialize sound output device: \(sndid)")
         }
         else {
             print("Using sound output device: \(sndid)")
         }
-        print("postset. Mode \(session.mode.rawValue), category \(session.category.rawValue), options \(getCategory(session.categoryOptions))")
-        
+        print("postset. Mode \(audioSession.mode.rawValue), category \(audioSession.category.rawValue), options \(getCategory(audioSession.categoryOptions))")
+
         // enable stereo on all data sources that support it
-        for input in session.availableInputs ?? [] {
+        for input in audioSession.availableInputs ?? [] {
             guard let dataSourceID = getAudioPortDataSource(descr: input) else { continue }
             for datasrc in input.dataSources ?? [] {
                 if datasrc.dataSourceID == dataSourceID {
@@ -235,7 +235,7 @@ func setupSoundDevices() {
                         print("No stereo on \(datasrc.dataSourceName)")
                     }
                 }
-                if session.inputDataSource?.dataSourceID != dataSourceID {
+                if audioSession.inputDataSource?.dataSourceID != dataSourceID {
                     try input.setPreferredDataSource(datasrc)
                 }
             }

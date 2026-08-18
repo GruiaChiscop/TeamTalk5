@@ -26,16 +26,20 @@ import TeamTalkKit
 
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
+    // Static so iTeamTalkApp's @State default (a struct init expression, which
+    // can't read another property off `self`/`appDelegate`) can reference it
+    // directly without needing a custom init.
+    static let session = TeamTalkSession()
+    var session: TeamTalkSession { Self.session }
 
     let backgroundQueue = DispatchQueue.global(qos: DispatchQoS.QoSClass.background)
     var backgroundRunning = false
     var backgroundTask: UIBackgroundTaskIdentifier = UIBackgroundTaskIdentifier.invalid
-    
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
-        
-        // Our one and only TT client instance
-        TeamTalkClient.shared.start(licenseName: REGISTRATION_NAME, licenseKey: REGISTRATION_KEY)
+
+        session.start(licenseName: REGISTRATION_NAME, licenseKey: REGISTRATION_KEY)
         
         // Default values are not set in Settings bundle, so we need to load them manually
         let defaults = UserDefaults.standard
@@ -66,7 +70,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             defaults.synchronize()
         }
         
-        TeamTalkClient.touchLinkerSymbolsForTests()
+        TeamTalkSession.touchLinkerSymbolsForTests()
         
         return true
     }
@@ -84,7 +88,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
         // Use this method to pause ongoing tasks, disable timers, and throttle down OpenGL ES frame rates. Games should use this method to pause the game.
         
-        if TeamTalkClient.shared.isConnected {
+        if session.isConnected {
             backgroundRunning = true
             backgroundQueue.async(execute: testBackgroundTask)
         }
@@ -107,7 +111,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func applicationWillTerminate(_ application: UIApplication) {
         // Called when the application is about to terminate. Save data if appropriate. See also applicationDidEnterBackground:.
-        TeamTalkClient.shared.close()
+        session.close()
     }
 
     // Forward remote control events (headset buttons) via NotificationCenter

@@ -71,13 +71,15 @@ var unreadmessages = Set<TeamTalkUserID>()
 @Observable
 final class ChannelListModel {
 
+    let session: TeamTalkSession
+
     // MARK: Published state for the channel list view
     var rows: [ChannelListRow] = []
     var navigationTitle: String = ""
 
     // MARK: Split-out sub-controllers
-    let moderation = ChannelModerationActions()
-    let pushToTalk = PushToTalkController()
+    let moderation: ChannelModerationActions
+    let pushToTalk: PushToTalkController
 
     // MARK: Published navigation state
     var navigationPath: [ChannelListDestination] = []
@@ -117,7 +119,10 @@ final class ChannelListModel {
     private var usersByChannel = [TeamTalkChannelID: [TeamTalkUser]]()
     private var childrenByParent = [TeamTalkChannelID: [TeamTalkChannel]]()
 
-    init() {
+    init(session: TeamTalkSession) {
+        self.session = session
+        moderation = ChannelModerationActions(session: session)
+        pushToTalk = PushToTalkController(session: session)
         moderation.owner = self
         pushToTalk.owner = self
     }
@@ -221,7 +226,7 @@ final class ChannelListModel {
     func userDetails(_ user: TeamTalkUser) -> ChannelUserDetails {
         let female = user.statusMode.contains(.female)
         let isTalking = user.states.contains(.voice) ||
-            (TeamTalkClient.shared.myUserIdentifier == user.userID && TeamTalkClient.shared.isVoiceTransmitting)
+            (session.myUserIdentifier == user.userID && session.isVoiceTransmitting)
         let iconName = isTalking
             ? (female ? "woman_green.png" : "man_green.png")
             : (female ? "woman_blue.png" : "man_blue.png")
@@ -241,7 +246,7 @@ final class ChannelListModel {
     }
 
     func channelDetails(_ channel: TeamTalkChannel) -> ChannelDisplayDetails {
-        let op = TeamTalkClient.shared.isChannelOperator(in: channel)
+        let op = session.isChannelOperator(in: channel)
         let canEdit = effectiveUserRights.contains(.canModifyChannels) || op
         let actionTitle = canEdit
             ? String(localized: "Edit", comment: "channel list")
@@ -327,7 +332,7 @@ final class ChannelListModel {
             Task { [weak self] in
                 guard let self else { return }
                 do {
-                    try await TeamTalkClient.shared.joinChannel(channel)
+                    try await self.session.joinChannel(channel)
                 } catch {
                     await self.presentError(error.localizedDescription)
                 }
@@ -344,7 +349,7 @@ final class ChannelListModel {
         Task { [weak self] in
             guard let self else { return }
             do {
-                try await TeamTalkClient.shared.joinChannel(channel, password: password)
+                try await self.session.joinChannel(channel, password: password)
             } catch {
                 await self.presentError(error.localizedDescription)
             }
@@ -360,7 +365,7 @@ final class ChannelListModel {
     // MARK: - Navigation
 
     func showUserDetail(_ user: TeamTalkUser) {
-        let model = UserDetailModel(user: user)
+        let model = UserDetailModel(user: user, session: session)
         navigationPath.append(.userDetail(model))
     }
 
@@ -371,7 +376,7 @@ final class ChannelListModel {
                 TeamTalkString.setChannel(.password, on: &rawChannel, to: password)
             }
         }
-        let model = ChannelDetailModel(channel: TeamTalkChannel(rawChannel))
+        let model = ChannelDetailModel(channel: TeamTalkChannel(rawChannel), session: session)
         channelDetailModel = model
     }
 
@@ -384,7 +389,7 @@ final class ChannelListModel {
                 newChannel.nParentID = root.channelID.cValue
             }
         }
-        let model = ChannelDetailModel(channel: TeamTalkChannel(newChannel))
+        let model = ChannelDetailModel(channel: TeamTalkChannel(newChannel), session: session)
         channelDetailModel = model
     }
 
@@ -397,7 +402,8 @@ final class ChannelListModel {
     private func makeTextMessageModel(for user: TeamTalkUser) -> TextMessageModel {
         let model = TextMessageModel(
             target: .directMessage(user),
-            title: String(localized: "Private Text Message", comment: "text message navigation title")
+            title: String(localized: "Private Text Message", comment: "text message navigation title"),
+            session: session
         )
         openTextMessages(model)
         return model
@@ -405,7 +411,7 @@ final class ChannelListModel {
 
     func openTextMessages(_ model: TextMessageModel) {
         model.delegate = self
-        addToTeamTalkEvents(model)
+        addToTeamTalkEvents(model, on: session)
         if let user = model.privateUser, let msgs = textmessages[user.userID] {
             for m in msgs { model.appendEventMessage(m) }
         }
@@ -425,7 +431,7 @@ final class ChannelListModel {
 
         guard !channelPath.isEmpty else { return }
 
-        let channelID = TeamTalkClient.shared.channelIdentifier(from: TeamTalkChannelPath(channelPath))
+        let channelID = session.channelIdentifier(from: TeamTalkChannelPath(channelPath))
         if channelID.isValid {
             rejoinchannel = TeamTalkChannelConfiguration(
                 channelID: channelID,
@@ -441,7 +447,7 @@ final class ChannelListModel {
 
         let channelName = tokens.removeLast()
         let channelPath = tokens.map { "/" + $0 }.joined()
-        let parentID = TeamTalkClient.shared.channelIdentifier(from: TeamTalkChannelPath(channelPath))
+        let parentID = session.channelIdentifier(from: TeamTalkChannelPath(channelPath))
 
         guard parentID.isValid else { return }
 
@@ -455,7 +461,7 @@ final class ChannelListModel {
 
     @MainActor
     func joinInitialChannelIfNeeded() async throws {
-        guard TeamTalkClient.shared.isAuthorized else {
+        guard session.isAuthorized else {
             refreshChannelList()
             return
         }
@@ -467,15 +473,15 @@ final class ChannelListModel {
                 if chanpasswds[channelID] == nil {
                     chanpasswds[channelID] = password
                 }
-                if let channel = TeamTalkClient.shared.channel(id: channelID) {
-                    try await TeamTalkClient.shared.joinChannel(channel, password: password)
+                if let channel = session.channel(id: channelID) {
+                    try await session.joinChannel(channel, password: password)
                 }
             } else if !rejoinchannel.name.isEmpty {
-                try await TeamTalkClient.shared.joinChannel(rejoinchannel)
+                try await session.joinChannel(rejoinchannel)
             }
         } else if Preferences.current.connection.joinRootChannel {
-            if let rootChannel = TeamTalkClient.shared.channel(id: TeamTalkChannelID(TeamTalkClient.shared.rootChannelID)) {
-                try await TeamTalkClient.shared.joinChannel(rootChannel)
+            if let rootChannel = session.channel(id: TeamTalkChannelID(session.rootChannelID)) {
+                try await session.joinChannel(rootChannel)
             }
         }
 
@@ -486,19 +492,19 @@ final class ChannelListModel {
 
     func updateAudioConfig() {
         if mychannel.rawValue.audiocfg.bEnableAGC == TRUE {
-            TeamTalkClient.shared.setSoundInputGainLevel(INT32(SOUND_GAIN_DEFAULT.rawValue))
+            session.setSoundInputGainLevel(INT32(SOUND_GAIN_DEFAULT.rawValue))
             var ap = TeamTalkAudioPreprocessor.makeWebRTCPreprocessor()
             let gain = Float(mychannel.rawValue.audiocfg.nGainLevel) / Float(TeamTalkAudioPreprocessor.channelAudioConfigMax)
             ap.webrtc.gaincontroller2.fixeddigital.fGainDB = WEBRTC_GAINCONTROLLER2_FIXEDGAIN_MAX * gain
             ap.webrtc.gaincontroller2.bEnable = TRUE
-            TeamTalkClient.shared.setSoundInputPreprocess(&ap)
+            session.setSoundInputPreprocess(&ap)
         } else {
             var ap = TeamTalkAudioPreprocessor.makeTeamTalkPreprocessor()
-            TeamTalkClient.shared.setSoundInputPreprocess(&ap)
+            session.setSoundInputPreprocess(&ap)
             // Preferences.sound.microphoneGainPercent reflects the SDK's *live* volume
             // (for the Preferences screen), not the persisted value being re-applied here.
             let vol = UserDefaults.standard.integer(forKey: PREF_MICROPHONE_GAIN)
-            TeamTalkClient.shared.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
+            session.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
         }
     }
 }
@@ -548,7 +554,7 @@ extension ChannelListModel: TeamTalkEventObserver {
         case .channelUpdated(let channel):
             channels[channel.channelID] = channel
             if mychannel.channelID == channel.channelID {
-                let myUserID = TeamTalkClient.shared.myUserIdentifier
+                let myUserID = session.myUserIdentifier
                 if channel.transmitUsersQueue.first == myUserID && mychannel.transmitUsersQueue.first != myUserID {
                     playSound(.transmit_ON)
                 }
@@ -569,7 +575,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             users[user.userID] = user
             if !isProcessingCommand {
                 if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
-                if TeamTalkClient.shared.myUserIdentifier != user.userID {
+                if session.myUserIdentifier != user.userID {
                     if Preferences.current.textToSpeechEvents.userLoggedIn {
                         newUtterance(getDisplayName(user) + " " + String(localized: "has logged on", comment: "TTS EVENT"))
                     }
@@ -581,7 +587,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             users.removeValue(forKey: user.userID)
             if !isProcessingCommand {
                 if user.channelIdentifier == curchannel.channelID { refreshChannelList() }
-                if TeamTalkClient.shared.myUserIdentifier != user.userID {
+                if session.myUserIdentifier != user.userID {
                     if Preferences.current.textToSpeechEvents.userLoggedOut {
                         newUtterance(getDisplayName(user) + " " + String(localized: "has logged out", comment: "TTS EVENT"))
                     }
@@ -590,7 +596,7 @@ extension ChannelListModel: TeamTalkEventObserver {
 
         case .userJoined(let user):
             users[user.userID] = user
-            if user.userID == TeamTalkClient.shared.myUserIdentifier, let joinedChannel = channels[user.channelIdentifier] {
+            if user.userID == session.myUserIdentifier, let joinedChannel = channels[user.channelIdentifier] {
                 curchannel = joinedChannel
                 mychannel = joinedChannel
                 if rejoinchannel?.id == 0 && chanpasswds[user.channelIdentifier] == nil {
@@ -618,7 +624,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             } else {
                 users[user.userID] = user
             }
-            if user.userID == TeamTalkClient.shared.myUserIdentifier {
+            if user.userID == session.myUserIdentifier {
                 mychannel = TeamTalkChannel(Channel())
                 rejoinchannel = nil
             }
@@ -638,7 +644,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                     let newmsg = MyTextMessage(
                         m: message.rawValue,
                         nickname: name,
-                        msgtype: TeamTalkClient.shared.myUserIdentifier == message.fromUserIdentifier ? .PRIV_IM_MYSELF : .PRIV_IM
+                        msgtype: session.myUserIdentifier == message.fromUserIdentifier ? .PRIV_IM_MYSELF : .PRIV_IM
                     )
                     appendTextMessage(for: message.fromUserIdentifier, message: newmsg)
                     if unreadmessages.isEmpty {

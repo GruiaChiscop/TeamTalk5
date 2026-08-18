@@ -31,6 +31,8 @@ import UIKit
 @Observable
 final class MainTabModel: TeamTalkEventObserver {
 
+    let session: TeamTalkSession
+
     let channelListModel: ChannelListModel
     let channelChatModel: TextMessageModel
     let channelFilesModel: ChannelFilesModel
@@ -46,21 +48,23 @@ final class MainTabModel: TeamTalkEventObserver {
     private var reconnecttimer: Timer?
     private var didSetup = false
 
-    init(server: Server) {
+    init(server: Server, session: TeamTalkSession) {
         self.server = server
-        channelListModel = ChannelListModel()
+        self.session = session
+        channelListModel = ChannelListModel(session: session)
         channelChatModel = TextMessageModel(
             target: .channelFeed,
-            title: String(localized: "Messages", comment: "tab")
+            title: String(localized: "Messages", comment: "tab"),
+            session: session
         )
-        channelFilesModel = ChannelFilesModel()
-        preferencesModel = PreferencesModel()
+        channelFilesModel = ChannelFilesModel(session: session)
+        preferencesModel = PreferencesModel(session: session)
         channelListModel.openTextMessages(channelChatModel)
     }
 
     deinit {
-        TeamTalkClient.shared.disconnect()
-        closeSoundDevices()
+        session.disconnect()
+        closeSoundDevices(session: session)
         print("Destroyed main view controller")
     }
 
@@ -68,31 +72,31 @@ final class MainTabModel: TeamTalkEventObserver {
         guard !didSetup else { return }
         didSetup = true
 
-        addToTeamTalkEvents(self)
-        addToTeamTalkEvents(channelListModel)
-        addToTeamTalkEvents(channelChatModel)
-        addToTeamTalkEvents(channelFilesModel)
-        addToTeamTalkEvents(preferencesModel)
+        addToTeamTalkEvents(self, on: session)
+        addToTeamTalkEvents(channelListModel, on: session)
+        addToTeamTalkEvents(channelChatModel, on: session)
+        addToTeamTalkEvents(channelFilesModel, on: session)
+        addToTeamTalkEvents(preferencesModel, on: session)
 
-        setupSoundDevices()
+        setupSoundDevices(session: session)
 
         // Reads the persisted values directly: Preferences.sound.* mirrors the SDK's
         // *live* volume for the Preferences screen, not what should be re-applied here.
         let defaults = UserDefaults.standard
         if defaults.object(forKey: PREF_MASTER_VOLUME) != nil {
             let vol = defaults.integer(forKey: PREF_MASTER_VOLUME)
-            TeamTalkClient.shared.setSoundOutputVolume(INT32(refVolume(Double(vol))))
+            session.setSoundOutputVolume(INT32(refVolume(Double(vol))))
         }
         if defaults.object(forKey: PREF_VOICEACTIVATION) != nil {
             let voiceact = defaults.integer(forKey: PREF_VOICEACTIVATION)
             if voiceact != VOICEACT_DISABLED {
-                TeamTalkClient.shared.enableVoiceActivation(true)
-                TeamTalkClient.shared.setVoiceActivationLevel(INT32(voiceact))
+                session.enableVoiceActivation(true)
+                session.setVoiceActivationLevel(INT32(voiceact))
             }
         }
         if defaults.object(forKey: PREF_MICROPHONE_GAIN) != nil {
             let vol = defaults.integer(forKey: PREF_MICROPHONE_GAIN)
-            TeamTalkClient.shared.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
+            session.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
         }
 
         let center = NotificationCenter.default
@@ -117,11 +121,11 @@ final class MainTabModel: TeamTalkEventObserver {
 
     func teardown() {
         reconnecttimer?.invalidate()
-        removeFromTeamTalkEvents(self)
-        removeFromTeamTalkEvents(channelListModel)
-        removeFromTeamTalkEvents(channelChatModel)
-        removeFromTeamTalkEvents(channelFilesModel)
-        removeFromTeamTalkEvents(preferencesModel)
+        removeFromTeamTalkEvents(self, from: session)
+        removeFromTeamTalkEvents(channelListModel, from: session)
+        removeFromTeamTalkEvents(channelChatModel, from: session)
+        removeFromTeamTalkEvents(channelFilesModel, from: session)
+        removeFromTeamTalkEvents(preferencesModel, from: session)
         unreadmessages.removeAll()
         UIDevice.current.isProximityMonitoringEnabled = false
         UIApplication.shared.endReceivingRemoteControlEvents()
@@ -191,15 +195,15 @@ final class MainTabModel: TeamTalkEventObserver {
     }
 
     @objc func connectToServer() {
-        if !setupEncryption(server: server) {
+        if !setupEncryption(server: server, session: session) {
             fatalAlertMessage = String(localized: "Failed to setup encryption", comment: "connect to a server")
-        } else if !TeamTalkClient.shared.connect(
+        } else if !session.connect(
             toHost: server.ipaddr,
             tcpPort: INT32(server.tcpport),
             udpPort: INT32(server.udpport),
             encrypted: server.encrypted
         ) {
-            TeamTalkClient.shared.disconnect()
+            session.disconnect()
             startReconnectTimer()
         }
     }
@@ -211,7 +215,7 @@ final class MainTabModel: TeamTalkEventObserver {
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
         switch reason {
         case .oldDeviceUnavailable:
-            setupSoundDevices()
+            setupSoundDevices(session: session)
         default:
             break
         }
@@ -222,7 +226,7 @@ final class MainTabModel: TeamTalkEventObserver {
         guard let optionValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
         let options = AVAudioSession.InterruptionOptions(rawValue: optionValue)
         if options.contains(.shouldResume) {
-            setupSoundDevices()
+            setupSoundDevices(session: session)
         }
     }
 
@@ -236,7 +240,7 @@ final class MainTabModel: TeamTalkEventObserver {
                 let webLogin = Preferences.current.webLogin
                 let username = webLogin.bearwareID ?? ""
                 let token = webLogin.bearwareToken ?? ""
-                let accesstoken = TeamTalkClient.shared.serverProperties()?.accessToken ?? ""
+                let accesstoken = session.serverProperties()?.accessToken ?? ""
                 let url = AppInfo.getBearWareServerTokenURL(
                     username: username, token: token, accesstoken: accesstoken
                 )
@@ -255,13 +259,13 @@ final class MainTabModel: TeamTalkEventObserver {
             login()
 
         case .connectionFailed:
-            TeamTalkClient.shared.disconnect()
+            session.disconnect()
             startReconnectTimer()
             os_log("Connect to \(self.server.ipaddr) failed")
 
         case .connectionLost:
             os_log("Connection to \(self.server.ipaddr) lost")
-            TeamTalkClient.shared.disconnect()
+            session.disconnect()
             playSound(.srv_LOST)
             if Preferences.current.textToSpeechEvents.connectionLost {
                 newUtterance(String(localized: "Connection lost", comment: "tts event"))
@@ -294,11 +298,11 @@ final class MainTabModel: TeamTalkEventObserver {
 
         case .userLoggedIn(let user):
             let subscriptions = getDefaultSubscriptions()
-            if TeamTalkClient.shared.myUserIdentifier != user.userID && user.localSubscriptions != subscriptions {
+            if session.myUserIdentifier != user.userID && user.localSubscriptions != subscriptions {
                 let difference = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
-                TeamTalkClient.shared.unsubscribe(difference, from: user)
+                session.unsubscribe(difference, from: user)
             }
-            syncFromUserCache(user: user)
+            syncFromUserCache(user: user, session: session)
 
         case .userLoggedOut(let user):
             syncToUserCache(user: user)
@@ -310,16 +314,16 @@ final class MainTabModel: TeamTalkEventObserver {
             let defaults = UserDefaults.standard
             if let mfvol = defaults.object(forKey: PREF_MEDIAFILE_VOLUME) as? Double {
                 let vol = refVolume(100.0 * mfvol)
-                TeamTalkClient.shared.setUserVolume(
+                session.setUserVolume(
                     user, stream: .mediaFileAudio, volume: INT32(vol)
                 )
             }
-            if !TeamTalkClient.shared.myRights.contains(.canViewAllUsers) {
-                syncFromUserCache(user: user)
+            if !session.myRights.contains(.canViewAllUsers) {
+                syncFromUserCache(user: user, session: session)
             }
 
         case .userLeft(_, let user):
-            if !TeamTalkClient.shared.myRights.contains(.canViewAllUsers) {
+            if !session.myRights.contains(.canViewAllUsers) {
                 syncToUserCache(user: user)
             }
 
@@ -346,7 +350,7 @@ final class MainTabModel: TeamTalkEventObserver {
             guard let self else { return }
 
             do {
-                try await TeamTalkClient.shared.logIn(
+                try await session.logIn(
                     nickname: nickname,
                     username: server.username,
                     password: server.password,
@@ -362,7 +366,7 @@ final class MainTabModel: TeamTalkEventObserver {
                     self.server.chanpasswd.removeAll()
 
                     if Preferences.current.general.genderIndex != 0 {
-                        TeamTalkClient.shared.setStatus(mode: .female)
+                        self.session.setStatus(mode: .female)
                     }
                 }
 
