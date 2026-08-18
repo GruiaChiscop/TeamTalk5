@@ -238,24 +238,35 @@ private func performSoundDeviceSetup(session: TeamTalkSession) {
         else {
             print("Using sound output device: \(sndid)")
         }
+
+        // The native SDK resets the audio session's category (without
+        // .defaultToSpeaker) the first time it opens an input/output device,
+        // clobbering the options set above regardless of the speaker preference.
+        // Re-assert the category, then force the physical route directly -
+        // overrideOutputAudioPort is independent of category options and wins
+        // even if something downstream fights the category again.
+        try audioSession.setCategory(.playAndRecord, options: catoptions)
+        try audioSession.overrideOutputAudioPort(speaker ? .speaker : .none)
+
         print("postset. Mode \(audioSession.mode.rawValue), category \(audioSession.category.rawValue), options \(getCategory(audioSession.categoryOptions))")
 
-        // enable stereo on all data sources that support it
+        // Restore the previously chosen input port + data source. Only the one
+        // data source matching what was saved should be applied - not whichever
+        // one happened to be last in the list - and the port itself needs to be
+        // made preferred too, or iOS falls back to its own default input.
         for input in audioSession.availableInputs ?? [] {
-            guard let dataSourceID = getAudioPortDataSource(descr: input) else { continue }
-            for datasrc in input.dataSources ?? [] {
-                if datasrc.dataSourceID == dataSourceID {
-                    if datasrc.supportedPolarPatterns?.contains(.stereo) == true {
-                        try datasrc.setPreferredPolarPattern(.stereo)
-                        print("Setting \(datasrc.dataSourceName) to stereo")
-                    } else {
-                        print("No stereo on \(datasrc.dataSourceName)")
-                    }
-                }
-                if audioSession.inputDataSource?.dataSourceID != dataSourceID {
-                    try input.setPreferredDataSource(datasrc)
-                }
+            guard let dataSourceID = getAudioPortDataSource(descr: input),
+                  let dataSource = input.dataSources?.first(where: { $0.dataSourceID == dataSourceID }) else { continue }
+
+            if dataSource.supportedPolarPatterns?.contains(.stereo) == true {
+                try dataSource.setPreferredPolarPattern(.stereo)
+                print("Setting \(dataSource.dataSourceName) to stereo")
+            } else {
+                print("No stereo on \(dataSource.dataSourceName)")
             }
+            try input.setPreferredDataSource(dataSource)
+            try audioSession.setPreferredInput(input)
+            try audioSession.setInputDataSource(dataSource)
         }
     }
     catch {
