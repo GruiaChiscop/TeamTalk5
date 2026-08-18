@@ -9,7 +9,7 @@ import TeamTalkC
 // specifically.
 
 /// Identifies one asynchronous command sent to the server. Delivered by
-/// every `TeamTalkClient` command method and echoed back in the matching
+/// every `TeamTalkSession` command method and echoed back in the matching
 /// `TeamTalkEvent.Kind.commandSucceeded`/`.commandError`.
 public struct TeamTalkCommandID: RawRepresentable, Hashable, Sendable, ExpressibleByIntegerLiteral, CustomStringConvertible {
     public let rawValue: Int32
@@ -127,7 +127,7 @@ public struct TeamTalkChannelPathComponent: RawRepresentable, Hashable, Sendable
 
 /// A slash-separated channel path (e.g. `"/Games/Chess"`), always
 /// normalized: no trailing slash, no empty/repeated segments. Resolve to an
-/// ID with `TeamTalkClient.channelIdentifier(from:)`.
+/// ID with `TeamTalkSession.channelIdentifier(from:)`.
 public struct TeamTalkChannelPath: RawRepresentable, Hashable, Sendable, CustomStringConvertible, ExpressibleByStringLiteral {
     public let rawValue: String
 

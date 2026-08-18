@@ -107,7 +107,7 @@ public struct TeamTalkServerProperties: Equatable, Hashable, Sendable {
 }
 
 /// Mutable counterpart to ``TeamTalkServerProperties`` for
-/// `TeamTalkClient.updateServer(_:)`. Requires the "update server
+/// `TeamTalkSession.updateServer(_:)`. Requires the "update server
 /// properties" right.
 public struct TeamTalkServerPropertiesConfiguration {
     public var name: String
@@ -206,7 +206,7 @@ public struct TeamTalkServerPropertiesConfiguration {
     }
 }
 
-/// Server-wide aggregate statistics, from `TeamTalkClient.queryServerStatistics()`.
+/// Server-wide aggregate statistics, from `TeamTalkSession.queryServerStatistics()`.
 public struct TeamTalkServerStatistics {
     public let rawValue: ServerStatistics
 
@@ -235,7 +235,7 @@ public struct TeamTalkServerStatistics {
     public var uptimeMilliseconds: Int64 { rawValue.nUptimeMSec }
 }
 
-/// Per-user network statistics, from `TeamTalkClient.userStatistics(_:)`.
+/// Per-user network statistics, from `TeamTalkSession.userStatistics(_:)`.
 public struct TeamTalkUserStatistics {
     public let rawValue: UserStatistics
 
@@ -261,7 +261,7 @@ public struct TeamTalkUserStatistics {
     public var mediaFileVideoFramesDropped: Int64 { rawValue.mediaFileVideoFramesDropped }
 }
 
-/// This client's own connection statistics, from `TeamTalkClient.clientStatistics()`.
+/// This client's own connection statistics, from `TeamTalkSession.clientStatistics()`.
 public struct TeamTalkClientStatistics {
     public let rawValue: ClientStatistics
 
@@ -314,7 +314,7 @@ public struct TeamTalkClientKeepAlive {
 }
 
 /// Mutable counterpart to ``TeamTalkClientKeepAlive`` for
-/// `TeamTalkClient.setClientKeepAlive(_:)`.
+/// `TeamTalkSession.setClientKeepAlive(_:)`.
 public struct TeamTalkClientKeepAliveConfiguration {
     public var connectionLostMilliseconds: Int32
     public var tcpKeepAliveIntervalMilliseconds: Int32

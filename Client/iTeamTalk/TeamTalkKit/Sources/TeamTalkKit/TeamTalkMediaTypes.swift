@@ -149,7 +149,7 @@ public struct TeamTalkFileTransferStatus: RawRepresentable, Hashable, Sendable {
 }
 
 /// Pixel encoding to convert a ``TeamTalkDesktopWindow`` frame to, e.g. via
-/// `TeamTalkClient.sendDesktopWindow(_:convertTo:)`/`acquireDesktopWindow(for:convertTo:)`.
+/// `TeamTalkSession.sendDesktopWindow(_:convertTo:)`/`acquireDesktopWindow(for:convertTo:)`.
 public struct TeamTalkBitmapFormat: RawRepresentable, Hashable, Sendable {
     public let rawValue: BitmapFormat
 

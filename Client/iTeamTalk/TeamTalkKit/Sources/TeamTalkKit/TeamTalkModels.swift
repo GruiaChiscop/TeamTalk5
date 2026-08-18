@@ -74,7 +74,7 @@ public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
     }
 
     /// What this client receives from `user` (set via
-    /// `TeamTalkClient.subscribe(_:to:)`/`unsubscribe(_:from:)`).
+    /// `TeamTalkSession.subscribe(_:to:)`/`unsubscribe(_:from:)`).
     public var localSubscriptions: TeamTalkSubscriptions {
         rawValue.localSubscriptions
     }
@@ -190,7 +190,7 @@ public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
     }
 
     /// Slash-separated channel path this account is placed into
-    /// automatically on login (see `TeamTalkClient.channel(path:)`), or
+    /// automatically on login (see `TeamTalkSession.channel(path:)`), or
     /// empty for the server's default.
     public var initialChannel: String {
         rawValue.initialChannel
@@ -256,7 +256,7 @@ public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
 }
 
 /// Mutable counterpart to ``TeamTalkUserAccount`` for
-/// `TeamTalkClient.createUserAccount(_:)`/updates.
+/// `TeamTalkSession.createUserAccount(_:)`/updates.
 public struct TeamTalkUserAccountConfiguration {
     public var username: String
     public var password: String

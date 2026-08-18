@@ -2,7 +2,7 @@ import Foundation
 import TeamTalkC
 
 /// One audio input/output device visible to the OS, as reported by
-/// `TeamTalkClient.soundDevices()`.
+/// `TeamTalkSession.soundDevices()`.
 public struct TeamTalkSoundDevice: Identifiable {
     public let rawValue: SoundDevice
 
@@ -18,7 +18,7 @@ public struct TeamTalkSoundDevice: Identifiable {
         rawValue.id
     }
 
-    /// The ID to pass to `TeamTalkClient.initSoundInputDevice(id:)`/`initSoundOutputDevice(id:)`.
+    /// The ID to pass to `TeamTalkSession.initSoundInputDevice(id:)`/`initSoundOutputDevice(id:)`.
     public var soundDeviceID: TeamTalkSoundDeviceID {
         rawValue.soundDeviceID
     }
@@ -71,7 +71,7 @@ public struct TeamTalkSoundDevice: Identifiable {
     }
 
     /// Whether this device can be opened in shared mode — see
-    /// `TeamTalkClient.initSoundInputSharedDevice(sampleRate:channels:frameSize:)`.
+    /// `TeamTalkSession.initSoundInputSharedDevice(sampleRate:channels:frameSize:)`.
     public var isShared: Bool {
         rawValue.isShared
     }
@@ -129,7 +129,7 @@ public struct TeamTalkSoundDeviceEffects {
 }
 
 /// Mutable counterpart to ``TeamTalkSoundDeviceEffects`` for
-/// `TeamTalkClient.setSoundDeviceEffects(_:)`.
+/// `TeamTalkSession.setSoundDeviceEffects(_:)`.
 public struct TeamTalkSoundDeviceEffectsConfiguration {
     public var automaticGainControlEnabled: Bool
     public var denoiseEnabled: Bool
@@ -183,7 +183,7 @@ public struct TeamTalkSoundDeviceEffectsConfiguration {
     }
 }
 
-/// Parameters for `TeamTalkClient.initSoundInputSharedDevice(_:)`/
+/// Parameters for `TeamTalkSession.initSoundInputSharedDevice(_:)`/
 /// `initSoundOutputSharedDevice(_:)`. Leaving a field at `0` uses the
 /// device's own default (see ``usesDefaultValues``).
 public struct TeamTalkSharedSoundDeviceConfiguration {
@@ -218,7 +218,7 @@ public struct TeamTalkSharedSoundDeviceConfiguration {
     }
 }
 
-/// Parameters for `TeamTalkClient.initSoundDuplexDevices(_:)`.
+/// Parameters for `TeamTalkSession.initSoundDuplexDevices(_:)`.
 public struct TeamTalkSoundDuplexConfiguration {
     public var inputDeviceID: TeamTalkSoundDeviceID
     public var outputDeviceID: TeamTalkSoundDeviceID

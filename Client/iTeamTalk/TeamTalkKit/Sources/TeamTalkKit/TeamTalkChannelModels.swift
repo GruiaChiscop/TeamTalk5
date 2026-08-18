@@ -52,7 +52,7 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
     }
 
     /// Lets a user claim operator status in this channel by supplying this
-    /// password, via `TeamTalkClient.setChannelOperator(_:in:operatorPassword:enabled:)`,
+    /// password, via `TeamTalkSession.setChannelOperator(_:in:operatorPassword:enabled:)`,
     /// without already holding the right.
     public var operatorPassword: String {
         rawValue.operatorPassword
@@ -120,7 +120,7 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
 }
 
 /// Mutable counterpart to ``TeamTalkChannel`` for
-/// `TeamTalkClient.createChannel(_:)`/`updateChannel(_:)`/`joinChannel(_:password:)`.
+/// `TeamTalkSession.createChannel(_:)`/`updateChannel(_:)`/`joinChannel(_:password:)`.
 public struct TeamTalkChannelConfiguration {
     public var id: Int32
     public var parentID: Int32

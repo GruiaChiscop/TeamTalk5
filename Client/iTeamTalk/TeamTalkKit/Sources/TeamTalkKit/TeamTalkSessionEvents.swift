@@ -4,7 +4,7 @@ import Combine
 #endif
 import TeamTalkC
 
-extension TeamTalkClient {
+extension TeamTalkSession {
 @discardableResult
 public func setEncryptionContext(_ encryption: inout EncryptionContext) -> Bool {
     TT_SetEncryptionContext(instance, &encryption) != 0
@@ -275,38 +275,38 @@ internal func unsubscribe(userID: Int32, subscriptions: UInt32) -> Int32 {
     return commandID
 }
 
-@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
+@available(*, deprecated, message: "Prefer typed TeamTalkSession APIs that emit updates automatically.")
 public func pump(_ event: ClientEvent, source: Int32) {
     TT_PumpMessage(instance, event, source)
 }
 
-@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
+@available(*, deprecated, message: "Prefer typed TeamTalkSession APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source: Int32) {
     pump(event.cValue, source: source)
 }
 
-@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
+@available(*, deprecated, message: "Prefer typed TeamTalkSession APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source: TeamTalkUserID) {
     pump(event, source: source.cValue)
 }
 
-@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
+@available(*, deprecated, message: "Prefer typed TeamTalkSession APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source: TeamTalkChannelID) {
     pump(event, source: source.cValue)
 }
 
-@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
+@available(*, deprecated, message: "Prefer typed TeamTalkSession APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source user: TeamTalkUser) {
     pump(event, source: user.userID)
 }
 
-@available(*, deprecated, message: "Prefer typed TeamTalkClient APIs that emit updates automatically.")
+@available(*, deprecated, message: "Prefer typed TeamTalkSession APIs that emit updates automatically.")
 public func pump(_ event: TeamTalkClientEvent, source channel: TeamTalkChannel) {
     pump(event, source: channel.channelID)
 }
 }
 
-private extension TeamTalkClient {
+private extension TeamTalkSession {
 func deliverPolledMessage(_ message: TTMessage) {
     observers.removeAll { $0.value == nil }
     eventObservers.removeAll { $0.value == nil }

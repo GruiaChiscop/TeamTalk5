@@ -96,7 +96,7 @@ private func withCommandTimeout<T: Sendable>(
     }
 }
 
-private extension TeamTalkClient {
+private extension TeamTalkSession {
     func performCommand(
         timeoutSeconds: TimeInterval = defaultTeamTalkCommandTimeoutSeconds,
         _ start: () -> TeamTalkCommandID
@@ -173,7 +173,7 @@ private extension TeamTalkClient {
     }
 }
 
-extension TeamTalkClient {
+extension TeamTalkSession {
     public func ping(timeoutSeconds: TimeInterval = defaultTeamTalkCommandTimeoutSeconds) async throws {
         try await performCommand(timeoutSeconds: timeoutSeconds) { ping() }
     }

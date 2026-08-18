@@ -2,7 +2,7 @@ import Foundation
 import TeamTalkC
 
 /// Progress/state for one upload or download in flight, from
-/// `TeamTalkClient.uploadFile(at:to:)`/`downloadFile(_:to:)`.
+/// `TeamTalkSession.uploadFile(at:to:)`/`downloadFile(_:to:)`.
 public struct TeamTalkFileTransfer: Identifiable, Equatable, Hashable, Sendable {
     public let rawValue: FileTransfer
 
@@ -183,7 +183,7 @@ public struct TeamTalkTextMessageAssembler {
     }
 }
 
-/// A message to send via `TeamTalkClient.sendTextMessage(_:)`. Prefer the
+/// A message to send via `TeamTalkSession.sendTextMessage(_:)`. Prefer the
 /// `user(to:content:)`/`channel(_:content:)`/`broadcast(content:)`/
 /// `reply(to:content:)` factory methods over the raw ID-based initializer.
 public struct TeamTalkOutgoingTextMessage {

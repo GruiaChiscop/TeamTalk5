@@ -6,8 +6,8 @@ import TeamTalkC
 // `TeamTalkEvent.Kind.commandSucceeded`/`.commandError` carrying that same ID
 // (or as a more specific event, e.g. `.channelCreated`), not through this
 // call. For a `try await` alternative that resolves once the matching event
-// arrives, see the wrappers in TeamTalkClientAsyncCommands.swift.
-extension TeamTalkClient {
+// arrives, see the wrappers in TeamTalkSessionAsyncCommands.swift.
+extension TeamTalkSession {
 @discardableResult
 public func ping() -> TeamTalkCommandID {
     TeamTalkCommandID(TT_DoPing(instance))

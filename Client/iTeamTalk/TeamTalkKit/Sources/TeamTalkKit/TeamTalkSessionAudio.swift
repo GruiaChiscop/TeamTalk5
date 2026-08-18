@@ -5,7 +5,7 @@ import TeamTalkC
 // straight from the SDK, while the plain-named sibling wraps it in a typed
 // Swift model. Prefer the typed sibling; the raw variant exists for callers
 // that need to pass the struct straight back into another C-level call.
-extension TeamTalkClient {
+extension TeamTalkSession {
 /// All sound devices currently visible to the OS, in raw SDK form. Prefer
 /// ``soundDevices()``.
 public func soundDevicesInfo() -> [SoundDevice] {

@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-/// Which platform audio backend to use for `TeamTalkClient.defaultSoundDevices(for:)`.
+/// Which platform audio backend to use for `TeamTalkSession.defaultSoundDevices(for:)`.
 /// Most cases are platform-specific; only ``coreAudio``/``audioUnit`` are
 /// relevant on iOS/macOS.
 public struct TeamTalkSoundSystem: RawRepresentable, Hashable, Sendable {
@@ -193,7 +193,7 @@ public struct TeamTalkErrorCode: RawRepresentable, Hashable, Sendable, Expressib
 }
 
 /// Permissions granted to a ``TeamTalkUserAccount``, checked via
-/// `TeamTalkClient.myRights`/`getUserRight(_:)`.
+/// `TeamTalkSession.myRights`/`getUserRight(_:)`.
 public struct TeamTalkUserRights: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
 
@@ -263,7 +263,7 @@ public struct TeamTalkUserTypes: OptionSet, Hashable, Sendable {
 }
 
 /// What one client receives from another — set per-peer via
-/// `TeamTalkClient.subscribe(_:to:)`/`unsubscribe(_:from:)`, independent of
+/// `TeamTalkSession.subscribe(_:to:)`/`unsubscribe(_:from:)`, independent of
 /// whether the peer is actually transmitting that stream type.
 public struct TeamTalkSubscriptions: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32
@@ -304,7 +304,7 @@ public struct TeamTalkSubscriptions: OptionSet, Hashable, Sendable {
 
 /// What a user is currently doing (talking, sharing desktop, ...). The
 /// `*Muted` cases reflect this *client's own* local mute setting for that
-/// user (see `TeamTalkClient.setUserMute(_:stream:muted:)`), not whether
+/// user (see `TeamTalkSession.setUserMute(_:stream:muted:)`), not whether
 /// the user has muted themselves.
 public struct TeamTalkUserStates: OptionSet, Hashable, Sendable {
     public let rawValue: UInt32

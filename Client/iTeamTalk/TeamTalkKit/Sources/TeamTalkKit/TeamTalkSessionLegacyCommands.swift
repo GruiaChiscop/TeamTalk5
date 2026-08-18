@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-extension TeamTalkClient {
+extension TeamTalkSession {
 @discardableResult
 internal func join(channel: inout Channel) -> Int32 {
     TT_DoJoinChannel(instance, &channel)

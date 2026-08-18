@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-extension TeamTalkClient {
+extension TeamTalkSession {
 /// Allocates the native SDK instance and applies the app's license. Call
 /// once, before any other client method; a no-op if already started.
 public func start(licenseName: String, licenseKey: String) {

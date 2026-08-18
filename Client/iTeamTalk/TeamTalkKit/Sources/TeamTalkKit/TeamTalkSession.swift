@@ -11,10 +11,10 @@ public protocol TeamTalkMessageObserver: AnyObject {
     func handleTeamTalkMessage(_ message: TTMessage)
 }
 
-/// Receives decoded ``TeamTalkEvent`` values. Register with
-/// `TeamTalkClient.shared.addEventObserver(_:)` and unregister with
-/// `removeEventObserver(_:)` to stop receiving callbacks. Observers are held
-/// weakly, so there's no need to unregister purely to break a retain cycle.
+/// Receives decoded ``TeamTalkEvent`` values. Register with a session's
+/// `addEventObserver(_:)` and unregister with `removeEventObserver(_:)` to
+/// stop receiving callbacks. Observers are held weakly, so there's no need
+/// to unregister purely to break a retain cycle.
 public protocol TeamTalkEventObserver: AnyObject {
     func handleTeamTalkEvent(_ event: TeamTalkEvent)
 }
@@ -85,7 +85,7 @@ func withOptionalAudioFormatPointer<Result>(
 }
 
 /// Snapshot of the client's connection/transmission state, mirroring the
-/// SDK's `CLIENT_*` flags. Read via ``TeamTalkClient/flags``.
+/// SDK's `CLIENT_*` flags. Read via ``TeamTalkSession/flags``.
 public struct TeamTalkClientFlags: OptionSet {
     public let rawValue: UInt32
 
@@ -123,21 +123,24 @@ public struct TeamTalkEncryptionConfiguration {
     }
 }
 
-/// The app's single connection to a TeamTalk server, wrapping one native SDK
-/// instance. Most of the public API lives in extensions across the package
-/// (commands, events, audio, media, desktop/video, server state); this file
-/// holds the instance itself and the small set of always-available
-/// properties. There is exactly one instance per process — see ``shared``.
-public final class TeamTalkClient {
-    /// The process-wide client instance. The underlying native SDK is a
-    /// single global handle, so there is no supported way to run two
-    /// independent sessions in one process.
-    public static let shared = TeamTalkClient()
-
+/// One connection to a TeamTalk server, wrapping one native SDK instance.
+/// Most of the public API lives in extensions across the package (commands,
+/// events, audio, media, desktop/video, server state); this file holds the
+/// instance itself and the small set of always-available properties.
+///
+/// The native SDK supports multiple independent instances in one process
+/// (each SDK call takes an explicit instance handle, not implicit global
+/// state), so nothing prevents creating more than one `TeamTalkSession` —
+/// e.g. to connect to two servers at once, or to give each unit test its
+/// own isolated instance. Most apps still only need one; hold it wherever
+/// makes sense for that app (a single shared instance created at launch is
+/// the common case) and pass it to whatever needs to issue commands or
+/// observe events.
+public final class TeamTalkSession {
     var instance: UnsafeMutableRawPointer?
     var observers = [TeamTalkMessageHandler]()
     var eventObservers = [TeamTalkEventHandler]()
-    private let eventLoopQueue = DispatchQueue(label: "dk.bearware.TeamTalk5.TeamTalkClient.eventLoop")
+    private let eventLoopQueue = DispatchQueue(label: "dk.bearware.TeamTalk5.TeamTalkSession.eventLoop")
     private let eventLoopLock = NSLock()
     let messagePollingLock = NSLock()
     private var eventLoopTimer: DispatchSourceTimer?
@@ -146,7 +149,7 @@ public final class TeamTalkClient {
     let eventSubject = PassthroughSubject<TeamTalkEvent, Never>()
 #endif
 
-    private init() {}
+    public init() {}
 
     /// Whether a repeating timer is currently polling the SDK's message queue.
     /// See ``startEventDispatching(pollInterval:)``.

@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-extension TeamTalkClient {
+extension TeamTalkSession {
 @discardableResult
 internal func setUserMediaStorage(
     userID: Int32,

@@ -54,7 +54,7 @@ public struct TeamTalkRemoteFile: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
-/// One ban entry, as returned by `TeamTalkClient.listBans(in:startingAt:count:)`.
+/// One ban entry, as returned by `TeamTalkSession.listBans(in:startingAt:count:)`.
 /// Has no single server-assigned ID; ``id`` is synthesized from its fields
 /// for `Identifiable` conformance.
 public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
@@ -133,7 +133,7 @@ public struct TeamTalkBannedUser: Identifiable, Equatable, Hashable, Sendable {
     }
 }
 
-/// Describes a ban to create via `TeamTalkClient.ban(_:)`/remove via
+/// Describes a ban to create via `TeamTalkSession.ban(_:)`/remove via
 /// `unban(_:)`, independent of any currently-online ``TeamTalkUser``.
 public struct TeamTalkBanConfiguration {
     public var ipAddress: String

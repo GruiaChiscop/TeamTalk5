@@ -2,7 +2,7 @@ import Foundation
 import TeamTalkC
 
 /// A raw PCM format request, e.g. for
-/// `TeamTalkClient.enableAudioBlockEvent(sourceID:streamTypes:audioFormat:enabled:)`
+/// `TeamTalkSession.enableAudioBlockEvent(sourceID:streamTypes:audioFormat:enabled:)`
 /// to have the SDK resample/reformat delivered audio blocks.
 public struct TeamTalkAudioFormatConfiguration {
     public var format: TeamTalkAudioFileFormat
@@ -41,7 +41,7 @@ public struct TeamTalkAudioFormatConfiguration {
 }
 
 /// One chunk of raw PCM audio, delivered via
-/// `TeamTalkClient.acquireAudioBlock(sourceID:streamTypes:)` after enabling
+/// `TeamTalkSession.acquireAudioBlock(sourceID:streamTypes:)` after enabling
 /// audio block events for a stream. Owns its samples as `Data`/`rawAudio`,
 /// safe to hold onto past the call that produced it.
 public struct TeamTalkAudioBlock {
@@ -212,7 +212,7 @@ public struct TeamTalkVideoFormat {
 }
 
 /// Format/duration/playback-progress info for a local media file, from
-/// `TeamTalkClient.mediaFile(at:)`.
+/// `TeamTalkSession.mediaFile(at:)`.
 public struct TeamTalkMediaFileInfo {
     public let rawValue: MediaFileInfo
 
@@ -457,7 +457,7 @@ public enum TeamTalkAudioPreprocessorConfiguration: Hashable, Sendable {
 }
 
 /// Playback state for a media file streamed via
-/// `TeamTalkClient.startStreamingMediaFileToChannel(from:playback:videoCodec:)`
+/// `TeamTalkSession.startStreamingMediaFileToChannel(from:playback:videoCodec:)`
 /// or played locally via `initLocalPlayback(from:playback:)`.
 public struct TeamTalkMediaFilePlayback {
     public let rawValue: MediaFilePlayback
@@ -529,7 +529,7 @@ public struct TeamTalkMediaFilePlaybackConfiguration {
     }
 }
 
-/// Parameters for `TeamTalkClient.setUserMediaStorage(for:configuration:)`,
+/// Parameters for `TeamTalkSession.setUserMediaStorage(for:configuration:)`,
 /// which auto-records a user's audio to per-user files as they speak.
 public struct TeamTalkUserMediaStorageConfiguration {
     public var directoryURL: URL?

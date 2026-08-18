@@ -19,7 +19,7 @@ public extension TeamTalkEvent {
     /// pull (e.g. ``userAudioBlock(userID:streamType:)``,
     /// ``userDesktopWindow(userID:streamID:)``) rather than carrying the
     /// data itself — see the corresponding `acquire...` method on
-    /// `TeamTalkClient` for those.
+    /// `TeamTalkSession` for those.
     enum Kind {
         case none
         case connectionSucceeded
@@ -54,7 +54,7 @@ public extension TeamTalkEvent {
         case serverStatistics(TeamTalkServerStatistics)
         case fileCreated(TeamTalkRemoteFile)
         case fileRemoved(TeamTalkRemoteFile)
-        /// One page of results from `TeamTalkClient.listUserAccounts(startingAt:count:)`,
+        /// One page of results from `TeamTalkSession.listUserAccounts(startingAt:count:)`,
         /// delivered per account rather than as a single batched array.
         case userAccount(TeamTalkUserAccount)
         case userAccountCreated(TeamTalkUserAccount)

@@ -73,7 +73,7 @@ public struct TeamTalkDesktopWindow {
 }
 
 /// One synthetic keyboard/mouse event to forward via
-/// `TeamTalkClient.sendDesktopInput(_:to:)` when remote-controlling another
+/// `TeamTalkSession.sendDesktopInput(_:to:)` when remote-controlling another
 /// user's shared desktop.
 public struct TeamTalkDesktopInput {
     /// The maximum number of inputs `sendDesktopInput(_:to:)` accepts in one call.
@@ -133,7 +133,7 @@ public struct TeamTalkDesktopInput {
 }
 
 /// One webcam/capture device visible to the OS, as reported by
-/// `TeamTalkClient.videoCaptureDevices()`.
+/// `TeamTalkSession.videoCaptureDevices()`.
 public struct TeamTalkVideoCaptureDevice: Identifiable {
     public let rawValue: VideoCaptureDevice
 

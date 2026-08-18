@@ -43,24 +43,24 @@ public extension TeamTalkAudioPreprocessor {
     }
 }
 
-public extension TeamTalkClient {
-    /// This client's own user ID, typed. See ``TeamTalkClient/myUserID``.
+public extension TeamTalkSession {
+    /// This client's own user ID, typed. See ``TeamTalkSession/myUserID``.
     var myUserIdentifier: TeamTalkUserID {
         TeamTalkUserID(myUserID)
     }
 
-    /// The channel this client currently occupies, typed. See ``TeamTalkClient/myChannelID``.
+    /// The channel this client currently occupies, typed. See ``TeamTalkSession/myChannelID``.
     var myChannelIdentifier: TeamTalkChannelID {
         TeamTalkChannelID(myChannelID)
     }
 
-    /// The server's root channel ID, typed. See ``TeamTalkClient/rootChannelID``.
+    /// The server's root channel ID, typed. See ``TeamTalkSession/rootChannelID``.
     var rootChannelIdentifier: TeamTalkChannelID {
         TeamTalkChannelID(rootChannelID)
     }
 
     /// This client's effective user rights, typed for `.contains(_:)` checks.
-    /// See ``TeamTalkClient/myUserRights``.
+    /// See ``TeamTalkSession/myUserRights``.
     var myRights: TeamTalkUserRights {
         TeamTalkUserRights(cValue: myUserRights)
     }

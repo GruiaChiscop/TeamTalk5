@@ -2,9 +2,9 @@ import Foundation
 
 public extension TeamTalkEvent.Kind {
     /// Resolves the user identifier carried by an event payload to a full `TeamTalkUser`,
-    /// querying the supplied client. Returns `nil` if the event has no user identifier
+    /// querying the supplied session. Returns `nil` if the event has no user identifier
     /// or the SDK no longer knows that user (e.g. they have already left).
-    func resolvedUser(in client: TeamTalkClient) -> TeamTalkUser? {
+    func resolvedUser(in session: TeamTalkSession) -> TeamTalkUser? {
         switch self {
         case .myselfLoggedIn(let id, _),
              .userVideoCapture(let id, _),
@@ -14,7 +14,7 @@ public extension TeamTalkEvent.Kind {
              .userDesktopInput(let id),
              .userRecordMediaFile(let id),
              .userAudioBlock(let id, _):
-            return client.user(id: id)
+            return session.user(id: id)
         case .userLoggedIn(let user),
              .userLoggedOut(let user),
              .userUpdated(let user),
@@ -32,13 +32,13 @@ public extension TeamTalkEvent.Kind {
     }
 
     /// Resolves the channel identifier carried by an event payload to a full `TeamTalkChannel`,
-    /// querying the supplied client. Returns `nil` if the event has no channel identifier or
+    /// querying the supplied session. Returns `nil` if the event has no channel identifier or
     /// the channel is no longer known (e.g. for `myselfKicked` after the kick has propagated).
-    func resolvedChannel(in client: TeamTalkClient) -> TeamTalkChannel? {
+    func resolvedChannel(in session: TeamTalkSession) -> TeamTalkChannel? {
         switch self {
         case .myselfKicked(let id, _),
              .userLeft(let id, _):
-            return client.channel(id: id)
+            return session.channel(id: id)
         case .channelCreated(let channel),
              .channelUpdated(let channel),
              .channelRemoved(let channel):
@@ -50,13 +50,13 @@ public extension TeamTalkEvent.Kind {
 }
 
 public extension TeamTalkEvent {
-    /// Convenience: resolve the event's primary user (if any) using the supplied client.
-    func resolvedUser(in client: TeamTalkClient) -> TeamTalkUser? {
-        kind.resolvedUser(in: client)
+    /// Convenience: resolve the event's primary user (if any) using the supplied session.
+    func resolvedUser(in session: TeamTalkSession) -> TeamTalkUser? {
+        kind.resolvedUser(in: session)
     }
 
-    /// Convenience: resolve the event's primary channel (if any) using the supplied client.
-    func resolvedChannel(in client: TeamTalkClient) -> TeamTalkChannel? {
-        kind.resolvedChannel(in: client)
+    /// Convenience: resolve the event's primary channel (if any) using the supplied session.
+    func resolvedChannel(in session: TeamTalkSession) -> TeamTalkChannel? {
+        kind.resolvedChannel(in: session)
     }
 }

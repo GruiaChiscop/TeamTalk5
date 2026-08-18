@@ -1,7 +1,7 @@
 import Foundation
 import TeamTalkC
 
-extension TeamTalkClient {
+extension TeamTalkSession {
 /// Transmits a captured screen/window image as this client's desktop share,
 /// starting or updating the desktop stream everyone else in the channel sees.
 public func sendDesktopWindow(
