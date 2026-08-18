@@ -293,7 +293,7 @@ final class MainTabModel: TeamTalkEventObserver {
             alertMessage = msg
 
         case .userLoggedIn(let user):
-            let subscriptions = TeamTalkSubscriptions(rawValue: getDefaultSubscriptions())
+            let subscriptions = getDefaultSubscriptions()
             if TeamTalkClient.shared.myUserIdentifier != user.userID && user.localSubscriptions != subscriptions {
                 let difference = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
                 TeamTalkClient.shared.unsubscribe(difference, from: user)
@@ -314,12 +314,12 @@ final class MainTabModel: TeamTalkEventObserver {
                     user, stream: .mediaFileAudio, volume: INT32(vol)
                 )
             }
-            if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
+            if !TeamTalkClient.shared.myRights.contains(.canViewAllUsers) {
                 syncFromUserCache(user: user)
             }
 
         case .userLeft(_, let user):
-            if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
+            if !TeamTalkClient.shared.myRights.contains(.canViewAllUsers) {
                 syncToUserCache(user: user)
             }
 

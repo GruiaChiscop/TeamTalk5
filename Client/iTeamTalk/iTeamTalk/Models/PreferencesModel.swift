@@ -118,7 +118,7 @@ struct Preferences {
     var textToSpeechEvents = TextToSpeechEvents()
     var serverListFilters = ServerListFilters()
     var webLogin = WebLogin()
-    var defaultSubscriptions: Subscriptions = SUBSCRIBE_CUSTOM_MSG.rawValue
+    var defaultSubscriptions: TeamTalkSubscriptions = .customMessages
 
     // Fresh, on-demand read of every key, for call sites that don't hold a
     // long-lived PreferencesModel (free functions, other model classes).
@@ -268,7 +268,7 @@ let DEFAULT_SUBSCRIPTION_MEDIAFILE = true
 let DEFAULT_SUBSCRIPTION_DESKTOP = true
 let DEFAULT_SUBSCRIPTION_DESKTOPINPUT = false
 
-func getDefaultSubscriptions() -> Subscriptions {
+func getDefaultSubscriptions() -> TeamTalkSubscriptions {
     let settings = UserDefaults.standard
 
     var sub_usermsg = DEFAULT_SUBSCRIPTION_USERMSG
@@ -304,30 +304,30 @@ func getDefaultSubscriptions() -> Subscriptions {
         sub_deskinput = settings.bool(forKey: PREF_SUB_DESKTOPINPUT)
     }
 
-    var subs: Subscriptions = SUBSCRIBE_CUSTOM_MSG.rawValue
+    var subs: TeamTalkSubscriptions = .customMessages
     if sub_usermsg {
-        subs |= SUBSCRIBE_USER_MSG.rawValue
+        subs.insert(.userMessages)
     }
     if sub_chanmsg {
-        subs |= SUBSCRIBE_CHANNEL_MSG.rawValue
+        subs.insert(.channelMessages)
     }
     if sub_bcastmsg {
-        subs |= SUBSCRIBE_BROADCAST_MSG.rawValue
+        subs.insert(.broadcastMessages)
     }
     if sub_voice {
-        subs |= SUBSCRIBE_VOICE.rawValue
+        subs.insert(.voice)
     }
     if sub_vidcap {
-        subs |= SUBSCRIBE_VIDEOCAPTURE.rawValue
+        subs.insert(.videoCapture)
     }
     if sub_mediafile {
-        subs |= SUBSCRIBE_MEDIAFILE.rawValue
+        subs.insert(.mediaFile)
     }
     if sub_desktop {
-        subs |= SUBSCRIBE_DESKTOP.rawValue
+        subs.insert(.desktop)
     }
     if sub_deskinput {
-        subs |= SUBSCRIBE_DESKTOPINPUT.rawValue
+        subs.insert(.desktopInput)
     }
 
     return subs
@@ -357,7 +357,7 @@ final class PreferencesModel {
     struct SubscriptionRow: Identifiable {
         let title: String
         let subtitle: String
-        let type: Subscription
+        let type: TeamTalkSubscriptions
         let key: String
 
         var id: String {
@@ -383,13 +383,13 @@ final class PreferencesModel {
 
     init() {
         subscriptionRows = [
-            SubscriptionRow(title: String(localized: "User Messages", comment: "preferences"), subtitle: String(localized: "Receive text messages by default", comment: "preferences"), type: SUBSCRIBE_USER_MSG, key: PREF_SUB_USERMSG),
-            SubscriptionRow(title: String(localized: "Channel Messages", comment: "preferences"), subtitle: String(localized: "Receive channel messages by default", comment: "preferences"), type: SUBSCRIBE_CHANNEL_MSG, key: PREF_SUB_CHANMSG),
-            SubscriptionRow(title: String(localized: "Broadcast Messages", comment: "preferences"), subtitle: String(localized: "Receive broadcast messages by default", comment: "preferences"), type: SUBSCRIBE_BROADCAST_MSG, key: PREF_SUB_BROADCAST),
-            SubscriptionRow(title: String(localized: "Voice", comment: "preferences"), subtitle: String(localized: "Receive voice streams by default", comment: "preferences"), type: SUBSCRIBE_VOICE, key: PREF_SUB_VOICE),
-            SubscriptionRow(title: String(localized: "WebCam", comment: "preferences"), subtitle: String(localized: "Receive webcam streams by default", comment: "preferences"), type: SUBSCRIBE_VIDEOCAPTURE, key: PREF_SUB_VIDEOCAP),
-            SubscriptionRow(title: String(localized: "Media File", comment: "preferences"), subtitle: String(localized: "Receive media file streams by default", comment: "preferences"), type: SUBSCRIBE_MEDIAFILE, key: PREF_SUB_MEDIAFILE),
-            SubscriptionRow(title: String(localized: "Desktop", comment: "preferences"), subtitle: String(localized: "Receive desktop sessions by default", comment: "preferences"), type: SUBSCRIBE_DESKTOP, key: PREF_SUB_DESKTOP)
+            SubscriptionRow(title: String(localized: "User Messages", comment: "preferences"), subtitle: String(localized: "Receive text messages by default", comment: "preferences"), type: .userMessages, key: PREF_SUB_USERMSG),
+            SubscriptionRow(title: String(localized: "Channel Messages", comment: "preferences"), subtitle: String(localized: "Receive channel messages by default", comment: "preferences"), type: .channelMessages, key: PREF_SUB_CHANMSG),
+            SubscriptionRow(title: String(localized: "Broadcast Messages", comment: "preferences"), subtitle: String(localized: "Receive broadcast messages by default", comment: "preferences"), type: .broadcastMessages, key: PREF_SUB_BROADCAST),
+            SubscriptionRow(title: String(localized: "Voice", comment: "preferences"), subtitle: String(localized: "Receive voice streams by default", comment: "preferences"), type: .voice, key: PREF_SUB_VOICE),
+            SubscriptionRow(title: String(localized: "WebCam", comment: "preferences"), subtitle: String(localized: "Receive webcam streams by default", comment: "preferences"), type: .videoCapture, key: PREF_SUB_VIDEOCAP),
+            SubscriptionRow(title: String(localized: "Media File", comment: "preferences"), subtitle: String(localized: "Receive media file streams by default", comment: "preferences"), type: .mediaFile, key: PREF_SUB_MEDIAFILE),
+            SubscriptionRow(title: String(localized: "Desktop", comment: "preferences"), subtitle: String(localized: "Receive desktop sessions by default", comment: "preferences"), type: .desktop, key: PREF_SUB_DESKTOP)
         ]
 
         let version = TeamTalkClient.shared.version
@@ -475,9 +475,9 @@ final class PreferencesModel {
 
     func subscriptionChanged(_ enabled: Bool, row: SubscriptionRow) {
         if enabled {
-            preferences.defaultSubscriptions |= row.type.rawValue
+            preferences.defaultSubscriptions.insert(row.type)
         } else {
-            preferences.defaultSubscriptions &= ~row.type.rawValue
+            preferences.defaultSubscriptions.remove(row.type)
         }
         UserDefaults.standard.set(enabled, forKey: row.key)
     }
@@ -535,7 +535,7 @@ final class PreferencesModel {
     }
 
     func isSubscribed(to row: SubscriptionRow) -> Bool {
-        (preferences.defaultSubscriptions & row.type.rawValue) != 0
+        preferences.defaultSubscriptions.contains(row.type)
     }
 
     func percentSubtitle(_ value: Double) -> String {
