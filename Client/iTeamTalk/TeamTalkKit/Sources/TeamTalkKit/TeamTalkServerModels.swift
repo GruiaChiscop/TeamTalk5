@@ -1,6 +1,8 @@
 import Foundation
 import TeamTalkC
 
+/// The connected server's configuration: name, limits, ports, and logging
+/// settings.
 public struct TeamTalkServerProperties: Equatable, Hashable, Sendable {
     public let rawValue: ServerProperties
 
@@ -24,6 +26,9 @@ public struct TeamTalkServerProperties: Equatable, Hashable, Sendable {
         rawValue.name
     }
 
+    /// The message of the day with variable placeholders substituted (e.g.
+    /// server name/version). See ``rawMessageOfTheDay`` for the unexpanded
+    /// template, which is what `TeamTalkServerPropertiesConfiguration` edits.
     public var messageOfTheDay: String {
         rawValue.messageOfTheDay
     }
@@ -101,6 +106,9 @@ public struct TeamTalkServerProperties: Equatable, Hashable, Sendable {
     }
 }
 
+/// Mutable counterpart to ``TeamTalkServerProperties`` for
+/// `TeamTalkClient.updateServer(_:)`. Requires the "update server
+/// properties" right.
 public struct TeamTalkServerPropertiesConfiguration {
     public var name: String
     public var rawMessageOfTheDay: String
@@ -198,6 +206,7 @@ public struct TeamTalkServerPropertiesConfiguration {
     }
 }
 
+/// Server-wide aggregate statistics, from `TeamTalkClient.queryServerStatistics()`.
 public struct TeamTalkServerStatistics {
     public let rawValue: ServerStatistics
 
@@ -226,6 +235,7 @@ public struct TeamTalkServerStatistics {
     public var uptimeMilliseconds: Int64 { rawValue.nUptimeMSec }
 }
 
+/// Per-user network statistics, from `TeamTalkClient.userStatistics(_:)`.
 public struct TeamTalkUserStatistics {
     public let rawValue: UserStatistics
 
@@ -251,6 +261,7 @@ public struct TeamTalkUserStatistics {
     public var mediaFileVideoFramesDropped: Int64 { rawValue.mediaFileVideoFramesDropped }
 }
 
+/// This client's own connection statistics, from `TeamTalkClient.clientStatistics()`.
 public struct TeamTalkClientStatistics {
     public let rawValue: ClientStatistics
 
@@ -281,6 +292,8 @@ public struct TeamTalkClientStatistics {
     public var soundInputDeviceDelayMilliseconds: Int32 { rawValue.soundInputDeviceDelayMilliseconds }
 }
 
+/// Timing thresholds for detecting a lost connection and keeping the TCP/UDP
+/// sockets alive through NATs/firewalls.
 public struct TeamTalkClientKeepAlive {
     public let rawValue: ClientKeepAlive
 
@@ -300,6 +313,8 @@ public struct TeamTalkClientKeepAlive {
     public var udpConnectTimeoutMilliseconds: Int32 { rawValue.udpConnectTimeoutMilliseconds }
 }
 
+/// Mutable counterpart to ``TeamTalkClientKeepAlive`` for
+/// `TeamTalkClient.setClientKeepAlive(_:)`.
 public struct TeamTalkClientKeepAliveConfiguration {
     public var connectionLostMilliseconds: Int32
     public var tcpKeepAliveIntervalMilliseconds: Int32
