@@ -610,6 +610,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                 rejoinchannel = TeamTalkChannelConfiguration(joinedChannel)
                 updateTitle()
                 updateAudioConfig()
+                pushToTalk.resumeIfWasLocked()
             }
             if user.channelIdentifier == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.joined_CHAN)

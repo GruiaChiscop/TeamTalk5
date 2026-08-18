@@ -24,6 +24,8 @@
 import SwiftUI
 import TeamTalkKit
 
+let PREF_PTT_TRANSMITTING = "ptt_transmitting_preference"
+
 // Push-to-talk button state and voice transmission toggling, split out of
 // ChannelListModel.
 @Observable
@@ -74,6 +76,17 @@ final class PushToTalkController {
         pttHint = hasPTTLock()
             ? String(localized: "Double tap and hold to transmit. Triple tap fast to lock transmission.", comment: "channel list")
             : String(localized: "Toggle to enable/disable transmission", comment: "channel list")
+        // Without the lock preference, a single press already toggles transmission
+        // on and leaves it on (txBtnUp does nothing in that mode) - so "on" is a
+        // real, persistent state regardless of whether the lock preference is set.
+        UserDefaults.standard.set(isTransmitting, forKey: PREF_PTT_TRANSMITTING)
         owner?.refreshChannelList()
+    }
+
+    // Called once after (re)joining a channel, so leaving the app while still
+    // transmitting resumes that instead of silently reverting to off.
+    func resumeIfWasLocked() {
+        guard UserDefaults.standard.bool(forKey: PREF_PTT_TRANSMITTING) else { return }
+        enableVoiceTx(true)
     }
 }
