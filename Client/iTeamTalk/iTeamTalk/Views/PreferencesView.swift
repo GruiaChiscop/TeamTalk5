@@ -56,6 +56,7 @@ struct PreferencesView: View {
                     .accessibilityLabel(Text("Nickname"))
                 } label: {
                     Text("Nickname")
+                        .accessibilityHidden(true)
                 }
                 PreferenceSubtitle("Name displayed in channel list")
             }
@@ -142,7 +143,6 @@ struct PreferencesView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                PreferenceSubtitle(verbatim: String(format: String(localized: "Limit length of names in channel list to %d characters", comment: "preferences"), Int(model.preferences.display.limitText)))
             }
             NavigationLink {
                 PublicServerView()
@@ -174,44 +174,39 @@ struct PreferencesView: View {
                     }
                     .pickerStyle(.segmented)
                 }
-                PreferenceSubtitle("Order of channels in Channel List")
             }
         }
     }
 
     private var soundSection: some View {
         Section("Sound System") {
-            sliderWithSubtitle(
+            PreferenceSlider(
                 title: "Master Volume",
-                subtitle: Text(verbatim: model.percentSubtitle(model.preferences.sound.masterVolumePercent)),
                 value: Binding(get: { model.preferences.sound.masterVolumePercent }, set: { model.masterVolumeChanged($0) }),
                 range: 0...100,
                 step: 10,
-                displayValue: { model.percentSubtitle($0) }
+                valueText: { model.percentText($0) }
             )
-            sliderWithSubtitle(
+            PreferenceSlider(
                 title: "Media File Volume",
-                subtitle: Text("Media file vs. voice volume"),
                 value: Binding(get: { model.preferences.sound.mediaFileVolumePercent }, set: { model.mediafileVolumeChanged($0) }),
                 range: 0...100,
                 step: 1,
-                displayValue: { "\(Int($0.rounded())) %" }
+                valueText: { "\(Int($0.rounded())) %" }
             )
-            sliderWithSubtitle(
+            PreferenceSlider(
                 title: "Microphone Gain",
-                subtitle: Text(verbatim: model.percentSubtitle(model.preferences.sound.microphoneGainPercent)),
                 value: Binding(get: { model.preferences.sound.microphoneGainPercent }, set: { model.microphoneGainChanged($0) }),
                 range: 0...100,
                 step: 10,
-                displayValue: { model.percentSubtitle($0) }
+                valueText: { model.percentText($0) }
             )
-            sliderWithSubtitle(
+            PreferenceSlider(
                 title: "Voice Activation Level",
-                subtitle: Text(verbatim: model.voiceActivationSubtitle(model.preferences.sound.voiceActivationLevel)),
                 value: Binding(get: { model.preferences.sound.voiceActivationLevel }, set: { model.voiceactlevelChanged($0) }),
                 range: 0...Double(VOICEACT_DISABLED),
                 step: 1,
-                displayValue: { model.voiceActivationValueText($0) }
+                valueText: { model.voiceActivationValueText($0) }
             )
             NavigationLink {
                 SoundDevicesView(session: model.session)
@@ -253,21 +248,19 @@ struct PreferencesView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-            sliderWithSubtitle(
+            PreferenceSlider(
                 title: "Speech Rate",
-                subtitle: Text(verbatim: String(format: String(localized: "The rate of the speaking voice is %.1f", comment: "preferences"), Float(model.preferences.textToSpeech.rate))),
                 value: Binding(get: { model.preferences.textToSpeech.rate }, set: { model.ttsrateChanged($0) }),
                 range: Double(AVSpeechUtteranceMinimumSpeechRate)...Double(AVSpeechUtteranceMaximumSpeechRate),
                 step: 0.1,
-                displayValue: { String(format: "%.1f", $0) }
+                valueText: { String(format: "%.1f", $0) }
             )
-            sliderWithSubtitle(
+            PreferenceSlider(
                 title: "Speech Volume",
-                subtitle: Text(verbatim: String(format: String(localized: "The volume of the speaking voice is %.1f", comment: "preferences"), Float(model.preferences.textToSpeech.volume))),
                 value: Binding(get: { model.preferences.textToSpeech.volume }, set: { model.ttsvolChanged($0) }),
                 range: 0...1,
                 step: 0.1,
-                displayValue: { String(format: "%.1f", $0) }
+                valueText: { String(format: "%.1f", $0) }
             )
             NavigationLink {
                 TextToSpeechEventsView()
@@ -321,26 +314,6 @@ struct PreferencesView: View {
         }
     }
 
-    private func sliderWithSubtitle(title: LocalizedStringKey,
-                                    subtitle: Text,
-                                    value: Binding<Double>,
-                                    range: ClosedRange<Double>,
-                                    step: Double,
-                                    displayValue: @escaping (Double) -> String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) {
-                    Text(title)
-                    Spacer(minLength: 16)
-                    Text(displayValue(value.wrappedValue))
-                        .font(.body.monospacedDigit())
-                        .foregroundStyle(.secondary)
-                }
-                Slider(value: value, in: range, step: step)
-            }
-            PreferenceSubtitle(subtitle)
-        }
-    }
 }
 
 struct PreferenceSubtitle: View {
@@ -362,5 +335,27 @@ struct PreferenceSubtitle: View {
         text
             .font(.footnote)
             .foregroundStyle(.secondary)
+    }
+}
+
+/// A titled slider with a trailing value label. No subtitle: the value is only shown once.
+struct PreferenceSlider: View {
+    let title: LocalizedStringKey
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let valueText: (Double) -> String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Text(title)
+                Spacer(minLength: 16)
+                Text(valueText(value))
+                    .font(.body.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+            Slider(value: $value, in: range, step: step)
+        }
     }
 }

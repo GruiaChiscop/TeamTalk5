@@ -551,7 +551,7 @@ final class PreferencesModel {
         preferences.defaultSubscriptions.contains(row.type)
     }
 
-    func percentSubtitle(_ value: Double) -> String {
+    func percentText(_ value: Double) -> String {
         let percent = Int(value.rounded())
         let vol = refVolume(Double(percent))
         if UInt32(vol) == SOUND_VOLUME_DEFAULT.rawValue {
@@ -566,14 +566,6 @@ final class PreferencesModel {
             return String(localized: "Disabled", comment: "preferences")
         }
         return "\(level)"
-    }
-
-    func voiceActivationSubtitle(_ value: Double) -> String {
-        let level = Int(value.rounded())
-        if level == VOICEACT_DISABLED {
-            return String(localized: "Voice Activation Level: Disabled", comment: "preferences")
-        }
-        return String(format: String(localized: "Voice Activation Level: %d. Recommended: %d", comment: "preferences"), level, DEFAULT_VOICEACT)
     }
 }
 
