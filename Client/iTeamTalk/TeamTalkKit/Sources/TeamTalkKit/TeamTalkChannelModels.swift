@@ -126,6 +126,18 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
         rawValue.isPasswordProtected
     }
 
+    /// Whether this channel automatically adjusts transmitting users'
+    /// volume to a target level, instead of using each user's raw input
+    /// gain. See ``gainLevel`` for the target.
+    public var isAGCEnabled: Bool {
+        rawValue.audiocfg.bEnableAGC != 0
+    }
+
+    /// The target volume ``isAGCEnabled`` normalizes transmitting users to.
+    public var gainLevel: Int32 {
+        rawValue.audiocfg.nGainLevel
+    }
+
     /// A placeholder to use before a real channel snapshot is available.
     public static let empty = TeamTalkChannel(Channel())
 }

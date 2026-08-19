@@ -189,6 +189,28 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertTrue(channel.isPasswordProtected)
     }
 
+    func testChannelAGCAndUserVolumeStereoAccessors() {
+        var rawChannel = Channel()
+        rawChannel.audiocfg.bEnableAGC = 1
+        rawChannel.audiocfg.nGainLevel = 15_000
+        let channel = TeamTalkChannel(rawChannel)
+        XCTAssertTrue(channel.isAGCEnabled)
+        XCTAssertEqual(channel.gainLevel, 15_000)
+
+        var rawUser = User()
+        rawUser.nVolumeVoice = 1_000
+        rawUser.nVolumeMediaFile = 2_000
+        rawUser.stereoPlaybackVoice = (1, 0)
+        rawUser.stereoPlaybackMediaFile = (0, 1)
+        let user = TeamTalkUser(rawUser)
+        XCTAssertEqual(user.voiceVolume, 1_000)
+        XCTAssertEqual(user.mediaFileVolume, 2_000)
+        XCTAssertTrue(user.voiceStereoLeftSpeaker)
+        XCTAssertFalse(user.voiceStereoRightSpeaker)
+        XCTAssertFalse(user.mediaFileStereoLeftSpeaker)
+        XCTAssertTrue(user.mediaFileStereoRightSpeaker)
+    }
+
     func testChannelTransmitUserAndQueueHelpers() {
         var rawChannel = Channel()
         rawChannel.transmitUserList = [

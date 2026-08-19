@@ -442,10 +442,10 @@ final class ChannelListModel {
     // MARK: - Audio config
 
     func updateAudioConfig() {
-        if mychannel.rawValue.audiocfg.bEnableAGC == TRUE {
+        if mychannel.isAGCEnabled {
             session.setSoundInputGainLevel(INT32(SOUND_GAIN_DEFAULT.rawValue))
             var ap = TeamTalkAudioPreprocessor.makeWebRTCPreprocessor()
-            let gain = Float(mychannel.rawValue.audiocfg.nGainLevel) / Float(TeamTalkAudioPreprocessor.channelAudioConfigMax)
+            let gain = Float(mychannel.gainLevel) / Float(TeamTalkAudioPreprocessor.channelAudioConfigMax)
             ap.webrtc.gaincontroller2.fixeddigital.fGainDB = WEBRTC_GAINCONTROLLER2_FIXEDGAIN_MAX * gain
             ap.webrtc.gaincontroller2.bEnable = TRUE
             session.setSoundInputPreprocess(&ap)

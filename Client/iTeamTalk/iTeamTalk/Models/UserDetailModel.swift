@@ -78,8 +78,8 @@ final class UserDetailModel {
         userID = user.userID
         displayName = getDisplayName(user)
         usernameText = user.username
-        voiceVolume = Double(refVolumeToPercent(Int(user.rawValue.nVolumeVoice)))
-        mediaVolume = Double(refVolumeToPercent(Int(user.rawValue.nVolumeMediaFile)))
+        voiceVolume = Double(refVolumeToPercent(Int(user.voiceVolume)))
+        mediaVolume = Double(refVolumeToPercent(Int(user.mediaFileVolume)))
         isVoiceMuted = user.states.contains(.voiceMuted)
         isMediaMuted = user.states.contains(.mediaFileMuted)
         subscriptions = user.localSubscriptions

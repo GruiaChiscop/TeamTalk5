@@ -102,6 +102,33 @@ public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
         rawValue.isInChannel
     }
 
+    /// This client's locally set playback volume for `user`'s voice - see
+    /// `TeamTalkSession.setUserVolume(_:stream:volume:)`.
+    public var voiceVolume: Int32 {
+        rawValue.nVolumeVoice
+    }
+
+    /// Like ``voiceVolume``, for `user`'s media file playback.
+    public var mediaFileVolume: Int32 {
+        rawValue.nVolumeMediaFile
+    }
+
+    public var voiceStereoLeftSpeaker: Bool {
+        rawValue.stereoPlaybackVoice.0 != 0
+    }
+
+    public var voiceStereoRightSpeaker: Bool {
+        rawValue.stereoPlaybackVoice.1 != 0
+    }
+
+    public var mediaFileStereoLeftSpeaker: Bool {
+        rawValue.stereoPlaybackMediaFile.0 != 0
+    }
+
+    public var mediaFileStereoRightSpeaker: Bool {
+        rawValue.stereoPlaybackMediaFile.1 != 0
+    }
+
     /// A placeholder to use before a real user snapshot is available.
     public static let empty = TeamTalkUser(User())
 }

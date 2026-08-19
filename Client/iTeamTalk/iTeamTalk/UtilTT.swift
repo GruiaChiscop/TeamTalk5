@@ -62,21 +62,21 @@ class UserCached {
     var subscriptions: TeamTalkSubscriptions
     var voiceMute: Bool
     var mediaMute: Bool
-    var voiceVolume: INT32
-    var mediaVolume: INT32
+    var voiceVolume: Int32
+    var mediaVolume: Int32
     var voiceLeftSpeaker, voiceRightSpeaker,
-    mediaLeftSpeaker, mediaRightSpeaker: TTBOOL
+    mediaLeftSpeaker, mediaRightSpeaker: Bool
 
     init(user: TeamTalkUser) {
         subscriptions = user.localSubscriptions
         voiceMute = user.states.contains(.voiceMuted)
         mediaMute = user.states.contains(.mediaFileMuted)
-        voiceVolume = user.rawValue.nVolumeVoice
-        mediaVolume = user.rawValue.nVolumeMediaFile
-        voiceLeftSpeaker = user.rawValue.stereoPlaybackVoice.0
-        voiceRightSpeaker = user.rawValue.stereoPlaybackVoice.1
-        mediaLeftSpeaker = user.rawValue.stereoPlaybackMediaFile.0
-        mediaRightSpeaker = user.rawValue.stereoPlaybackMediaFile.1
+        voiceVolume = user.voiceVolume
+        mediaVolume = user.mediaFileVolume
+        voiceLeftSpeaker = user.voiceStereoLeftSpeaker
+        voiceRightSpeaker = user.voiceStereoRightSpeaker
+        mediaLeftSpeaker = user.mediaFileStereoLeftSpeaker
+        mediaRightSpeaker = user.mediaFileStereoRightSpeaker
     }
 
     func sync(user: TeamTalkUser, session: TeamTalkSession) {
@@ -84,8 +84,8 @@ class UserCached {
         session.setUserMute(user, stream: .mediaFileAudio, muted: mediaMute)
         session.setUserVolume(user, stream: .voice, volume: voiceVolume)
         session.setUserVolume(user, stream: .mediaFileAudio, volume: mediaVolume)
-        session.setUserStereo(user, stream: .voice, leftSpeaker: voiceLeftSpeaker != 0, rightSpeaker: voiceRightSpeaker != 0)
-        session.setUserStereo(user, stream: .mediaFileAudio, leftSpeaker: mediaLeftSpeaker != 0, rightSpeaker: mediaRightSpeaker != 0)
+        session.setUserStereo(user, stream: .voice, leftSpeaker: voiceLeftSpeaker, rightSpeaker: voiceRightSpeaker)
+        session.setUserStereo(user, stream: .mediaFileAudio, leftSpeaker: mediaLeftSpeaker, rightSpeaker: mediaRightSpeaker)
         if subscriptions != user.localSubscriptions {
             let diff = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
             session.unsubscribe(diff, from: user)
