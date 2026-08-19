@@ -138,6 +138,15 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
         rawValue.audiocfg.nGainLevel
     }
 
+    /// A copy of this channel with `password` set, e.g. to carry a
+    /// remembered join password into a "channel detail" UI that otherwise
+    /// only sees the server's (unpopulated) `password` field.
+    public func settingPassword(_ password: String) -> TeamTalkChannel {
+        var rawValue = rawValue
+        TeamTalkString.setChannel(.password, on: &rawValue, to: password)
+        return TeamTalkChannel(rawValue)
+    }
+
     /// A placeholder to use before a real channel snapshot is available.
     public static let empty = TeamTalkChannel(Channel())
 }

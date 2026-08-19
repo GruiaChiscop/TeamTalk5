@@ -323,13 +323,11 @@ final class ChannelListModel {
     }
 
     func showChannelDetail(_ channel: TeamTalkChannel) {
-        var rawChannel = channel.cValue
-        if TeamTalkString.channel(.password, from: rawChannel).isEmpty {
-            if let password = chanpasswds[channel.channelID] {
-                TeamTalkString.setChannel(.password, on: &rawChannel, to: password)
-            }
+        var channel = channel
+        if channel.password.isEmpty, let password = chanpasswds[channel.channelID] {
+            channel = channel.settingPassword(password)
         }
-        let model = ChannelDetailModel(channel: TeamTalkChannel(rawChannel), session: session)
+        let model = ChannelDetailModel(channel: channel, session: session)
         channelDetailModel = model
     }
 

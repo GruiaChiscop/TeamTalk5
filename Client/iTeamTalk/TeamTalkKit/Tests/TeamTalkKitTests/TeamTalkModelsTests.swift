@@ -68,6 +68,12 @@ final class TeamTalkModelsTests: XCTestCase {
         let newChannel = TeamTalkChannel(parentChannelID: parentID)
         XCTAssertEqual(newChannel.parentChannelID, parentID)
         XCTAssertFalse(newChannel.channelID.isValid)
+
+        XCTAssertTrue(newChannel.password.isEmpty)
+        let passworded = newChannel.settingPassword("secret")
+        XCTAssertEqual(passworded.password, "secret")
+        XCTAssertEqual(passworded.parentChannelID, parentID)
+        XCTAssertTrue(newChannel.password.isEmpty)
     }
 
     func testUserAccountConfigurationRoundTrip() {
