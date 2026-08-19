@@ -47,11 +47,11 @@ struct MyTextMessage {
     var msgtype : MsgType
     var fromUserID: TeamTalkUserID = .none
     
-    init(m: TextMessage, nickname: String, msgtype: MsgType) {
-        message = TeamTalkString.textMessage(m)
+    init(m: TeamTalkTextMessage, nickname: String, msgtype: MsgType) {
+        message = m.content
         self.nickname = nickname
         self.msgtype = msgtype
-        self.fromUserID = TeamTalkUserID(m.nFromUserID)
+        self.fromUserID = m.fromUserIdentifier
     }
 
     init(fromUserID: TeamTalkUserID, nickname: String, msgtype: MsgType, content: String) {
@@ -103,21 +103,17 @@ func announceForAccessibility(_ message: String) {
     UIAccessibility.post(notification: .announcement, argument: message)
 }
 
-private func getDisplayName(_ user: User) -> String {
-    if Preferences.current.display.showUsername {
-        return limitText(TeamTalkString.user(.username, from: user))
-    }
-
-    let nickname = TeamTalkString.user(.nickname, from: user)
-    if nickname.isEmpty {
-        return DEFAULT_NICKNAME + " - #\(user.nUserID)"
-    }
-    
-    return limitText(nickname)
-}
-
 func getDisplayName(_ user: TeamTalkUser) -> String {
-    getDisplayName(user.rawValue)
+    if Preferences.current.display.showUsername {
+        return limitText(user.username)
+    }
+
+    let nickname = user.nickname
+    if nickname.isEmpty {
+        return DEFAULT_NICKNAME + " - #\(user.id)"
+    }
+
+    return limitText(nickname)
 }
 
 

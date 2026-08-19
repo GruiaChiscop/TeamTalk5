@@ -227,7 +227,7 @@ extension TextMessageModel: TeamTalkEventObserver {
             content: content
         )
         appendEventMessage(mymsg)
-        speakTextMessage(txtmsg.type.cValue, mymsg: mymsg)
+        speakTextMessage(txtmsg.type, mymsg: mymsg)
     }
 
     private func msgType(for txtmsg: TeamTalkTextMessage) -> MsgType {

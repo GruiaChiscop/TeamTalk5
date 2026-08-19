@@ -56,11 +56,11 @@ func newUtterance(_ utterance: String) {
     synth.speak(myUtterance)
 }
 
-func speakTextMessage(_ msgtype: TextMsgType, mymsg: MyTextMessage) {
+func speakTextMessage(_ msgtype: TeamTalkTextMessageType, mymsg: MyTextMessage) {
 
     let events = Preferences.current.textToSpeechEvents
-    let tts_priv = events.privateTextMessage && msgtype == MSGTYPE_USER
-    let tts_chan = events.channelTextMessage && msgtype == MSGTYPE_CHANNEL
+    let tts_priv = events.privateTextMessage && msgtype == .user
+    let tts_chan = events.channelTextMessage && msgtype == .channel
     
     if tts_priv {
         let ttsmsg = String(format: String(localized: "Private text message from %@. %@", comment: "TTS EVENT"),

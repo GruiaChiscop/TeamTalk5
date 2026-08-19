@@ -592,7 +592,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                 if let user = users[fromUserID] {
                     let name = getDisplayName(user)
                     let newmsg = MyTextMessage(
-                        m: message.rawValue,
+                        m: message,
                         nickname: name,
                         msgtype: session.myUserIdentifier == message.fromUserIdentifier ? .PRIV_IM_MYSELF : .PRIV_IM
                     )
@@ -616,7 +616,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                     currentTextMessageModel = model
                     navigationPath.append(.textMessage(model))
                     if let msg = model.lastMessage() {
-                        speakTextMessage(message.type.cValue, mymsg: msg)
+                        speakTextMessage(message.type, mymsg: msg)
                     }
                 }
             }
