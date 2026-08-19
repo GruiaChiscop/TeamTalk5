@@ -104,6 +104,10 @@ public struct TeamTalkServerProperties: Equatable, Hashable, Sendable {
     public var autoSave: Bool {
         rawValue.autoSave
     }
+
+    /// A placeholder to use before a real server properties snapshot is
+    /// available.
+    public static let empty = TeamTalkServerProperties(ServerProperties())
 }
 
 /// Mutable counterpart to ``TeamTalkServerProperties`` for

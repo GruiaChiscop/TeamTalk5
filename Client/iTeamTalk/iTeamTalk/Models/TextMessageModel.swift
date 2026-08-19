@@ -188,12 +188,12 @@ final class TextMessageModel {
     }
 
     private var myDisplayName: String {
-        let me = session.currentUser() ?? TeamTalkUser(User())
+        let me = session.currentUser() ?? TeamTalkUser.empty
         return getDisplayName(me)
     }
 
     private func displayName(forSender userID: TeamTalkUserID) -> String {
-        let user = session.user(id: userID) ?? privateUser ?? TeamTalkUser(User())
+        let user = session.user(id: userID) ?? privateUser ?? TeamTalkUser.empty
         return getDisplayName(user)
     }
 }

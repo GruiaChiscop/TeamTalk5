@@ -58,6 +58,18 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertNotEqual(TeamTalkChannel(rawChannelA), TeamTalkChannel(rawChannelB))
     }
 
+    func testEmptyPlaceholdersAndNewChannelConvenienceInit() {
+        XCTAssertEqual(TeamTalkChannel.empty.channelID, .none)
+        XCTAssertEqual(TeamTalkUser.empty.userID, .none)
+        XCTAssertEqual(TeamTalkUserAccount.empty.username, "")
+        XCTAssertEqual(TeamTalkServerProperties.empty.name, "")
+
+        let parentID = TeamTalkChannelID(7)
+        let newChannel = TeamTalkChannel(parentChannelID: parentID)
+        XCTAssertEqual(newChannel.parentChannelID, parentID)
+        XCTAssertFalse(newChannel.channelID.isValid)
+    }
+
     func testUserAccountConfigurationRoundTrip() {
         let configuration = TeamTalkUserAccountConfiguration(
             username: "guest",

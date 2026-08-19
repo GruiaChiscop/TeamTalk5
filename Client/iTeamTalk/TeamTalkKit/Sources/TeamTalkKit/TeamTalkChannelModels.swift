@@ -11,6 +11,14 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
         self.rawValue = rawValue
     }
 
+    /// A new, unsaved channel under `parentChannelID`, for a "create
+    /// channel" UI to populate before submitting.
+    public init(parentChannelID: TeamTalkChannelID) {
+        var rawValue = Channel()
+        rawValue.nParentID = parentChannelID.cValue
+        self.rawValue = rawValue
+    }
+
     public var cValue: Channel {
         rawValue
     }
@@ -117,6 +125,9 @@ public struct TeamTalkChannel: Identifiable, Equatable, Hashable, Sendable {
     public var isPasswordProtected: Bool {
         rawValue.isPasswordProtected
     }
+
+    /// A placeholder to use before a real channel snapshot is available.
+    public static let empty = TeamTalkChannel(Channel())
 }
 
 /// Mutable counterpart to ``TeamTalkChannel`` for

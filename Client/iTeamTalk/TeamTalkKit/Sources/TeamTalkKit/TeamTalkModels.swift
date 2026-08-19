@@ -101,6 +101,9 @@ public struct TeamTalkUser: Identifiable, Equatable, Hashable, Sendable {
     public var isInChannel: Bool {
         rawValue.isInChannel
     }
+
+    /// A placeholder to use before a real user snapshot is available.
+    public static let empty = TeamTalkUser(User())
 }
 
 /// Server-side rate limiting for one user account: how many commands are
@@ -253,6 +256,10 @@ public struct TeamTalkUserAccount: Equatable, Hashable, Sendable {
     public var isAdministrator: Bool {
         rawValue.isAdministrator
     }
+
+    /// A placeholder to use before a real user account snapshot is
+    /// available.
+    public static let empty = TeamTalkUserAccount(UserAccount())
 }
 
 /// Mutable counterpart to ``TeamTalkUserAccount`` for

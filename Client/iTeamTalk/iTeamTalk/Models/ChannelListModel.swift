@@ -104,12 +104,12 @@ final class ChannelListModel {
     // MARK: Server / channel state
     var channels = [TeamTalkChannelID: TeamTalkChannel]()
     var chanpasswds = [TeamTalkChannelID: String]()
-    var mychannel = TeamTalkChannel(Channel())
+    var mychannel = TeamTalkChannel.empty
     var rejoinchannel: TeamTalkChannelConfiguration?
     var users = [TeamTalkUserID: TeamTalkUser]()
     var isProcessingCommand = false
-    var srvprop = TeamTalkServerProperties(ServerProperties())
-    var myuseraccount = TeamTalkUserAccount(UserAccount())
+    var srvprop = TeamTalkServerProperties.empty
+    var myuseraccount = TeamTalkUserAccount.empty
 
     // Admins implicitly hold every right, regardless of what the account grants.
     var effectiveUserRights: TeamTalkUserRights {
@@ -334,15 +334,14 @@ final class ChannelListModel {
     }
 
     func showNewChannel() {
-        var newChannel = Channel()
-        newChannel.nParentID = mychannel.channelID.cValue
-        if newChannel.nParentID == 0 {
+        var parentChannelID = mychannel.channelID
+        if !parentChannelID.isValid {
             let subchans = channels.values.filter { !$0.parentChannelID.isValid }
             if let root = subchans.first {
-                newChannel.nParentID = root.channelID.cValue
+                parentChannelID = root.channelID
             }
         }
-        let model = ChannelDetailModel(channel: TeamTalkChannel(newChannel), session: session)
+        let model = ChannelDetailModel(channel: TeamTalkChannel(parentChannelID: parentChannelID), session: session)
         channelDetailModel = model
     }
 
@@ -484,7 +483,7 @@ extension ChannelListModel: TeamTalkEventObserver {
         case .connectionLost:
             channels.removeAll()
             users.removeAll()
-            mychannel = TeamTalkChannel(Channel())
+            mychannel = TeamTalkChannel.empty
             rejoinchannel = nil
             refreshChannelList()
 
@@ -576,7 +575,7 @@ extension ChannelListModel: TeamTalkEventObserver {
                 users[user.userID] = user
             }
             if user.userID == session.myUserIdentifier {
-                mychannel = TeamTalkChannel(Channel())
+                mychannel = TeamTalkChannel.empty
                 rejoinchannel = nil
             }
             if previousChannelID == mychannel.channelID && mychannel.channelID.isValid {
