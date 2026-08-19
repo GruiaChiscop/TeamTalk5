@@ -1,46 +1,80 @@
 # Getting Started
 
-This guide shows the intended Swift-first way to use TeamTalkKit. The old C-like
-methods remain available for compatibility, but new app code should prefer the
-typed APIs.
+This guide walks through the API surface a new app needs: create a session,
+connect, log in, do something, and tear down. For a complete, runnable
+version of everything below, see
+[`Examples/TeamTalkKitExample`](../Examples/TeamTalkKitExample) - run it with:
+
+```sh
+swift run TeamTalkKitExample <host> [tcpPort] [udpPort] [nickname]
+```
 
 ## Import
-
-Add TeamTalkKit as a Swift package dependency, then import it:
 
 ```swift
 import TeamTalkKit
 ```
 
-TeamTalkKit re-exports `TeamTalkC`, so raw C SDK types remain available when
-needed.
+TeamTalkKit does not re-export the underlying `TeamTalkC` module or any raw
+SDK type. Application code talks to Swift model types only (`TeamTalkUser`,
+`TeamTalkChannel`, `TeamTalkSession`, ...); if you ever need the raw C value
+behind one, it's on `rawValue`/`cValue` (see [Advanced Usage](Advanced.md)).
+
+## Create A Session
+
+Unlike the pre-1.0 API, there's no shared singleton - create a
+`TeamTalkSession` wherever your app manages connection lifecycle (a session
+model, a dependency-injected service, etc.):
+
+```swift
+let session = TeamTalkSession()
+```
+
+Nothing stops you from creating more than one (e.g. to connect to two
+servers at once); most apps only need one, held for the app's lifetime.
 
 ## Start And Close
 
-Create the TeamTalk instance once during app startup:
+`start` allocates the native SDK instance and applies your license. Call it
+once, before anything else:
 
 ```swift
-let client = TeamTalkClient.shared
-
-client.start(
-    licenseName: REGISTRATION_NAME,
-    licenseKey: REGISTRATION_KEY
-)
+session.start(licenseName: REGISTRATION_NAME, licenseKey: REGISTRATION_KEY)
 ```
 
-Release the instance when the app is shutting down:
+An empty name/key (`""`, `""`) runs the SDK unregistered - the same default
+iTeamTalk itself ships with. BearWare.dk issues a real license key for
+production use; see their site for terms.
+
+Tear the instance down when you're done with it (app shutdown, or before
+reusing the session with a fresh `start` call):
 
 ```swift
-TeamTalkClient.shared.close()
+session.close()
 ```
+
+## Poll Events
+
+The TeamTalk C SDK is poll based - it queues messages internally and expects
+the host app to drain that queue. `TeamTalkSession` can do this for you with
+a repeating timer:
+
+```swift
+session.startEventDispatching()   // default: every 0.1s
+session.stopEventDispatching()    // e.g. around session.close()
+```
+
+If you'd rather drive polling yourself (a custom run loop, a specific
+dispatch queue), call `session.pollMessages()` on whatever schedule you
+choose instead - `startEventDispatching` is a convenience, not a requirement.
 
 ## Connect And Log In
 
-Connecting returns a synchronous `Bool` because it starts the connection
-attempt. The actual connection result arrives later through events.
+Connecting starts the TCP/UDP handshake and returns immediately; the actual
+result arrives later as an event.
 
 ```swift
-let didStartConnection = client.connect(
+let didStartConnection = session.connect(
     toHost: "example.org",
     tcpPort: 10333,
     udpPort: 10333,
@@ -52,48 +86,50 @@ guard didStartConnection else {
 }
 ```
 
-After receiving `.connectionSucceeded`, log in:
+Every command on `TeamTalkSession` comes in two flavors: a synchronous,
+fire-and-forget one returning a `TeamTalkCommandID` you match against events
+yourself, and an `async throws` one that awaits the matching completion
+event for you (with a timeout, so it can't hang forever). Prefer the async
+ones for new code:
 
 ```swift
-let loginCommandID = client.logIn(
+// After .connectionSucceeded arrives (see "Observe Typed Events" below):
+let me = try await session.logIn(
     nickname: "Alice",
     username: "alice",
     password: "secret",
-    clientName: "iTeamTalk"
+    clientName: "MyApp"
+)
+print("Logged in as \(me.nickname), user #\(me.id)")
+```
+
+> **Overload gotcha:** because both the sync and async `logIn` overloads
+> accept the same argument labels, `try await session.logIn(...)` bound to a
+> `let` doesn't always resolve to the async one on its own - annotate the
+> expected type (`let me: TeamTalkUser = try await ...`) to be sure. See
+> [Advanced Usage](Advanced.md#command-tracking) for the full explanation.
+
+Or track the command ID yourself with the sync overload:
+
+```swift
+let loginCommandID = session.logIn(
+    nickname: "Alice",
+    username: "alice",
+    password: "secret",
+    clientName: "MyApp"
 )
 ```
 
-`loginCommandID` is a `TeamTalkCommandID`, not a raw `Int32`. It can be compared
-against command events.
-
-## Poll Events
-
-The TeamTalk C SDK is poll based. TeamTalkKit does not start a hidden polling
-thread. The host app must call:
-
-```swift
-TeamTalkClient.shared.pollMessages()
-```
-
-iTeamTalk currently drives this from its app event loop. A new app can use a
-timer, run loop integration, or a dedicated task, as long as all TeamTalk calls
-are kept on a predictable execution context.
-
 ## Observe Typed Events
 
-Use `TeamTalkEventObserver` when you want a delegate-style observer:
+Use `TeamTalkEventObserver` for delegate-style callbacks:
 
 ```swift
 final class SessionModel: TeamTalkEventObserver {
     func handleTeamTalkEvent(_ event: TeamTalkEvent) {
         switch event.kind {
         case .connectionSucceeded:
-            TeamTalkClient.shared.logIn(
-                nickname: "Alice",
-                username: "alice",
-                password: "secret",
-                clientName: "iTeamTalk"
-            )
+            print("Connected")
 
         case .commandError(let commandID, let error):
             print("Command \(commandID) failed: \(error.message)")
@@ -106,114 +142,90 @@ final class SessionModel: TeamTalkEventObserver {
         }
     }
 }
-```
 
-Register and remove observers explicitly:
-
-```swift
 let model = SessionModel()
-client.addEventObserver(model)
-client.removeEventObserver(model)
+session.addEventObserver(model)   // held weakly - no need to remove just to break a retain cycle
+session.removeEventObserver(model)
 ```
 
-You can also consume events as an `AsyncStream`:
+Or consume events as an `AsyncStream`. Each access to `events` opens a fresh
+stream backed by its own observer, cleaned up automatically when the
+consuming loop ends:
 
 ```swift
 Task {
-    for await event in TeamTalkClient.shared.events {
+    for await event in session.events {
         print(event.kind)
     }
 }
 ```
 
-The `AsyncStream` only receives events when `pollMessages()` is called somewhere
-else.
+`events` only receives events while something is polling - either
+`startEventDispatching()` or your own `pollMessages()` calls.
 
 ## Query Server State
 
-Once logged in, query snapshots with Swift models:
+Once logged in, query snapshots straight from Swift models - no command
+round-trip needed, these read the SDK's already-cached state:
 
 ```swift
-let properties = client.serverProperties()
-let account = client.currentUserAccount()
-let channels = client.channels()
-let users = client.serverUsers()
-let files = client.remoteFiles(in: client.myChannelID)
+let properties = session.serverProperties()
+let me = session.currentUser()
+let channels = session.channels()
+let users = session.serverUsers()
+let files = session.remoteFiles(in: someChannel)
 ```
 
-Each model keeps the raw C value available:
-
-```swift
-if let channel = client.channel(id: client.myChannelID) {
-    let rawChannel: Channel = channel.cValue
-    print(rawChannel.nChannelID)
-}
-```
+Every snapshot model keeps its raw C value available through `cValue`/
+`rawValue` for the rare case you need it - see
+[Advanced Usage](Advanced.md#raw-values-and-c-values).
 
 ## Join A Channel
 
-Join by ID:
+Join an existing channel:
 
 ```swift
-let commandID = client.joinChannel(withID: channel.id, password: "")
+try await session.joinChannel(channel, password: "")
 ```
 
-Create or join with a channel configuration:
+Create-and-join with a configuration:
 
 ```swift
 let configuration = TeamTalkChannelConfiguration(
-    parentID: client.rootChannelID,
+    parentChannelID: session.channelIdentifier(fromPath: "/"),
     name: "Meeting",
     topic: "Weekly sync",
-    types: [.default],
     maxUsers: 25
 )
 
-let commandID = client.join(configuration)
+let created = try await session.createChannel(configuration)
+try await session.joinChannel(created)
 ```
 
 ## Send Text Messages
 
-Use `TeamTalkOutgoingTextMessage`. Long messages are split into multiple
-TeamTalk text-message packets automatically.
+`TeamTalkOutgoingTextMessage` splits long content across as many SDK
+messages as needed automatically:
 
 ```swift
-let commandIDs = client.sendTextMessage(
-    .channel(client.myChannelID, content: "Hello")
-)
-```
-
-For private messages:
-
-```swift
-client.sendTextMessage(.user(to: user.id, content: "Hi"))
+try await session.sendTextMessage(.channel(someChannel, content: "Hello"))
+try await session.sendTextMessage(.user(to: someUser, content: "Hi"))
 ```
 
 ## Files
 
-List files in a channel:
-
 ```swift
-let files = client.remoteFiles(in: channel.id)
+let files = session.remoteFiles(in: someChannel)
+
+let uploadedFile = try await session.uploadFile(at: localURL, to: someChannel)
+try await session.downloadFile(someFile, to: destinationURL)
 ```
 
-Download:
-
-```swift
-let commandID = client.downloadFile(file, to: destinationURL)
-```
-
-Upload:
-
-```swift
-let commandID = client.uploadFile(at: localURL, to: channel)
-```
-
-Track progress through `.fileTransfer` events:
+Track transfer progress through `.fileTransfer` events:
 
 ```swift
 case .fileTransfer(let transfer):
-    print(transfer.progress)
+    print(transfer.status, transfer.progress)   // progress is normalized 0...1
 ```
 
 ## Rights And Options
@@ -221,17 +233,20 @@ case .fileTransfer(let transfer):
 Swift option sets wrap TeamTalk bitmasks:
 
 ```swift
-if client.hasUserRight(.canUploadFiles) {
+if session.myRights.contains(.canUploadFiles) {
     print("Can upload")
 }
 
-if user.hasSubscription(.voice) {
+if someUser.hasSubscription(.voice) {
     print("Receiving voice from user")
 }
 ```
 
-When the C value is needed:
+## Disconnect And Shut Down
 
 ```swift
-let rawRights: UserRights = TeamTalkUserRights.canUploadFiles.cValue
+try? await session.logOut()
+session.disconnect()
+session.stopEventDispatching()
+session.close()
 ```

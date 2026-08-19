@@ -49,10 +49,17 @@ register a hotkey to trigger them on the platforms this package targets.
 
 - Continue migrating event payloads and application-facing APIs from raw `Int32`
   IDs to lightweight ID wrappers where it improves clarity.
-- Consider a dedicated `TeamTalkSession` type instead of exposing only
-  `TeamTalkClient.shared`.
-- Consider async command helpers which wait for matching success/error events:
-  `try await client.joinChannel(...)`.
+- [x] Consider a dedicated `TeamTalkSession` type instead of exposing only
+  `TeamTalkClient.shared`. Resolved: `TeamTalkClient.shared` is gone;
+  `TeamTalkSession` is a plain, instantiable class, and nothing prevents
+  holding more than one.
+- [x] Consider async command helpers which wait for matching success/error
+  events: `try await client.joinChannel(...)`. Resolved:
+  `TeamTalkSessionAsyncCommands.swift` covers login, channels, files, bans,
+  user accounts, server settings and server statistics. See
+  `Documentation/Advanced.md#command-tracking` for the sync/async overload
+  pair this introduced, and its one sharp edge (documented there and in
+  `APIAudit.md`).
 - Consider typed event streams filtered by command ID or event kind.
 - Consider model builders for `Channel`, `UserAccount`, `ServerProperties` and
   `BannedUser` once the configuration structs grow.
@@ -101,7 +108,13 @@ register a hotkey to trigger them on the platforms this package targets.
 
 ## Documentation Follow-Ups
 
+- [x] Rewrite `GettingStarted.md`/`Advanced.md`/`APIAudit.md`, which still
+  described the retired `TeamTalkClient.shared` singleton and the
+  now-empty `Exports.swift` re-export layer, to match the current
+  `TeamTalkSession`-based API.
+- [x] Add a runnable example. `Examples/TeamTalkKitExample` is a macOS
+  console app (`swift run TeamTalkKitExample <host> ...`) covering connect,
+  login, channel listing/joining, and event observation.
 - Add examples for account administration once the app has an admin UI.
 - Add examples for file browsing once the Files tab is migrated to the new API.
-- Add examples for async command helpers if they are implemented.
 - Add a generated symbol reference later, after the public API stabilizes.

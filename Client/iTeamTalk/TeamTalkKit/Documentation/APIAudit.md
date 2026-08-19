@@ -1,104 +1,100 @@
 # API Audit
 
-This document records the current TeamTalkKit API split between the preferred
-Swift layer and the compatibility layer that still exists to support the app's
-ongoing migration away from the raw C API.
+This document records the current split between TeamTalkKit's public Swift
+API and its internal-only plumbing, and the reasoning behind it. It used to
+track an in-progress migration away from a raw-C-exposing compatibility
+layer (`TeamTalkClient` + `@_exported import TeamTalkC`); that migration is
+now complete, so this reads as a snapshot of the finished design rather than
+a punch list. See `Documentation/TODO.md`'s "Application Migration" section
+for how each raw-C touch point was retired.
 
-## Preferred Public API
+## Public API
 
-Application code should prefer:
+Application code should use:
 
-- `TeamTalkClient` async command helpers from
-  `TeamTalkClientAsyncCommands.swift` when the caller wants
-  `try await` semantics without manual command tracking
-- typed `TeamTalkClient` command methods from `TeamTalkClientCommands.swift`
-  when a caller explicitly needs the underlying `TeamTalkCommandID`
-- typed snapshot models such as `TeamTalkUser`, `TeamTalkChannel`,
+- `TeamTalkSession` - one instance wraps one native SDK connection. Its
+  public surface is spread across `TeamTalkSession*.swift` extension files
+  by concern: lifecycle/queries (`TeamTalkSessionServerState.swift`),
+  commands (`TeamTalkSessionCommands.swift`), the `async throws` command
+  wrappers (`TeamTalkSessionAsyncCommands.swift`), events
+  (`TeamTalkSessionEvents.swift`), audio/media
+  (`TeamTalkSessionAudio.swift`, `TeamTalkSessionMedia.swift`), and
+  desktop/video (`TeamTalkSessionDesktopVideo.swift`);
+- typed snapshot models: `TeamTalkUser`, `TeamTalkChannel`,
   `TeamTalkRemoteFile`, `TeamTalkFileTransfer`, `TeamTalkTextMessage`,
-  `TeamTalkServerProperties` and `TeamTalkUserAccount`
-- configuration models such as `TeamTalkChannelConfiguration`,
+  `TeamTalkServerProperties`, `TeamTalkUserAccount`, and configuration
+  counterparts (`TeamTalkChannelConfiguration`,
   `TeamTalkUserAccountConfiguration`, `TeamTalkServerPropertiesConfiguration`,
-  `TeamTalkBanConfiguration`, `TeamTalkMediaFilePlaybackConfiguration` and
-  `TeamTalkUserMediaStorageConfiguration`
-- typed IDs and option sets such as `TeamTalkUserID`, `TeamTalkChannelID`,
+  `TeamTalkBanConfiguration`, `TeamTalkAudioCodecConfiguration`,
+  `TeamTalkAudioPreprocessorConfiguration`,
+  `TeamTalkMediaFilePlaybackConfiguration`,
+  `TeamTalkUserMediaStorageConfiguration`, ...);
+- typed IDs and option sets: `TeamTalkUserID`, `TeamTalkChannelID`,
   `TeamTalkFileID`, `TeamTalkTransferID`, `TeamTalkCommandID`,
-  `TeamTalkSubscriptions`, `TeamTalkUserRights` and `TeamTalkStreamTypes`
-- `TeamTalkEvent`, `eventPublisher` and `AsyncStream<TeamTalkEvent>` instead of
-  polling raw `TTMessage` values directly
+  `TeamTalkSubscriptions`, `TeamTalkUserRights`, `TeamTalkStreamTypes`,
+  `TeamTalkChannelTypes`, and the rest of `TeamTalkTypes.swift`;
+- `TeamTalkEvent`, `TeamTalkEventObserver`, `eventPublisher` (Combine, where
+  available) and `events: AsyncStream<TeamTalkEvent>` instead of parsing raw
+  `TTMessage` values directly.
 
-This is the surface area whose naming and ergonomics should keep improving.
+`rawValue`/`cValue` remain on every wrapper type as an intentional escape
+hatch - see [Advanced Usage](Advanced.md#raw-values-and-c-values). Reaching
+for them from app code requires `import TeamTalkC` explicitly, since
+`Exports.swift` re-exports nothing.
 
-## Compatibility API To Keep Public For Now
+## Internal-Only Plumbing
 
-The following should remain public until the app no longer depends on them:
+The following exist to implement the public API above, not to be called
+directly, and are already marked `internal`/`private` in source (not just
+"discouraged by convention"):
 
-- `@_exported import TeamTalkC` in `Exports.swift`
-- raw C model access through `rawValue` and `cValue`
-- raw C struct extensions on `User`, `Channel`, `RemoteFile`, `FileTransfer`,
-  `TTMessage`, `AudioCodec`, `AudioPreprocessor` and related types
-- `Int32`-based overloads in modern `TeamTalkClient` files where they support
-  mixed migration and simplify bridging from older code
-- command-ID-returning overloads in `TeamTalkClientCommands.swift` for
-  workflows that still need low-level SDK-style command orchestration
+- `TeamTalkSessionLegacyCommands.swift` - `Int32`-keyed command helpers
+  (`joinChannel(id:password:)`, `kickUser(id:fromChannelID:)`, ...) that the
+  typed, public overloads in `TeamTalkSessionCommands.swift` call into;
+- raw C struct extensions on `Channel`, `User`, `RemoteFile`,
+  `FileTransfer`, `TTMessage`, `AudioCodec`, `AudioPreprocessor` and related
+  types, used by the snapshot/configuration models' own `init`/`cValue`
+  implementations;
+- `TeamTalkMessageObserver` and `messagePublisher` for raw `TTMessage`
+  observation - kept for completeness/debugging, but `TeamTalkEventObserver`
+  and `events`/`eventPublisher` are what app code should use.
 
-These APIs are still useful escape hatches, especially when an SDK feature is
-only partially wrapped or when the app still holds raw TeamTalk C values.
+Because these are already `internal` (or explicitly deprecated, in the
+message-observer case), there's no further deprecation wave needed for
+them - the compiler already keeps them out of a consumer's autocomplete.
 
-## Compatibility API Likely To Be Deprecated Later
+## Known Sharp Edge: Sync/Async Overload Pairs
 
-Once iTeamTalk has largely migrated to the Swift model layer, the strongest
-candidates for deprecation are:
+Every mutating `TeamTalkSession` command exists as both a synchronous,
+`@discardableResult` overload and an `async throws` overload with the same
+argument labels (e.g. `logIn`, `joinChannel`, `logOut`). Swift's overload
+resolution doesn't reliably prefer the async one just because the call site
+has `try await` - see
+[Advanced Usage](Advanced.md#overload-gotcha) for the failure mode and the
+fix (annotate the expected type). This is a real ergonomic gap in the
+current design; a future revision could close it by, for example, giving
+the sync overloads a distinct base name (`startLogIn`, `startJoinChannel`,
+...) instead of overloading on effect alone. Not changed yet because it
+would be a breaking rename across every call site in `iTeamTalk`.
 
-- the command methods in `TeamTalkClientLegacyCommands.swift`
-- `Int32` ID overloads in `TeamTalkClientCommands.swift` when a typed overload
-  already exists for the same operation
-- `Int32` ID overloads in `TeamTalkClientServerState.swift` where typed lookup
-  and typed model overloads now exist side by side
-- `Int32` session/channel/user overloads in `TeamTalkClientMedia.swift` and
-  `TeamTalkClientDesktopVideo.swift` when the typed alternatives cover the same
-  call paths used by the app
-- low-level event helpers in `TeamTalkClientEvents.swift` that still take raw
-  `StreamType` or `UInt32` when the typed overloads become sufficient for all
-  in-tree callers
-- raw `TTMessage` observation through `TeamTalkMessageObserver` and
-  `messagePublisher`
-- direct `pump(...)` calls once the remaining UI state updates are owned by the
-  typed TeamTalkClient surface
+## Event Naming
 
-The deprecation pass should be additive and gentle:
+Event naming is in good shape. Notable past cleanups:
 
-1. keep the raw API public
-2. add deprecation messages steering callers toward the typed or async overloads
-3. only consider removal after at least one release cycle of app migration
+- `connectionMaxPayloadUpdated(maxPayloadSize:)` reflects the actual SDK
+  payload field instead of a misleading `source` label;
+- `hotkey(hotkeyID:isActive:)` is clearer than `hotkey(id:isActive:)`.
 
-## APIs That Should Not Be Deprecated Soon
+Remaining raw scalar payloads in `TeamTalkEvent.Kind` (key codes, payload
+sizes) are intentionally left as scalar values - they're not SDK identity
+types, so a typed ID wrapper wouldn't add anything.
 
-The following are still worth keeping available even after app migration:
+## Recommended Next Steps
 
-- `rawValue` and `cValue` on typed wrappers
-- selected raw C extensions that expose data not yet mirrored on a typed model
-- `TeamTalkC` re-export, at least until async helpers and broader wrapper
-  coverage make the raw API a much rarer escape hatch
-
-TeamTalkKit is still intentionally a wrapper around the TeamTalk SDK, not a
-sealed abstraction that hides the native layer completely.
-
-## Event Naming Audit
-
-Current event naming is mostly in good shape. The recent cleanup fixed the two
-main rough spots:
-
-- `connectionMaxPayloadUpdated(maxPayloadSize:)` now reflects the actual SDK
-  payload field instead of exposing a misleading `source` label
-- `hotkey(hotkeyID:isActive:)` is clearer than `hotkey(id:isActive:)`
-
-Remaining raw scalar payloads in `TeamTalkEvent.Kind`, such as key codes or
-payload sizes, are intentionally left as scalar values because they are not
-SDK identity types.
-
-## Recommended Next Step
-
-Continue migrating app-side observers from raw message parsing toward typed
-`TeamTalkEvent` handling, then expand the first deprecation wave from legacy
-message observers and `pump(...)` to the oldest compatibility methods in
-`TeamTalkClientLegacyCommands.swift`.
+1. Decide on the sync/async naming split described above, since it's the
+   main remaining ergonomic rough edge in the public API.
+2. Continue expanding `Examples/` as new API surface areas (files, admin,
+   audio) get their own worked examples, rather than only documenting them
+   in prose.
+3. Validate macOS runtime behavior in a real (non-console) app target - see
+   [Advanced Usage](Advanced.md#macos-notes).

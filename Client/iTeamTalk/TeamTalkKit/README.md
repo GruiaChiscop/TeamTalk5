@@ -13,7 +13,7 @@ raw `TeamTalkC` symbol import that module directly instead.
 
 `Package.swift` declares:
 
-- iOS 16 and newer
+- iOS 18 and newer
 - macOS 10.15 and newer
 
 The package vendors the TeamTalk native SDK artifacts it needs under
@@ -32,7 +32,9 @@ Silicon simulator hosts.
 
 - [Getting Started](Documentation/GettingStarted.md)
 - [Advanced Usage](Documentation/Advanced.md)
+- [API Audit](Documentation/APIAudit.md)
 - [TODO](Documentation/TODO.md)
+- [Examples](Examples/) - a runnable console client, `swift run TeamTalkKitExample <host>`
 
 ## Current API Shape
 
@@ -47,8 +49,10 @@ TeamTalkKit currently contains:
 - `TeamTalkCommandID` for tracking command processing;
 - a typed event system through `TeamTalkEventObserver` and
   `AsyncStream<TeamTalkEvent>`;
-- Swift command APIs on `TeamTalkClient` for login, channels, files, bans,
-  user accounts, server settings and server statistics;
+- Swift command APIs on `TeamTalkSession` for login, channels, files, bans,
+  user accounts, server settings and server statistics - each as both a
+  synchronous, command-ID-returning call and an `async throws` call that
+  awaits the matching completion event for you;
 - no raw C re-exports (`Sources/TeamTalkKit/Exports.swift` is empty) — every
   raw C type the wrapper's own API used to hand back has a Swift-native
   counterpart (e.g. `TeamTalkAudioCodecConfiguration` instead of the raw
@@ -65,6 +69,7 @@ From the package directory:
 ```sh
 swift build
 swift test
+swift run TeamTalkKitExample <host> [tcpPort] [udpPort] [nickname]
 ```
 
 From the iTeamTalk workspace:

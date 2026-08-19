@@ -30,6 +30,10 @@ let package = Package(
         .target(
             name: "TeamTalkKit",
             dependencies: ["TeamTalkC"]),
+        .executableTarget(
+            name: "TeamTalkKitExample",
+            dependencies: ["TeamTalkKit"],
+            path: "Examples/TeamTalkKitExample"),
         .testTarget(
             name: "TeamTalkKitTests",
             dependencies: ["TeamTalkKit", "TeamTalkC"])
