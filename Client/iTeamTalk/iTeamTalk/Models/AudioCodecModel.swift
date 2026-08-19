@@ -36,17 +36,17 @@ enum AudioCodecAction {
 final class AudioCodecModel {
 
     struct Section: Identifiable {
-        let codec: Codec
+        let codec: TeamTalkCodec
 
         var id: String {
             switch codec {
-            case OPUS_CODEC:
+            case .opus:
                 return "opus"
-            case SPEEX_CODEC:
+            case .speex:
                 return "speex"
-            case SPEEX_VBR_CODEC:
+            case .speexVBR:
                 return "speex-vbr"
-            case NO_CODEC:
+            case .none:
                 return "no-audio"
             default:
                 return "unknown"
@@ -54,12 +54,12 @@ final class AudioCodecModel {
         }
     }
 
-    let activeCodec: Codec
+    let activeCodec: TeamTalkCodec
     let sections: [Section]
 
-    private let opusApplications: [Int32] = [OPUS_APPLICATION_VOIP, OPUS_APPLICATION_AUDIO]
+    private let opusApplications: [Int32] = [TeamTalkOpusCodecConfiguration.applicationVOIP, TeamTalkOpusCodecConfiguration.applicationAudio]
     private let opusSampleRates: [Int32] = [8000, 12000, 16000, 24000, 48000]
-    private let speexBandmodes: [INT32] = [0, 1, 2]
+    private let speexBandmodes: [Int32] = [0, 1, 2]
 
     var opusApplicationIndex: Int
     var opusSampleRateIndex: Int
@@ -70,8 +70,8 @@ final class AudioCodecModel {
     var opusFrameSize: Double
     var opusTransmitInterval: Double {
         didSet {
-            if opusFrameSize == 0 && INT32(opusTransmitInterval) > OPUS_REALMAX_FRAMESIZE {
-                opusFrameSize = Double(OPUS_REALMAX_FRAMESIZE)
+            if opusFrameSize == 0 && Int32(opusTransmitInterval) > TeamTalkOpusCodecConfiguration.maxFrameSizeMilliseconds {
+                opusFrameSize = Double(TeamTalkOpusCodecConfiguration.maxFrameSizeMilliseconds)
             } else if opusFrameSize >= opusTransmitInterval {
                 opusFrameSize = 0
             }
@@ -88,78 +88,89 @@ final class AudioCodecModel {
     var speexVBRDTX: Bool
     var speexVBRTransmitInterval: Double
 
-    init(activeCodec: Codec, opuscodec: OpusCodec, speexcodec: SpeexCodec, speexvbrcodec: SpeexVBRCodec) {
+    init(
+        activeCodec: TeamTalkCodec,
+        opuscodec: TeamTalkOpusCodecConfiguration,
+        speexcodec: TeamTalkSpeexCodecConfiguration,
+        speexvbrcodec: TeamTalkSpeexVBRCodecConfiguration
+    ) {
         self.activeCodec = activeCodec
 
         switch activeCodec {
-        case OPUS_CODEC:
-            sections = [OPUS_CODEC, SPEEX_CODEC, SPEEX_VBR_CODEC, NO_CODEC].map(Section.init)
-        case SPEEX_CODEC:
-            sections = [SPEEX_CODEC, OPUS_CODEC, SPEEX_VBR_CODEC, NO_CODEC].map(Section.init)
-        case SPEEX_VBR_CODEC:
-            sections = [SPEEX_VBR_CODEC, OPUS_CODEC, SPEEX_CODEC, NO_CODEC].map(Section.init)
-        case NO_CODEC:
+        case .opus:
+            sections = [.opus, .speex, .speexVBR, .none].map(Section.init)
+        case .speex:
+            sections = [.speex, .opus, .speexVBR, .none].map(Section.init)
+        case .speexVBR:
+            sections = [.speexVBR, .opus, .speex, .none].map(Section.init)
+        case .none:
             fallthrough
         default:
-            sections = [NO_CODEC, OPUS_CODEC, SPEEX_CODEC, SPEEX_VBR_CODEC].map(Section.init)
+            sections = [.none, .opus, .speex, .speexVBR].map(Section.init)
         }
 
-        opusApplicationIndex = opusApplications.firstIndex(of: opuscodec.nApplication) ?? 0
-        opusSampleRateIndex = opusSampleRates.firstIndex(of: opuscodec.nSampleRate) ?? 4
-        opusChannelsIndex = opuscodec.nChannels == 2 ? 1 : 0
-        let bitrate = within(OPUS_MIN_BITRATE, max_v: OPUS_MAX_BITRATE, value: opuscodec.nBitRate)
+        opusApplicationIndex = opusApplications.firstIndex(of: opuscodec.application) ?? 0
+        opusSampleRateIndex = opusSampleRates.firstIndex(of: opuscodec.sampleRate) ?? 4
+        opusChannelsIndex = opuscodec.channels == 2 ? 1 : 0
+        let bitrate = within(TeamTalkOpusCodecConfiguration.bitrateRange.lowerBound, max_v: TeamTalkOpusCodecConfiguration.bitrateRange.upperBound, value: opuscodec.bitrate)
         opusBitrate = Double(bitrate) / 1000.0
-        opusVBR = opuscodec.bVBR == TRUE
-        opusDTX = opuscodec.bDTX != 0
-        opusFrameSize = Double(opuscodec.nFrameSizeMSec)
-        opusTransmitInterval = Double(opuscodec.nTxIntervalMSec)
+        opusVBR = opuscodec.variableBitrateEnabled
+        opusDTX = opuscodec.discontinuousTransmissionEnabled
+        opusFrameSize = Double(opuscodec.frameSizeMilliseconds)
+        opusTransmitInterval = Double(opuscodec.transmitIntervalMilliseconds)
 
-        speexSampleRateIndex = Int(speexcodec.nBandmode)
-        speexQuality = Double(speexcodec.nQuality)
-        speexTransmitInterval = Double(speexcodec.nTxIntervalMSec)
+        speexSampleRateIndex = Int(speexcodec.bandmode)
+        speexQuality = Double(speexcodec.quality)
+        speexTransmitInterval = Double(speexcodec.transmitIntervalMilliseconds)
 
-        speexVBRSampleRateIndex = Int(speexvbrcodec.nBandmode)
-        speexVBRQuality = Double(speexvbrcodec.nQuality)
-        speexVBRBitrate = Double(speexvbrcodec.nMaxBitRate) / 1000.0
-        speexVBRDTX = speexvbrcodec.bDTX != 0
-        speexVBRTransmitInterval = Double(speexvbrcodec.nTxIntervalMSec)
+        speexVBRSampleRateIndex = Int(speexvbrcodec.bandmode)
+        speexVBRQuality = Double(speexvbrcodec.quality)
+        speexVBRBitrate = Double(speexvbrcodec.maxBitrate) / 1000.0
+        speexVBRDTX = speexvbrcodec.discontinuousTransmissionEnabled
+        speexVBRTransmitInterval = Double(speexvbrcodec.transmitIntervalMilliseconds)
     }
 
-    func saveOPUSCodec(to opuscodec: inout OpusCodec) {
-        opuscodec.nApplication = opusApplications[opusApplicationIndex]
-        opuscodec.nBitRate = INT32(opusBitrate) * 1000
-        opuscodec.nSampleRate = opusSampleRates[opusSampleRateIndex]
-        opuscodec.nChannels = INT32(opusChannelsIndex + 1)
-        opuscodec.nTxIntervalMSec = INT32(opusTransmitInterval)
-        opuscodec.bDTX = opusDTX ? TRUE : FALSE
-        opuscodec.bVBR = opusVBR ? TRUE : FALSE
-        opuscodec.nFrameSizeMSec = INT32(opusFrameSize)
+    func saveOPUSCodec() -> TeamTalkOpusCodecConfiguration {
+        var opuscodec = TeamTalkOpusCodecConfiguration()
+        opuscodec.application = opusApplications[opusApplicationIndex]
+        opuscodec.bitrate = Int32(opusBitrate) * 1000
+        opuscodec.sampleRate = opusSampleRates[opusSampleRateIndex]
+        opuscodec.channels = Int32(opusChannelsIndex + 1)
+        opuscodec.transmitIntervalMilliseconds = Int32(opusTransmitInterval)
+        opuscodec.discontinuousTransmissionEnabled = opusDTX
+        opuscodec.variableBitrateEnabled = opusVBR
+        opuscodec.frameSizeMilliseconds = Int32(opusFrameSize)
+        return opuscodec
     }
 
-    func saveSpeexCodec(to speexcodec: inout SpeexCodec) {
-        speexcodec.nBandmode = speexBandmodes[speexSampleRateIndex]
-        speexcodec.nQuality = INT32(speexQuality)
-        speexcodec.nTxIntervalMSec = INT32(speexTransmitInterval)
+    func saveSpeexCodec() -> TeamTalkSpeexCodecConfiguration {
+        var speexcodec = TeamTalkSpeexCodecConfiguration()
+        speexcodec.bandmode = speexBandmodes[speexSampleRateIndex]
+        speexcodec.quality = Int32(speexQuality)
+        speexcodec.transmitIntervalMilliseconds = Int32(speexTransmitInterval)
+        return speexcodec
     }
 
-    func saveSpeexVBRCodec(to speexvbrcodec: inout SpeexVBRCodec) {
-        speexvbrcodec.nBandmode = speexBandmodes[speexVBRSampleRateIndex]
-        speexvbrcodec.nQuality = INT32(speexVBRQuality)
-        speexvbrcodec.nMaxBitRate = INT32(speexVBRBitrate * 1000)
-        speexvbrcodec.bDTX = speexVBRDTX ? 1 : 0
-        speexvbrcodec.nTxIntervalMSec = INT32(speexVBRTransmitInterval)
+    func saveSpeexVBRCodec() -> TeamTalkSpeexVBRCodecConfiguration {
+        var speexvbrcodec = TeamTalkSpeexVBRCodecConfiguration()
+        speexvbrcodec.bandmode = speexBandmodes[speexVBRSampleRateIndex]
+        speexvbrcodec.quality = Int32(speexVBRQuality)
+        speexvbrcodec.maxBitrate = Int32(speexVBRBitrate * 1000)
+        speexvbrcodec.discontinuousTransmissionEnabled = speexVBRDTX
+        speexvbrcodec.transmitIntervalMilliseconds = Int32(speexVBRTransmitInterval)
+        return speexvbrcodec
     }
 
-    func title(for codec: Codec) -> String {
+    func title(for codec: TeamTalkCodec) -> String {
         let title: String
         switch codec {
-        case OPUS_CODEC:
+        case .opus:
             title = String(localized: "OPUS Codec", comment: "codec detail")
-        case SPEEX_CODEC:
+        case .speex:
             title = String(localized: "Speex Codec", comment: "codec detail")
-        case SPEEX_VBR_CODEC:
+        case .speexVBR:
             title = String(localized: "Speex Variable Bitrate Codec", comment: "codec detail")
-        case NO_CODEC:
+        case .none:
             title = String(localized: "No Audio", comment: "codec detail")
         default:
             title = ""

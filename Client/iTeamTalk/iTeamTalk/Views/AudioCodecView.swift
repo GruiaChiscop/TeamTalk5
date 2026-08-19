@@ -40,15 +40,15 @@ struct AudioCodecView: View {
     }
 
     @ViewBuilder
-    private func rows(for codec: Codec) -> some View {
+    private func rows(for codec: TeamTalkCodec) -> some View {
         switch codec {
-        case OPUS_CODEC:
+        case .opus:
             opusRows
-        case SPEEX_CODEC:
+        case .speex:
             speexRows
-        case SPEEX_VBR_CODEC:
+        case .speexVBR:
             speexVBRRows
-        case NO_CODEC:
+        case .none:
             Button {
                 performAction(.useNoAudio)
             } label: {
@@ -99,14 +99,14 @@ struct AudioCodecView: View {
                         .accessibilityHidden(true)
                 }
                 Slider(value: $model.opusBitrate,
-                       in: Double(OPUS_MIN_BITRATE) / 1000.0...Double(OPUS_MAX_BITRATE) / 1000.0,
+                       in: Double(TeamTalkOpusCodecConfiguration.bitrateRange.lowerBound) / 1000.0...Double(TeamTalkOpusCodecConfiguration.bitrateRange.upperBound) / 1000.0,
                        step: 1) {
                     Text("Bitrate")
                 }
             }
             Toggle("Variable Bitrate", isOn: $model.opusVBR)
             Toggle("DTX", isOn: $model.opusDTX)
-            Stepper(value: $model.opusFrameSize, in: 0...Double(OPUS_REALMAX_FRAMESIZE), step: 5) {
+            Stepper(value: $model.opusFrameSize, in: 0...Double(TeamTalkOpusCodecConfiguration.maxFrameSizeMilliseconds), step: 5) {
                 HStack(spacing: 12) {
                     Text("Frame Size")
                     Spacer(minLength: 16)
@@ -193,7 +193,7 @@ struct AudioCodecView: View {
                         .accessibilityHidden(true)
                 }
                 Slider(value: $model.speexVBRBitrate,
-                       in: 0...Double(SPEEX_UWB_MAX_BITRATE) / 1000.0,
+                       in: 0...Double(TeamTalkSpeexVBRCodecConfiguration.maxBitrateUpperBound) / 1000.0,
                        step: 1) {
                     Text("Bitrate")
                 }

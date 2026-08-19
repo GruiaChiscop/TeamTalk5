@@ -59,12 +59,10 @@ final class ChannelDetailModel {
 
     init(channel: TeamTalkChannel, session: TeamTalkSession) {
         self.session = session
-        var rawChannel = channel.cValue
         var configuration = TeamTalkChannelConfiguration(channel)
 
         if !channel.channelID.isValid {
-            rawChannel.audiocodec = newAudioCodec(DEFAULT_AUDIOCODEC)
-            configuration.audioCodec = rawChannel.audiocodec
+            configuration.audioCodec = .opus(TeamTalkOpusCodecConfiguration())
         }
         self.configuration = configuration
         isPasswordProtected = channel.isPasswordProtected
@@ -77,7 +75,7 @@ final class ChannelDetailModel {
         hasNoVoiceActivation = channel.types.contains(.noVoiceActivation)
         hasNoAudioRecording = channel.types.contains(.noRecording)
         isHidden = channel.types.contains(.hidden)
-        codecDescription = Self.codecDescription(for: rawChannel.audiocodec)
+        codecDescription = Self.codecDescription(for: configuration.audioCodec)
     }
 
     var navigationTitle: String {
@@ -90,7 +88,7 @@ final class ChannelDetailModel {
         return String(localized: "Create Channel", comment: "View Title")
     }
 
-    func refreshCodecDescription(_ codec: AudioCodec) {
+    func refreshCodecDescription(_ codec: TeamTalkAudioCodecConfiguration) {
         codecDescription = Self.codecDescription(for: codec)
     }
 
@@ -191,28 +189,26 @@ final class ChannelDetailModel {
     }
 
     func makeAudioCodecModel() -> AudioCodecModel {
-        var opuscodec = newOpusCodec()
-        var speexcodec = newSpeexCodec()
-        var speexvbrcodec = newSpeexVBRCodec()
-        var activeCodec = configuration.audioCodec
+        var opuscodec = TeamTalkOpusCodecConfiguration()
+        var speexcodec = TeamTalkSpeexCodecConfiguration()
+        var speexvbrcodec = TeamTalkSpeexVBRCodecConfiguration()
+        var activeCodec = configuration.audioCodec.codec
 
-        switch configuration.audioCodec.nCodec {
-        case SPEEX_CODEC:
-            speexcodec = TeamTalkAudioCodec.speexCodec(from: configuration.audioCodec)
-        case SPEEX_VBR_CODEC:
-            speexvbrcodec = TeamTalkAudioCodec.speexVBRCodec(from: configuration.audioCodec)
-        case OPUS_CODEC:
-            opuscodec = TeamTalkAudioCodec.opusCodec(from: configuration.audioCodec)
-        case NO_CODEC:
+        switch configuration.audioCodec {
+        case .speex(let speexConfiguration):
+            speexcodec = speexConfiguration
+        case .speexVBR(let speexVBRConfiguration):
+            speexvbrcodec = speexVBRConfiguration
+        case .opus(let opusConfiguration):
+            opuscodec = opusConfiguration
+        case .none:
             if configuration.id == 0 {
-                activeCodec.nCodec = OPUS_CODEC
+                activeCodec = .opus
             }
-        default:
-            activeCodec.nCodec = NO_CODEC
         }
 
         return AudioCodecModel(
-            activeCodec: activeCodec.nCodec,
+            activeCodec: activeCodec,
             opuscodec: opuscodec,
             speexcodec: speexcodec,
             speexvbrcodec: speexvbrcodec
@@ -222,19 +218,13 @@ final class ChannelDetailModel {
     func applyCodecAction(_ action: AudioCodecAction, codecModel: AudioCodecModel) {
         switch action {
         case .useNoAudio:
-            configuration.audioCodec.nCodec = NO_CODEC
+            configuration.audioCodec = .none
         case .useOPUS:
-            var opuscodec = newOpusCodec()
-            codecModel.saveOPUSCodec(to: &opuscodec)
-            TeamTalkAudioCodec.setOpusCodec(opuscodec, on: &configuration.audioCodec)
+            configuration.audioCodec = .opus(codecModel.saveOPUSCodec())
         case .useSpeex:
-            var speexcodec = newSpeexCodec()
-            codecModel.saveSpeexCodec(to: &speexcodec)
-            TeamTalkAudioCodec.setSpeexCodec(speexcodec, on: &configuration.audioCodec)
+            configuration.audioCodec = .speex(codecModel.saveSpeexCodec())
         case .useSpeexVBR:
-            var speexvbrcodec = newSpeexVBRCodec()
-            codecModel.saveSpeexVBRCodec(to: &speexvbrcodec)
-            TeamTalkAudioCodec.setSpeexVBRCodec(speexvbrcodec, on: &configuration.audioCodec)
+            configuration.audioCodec = .speexVBR(codecModel.saveSpeexVBRCodec())
         }
         refreshCodecDescription(configuration.audioCodec)
     }
@@ -264,26 +254,21 @@ final class ChannelDetailModel {
         return types
     }
 
-    private static func codecDescription(for codec: AudioCodec) -> String {
-        switch codec.nCodec {
-        case OPUS_CODEC:
-            let opus = TeamTalkAudioCodec.opusCodec(from: codec)
-            let chans = opus.nChannels > 1 ? String(localized: "Stereo", comment: "create channel") : String(localized: "Mono", comment: "create channel")
-            return "OPUS \(opus.nSampleRate / 1000) KHz \(opus.nBitRate / 1000) KB/s " + chans
-        case SPEEX_CODEC:
-            let speex = TeamTalkAudioCodec.speexCodec(from: codec)
-            return "Speex " + bandmodeString(speex.nBandmode)
-        case SPEEX_VBR_CODEC:
-            let speexvbr = TeamTalkAudioCodec.speexVBRCodec(from: codec)
-            return "Speex VBR " + bandmodeString(speexvbr.nBandmode)
-        case NO_CODEC:
-            fallthrough
-        default:
+    private static func codecDescription(for codec: TeamTalkAudioCodecConfiguration) -> String {
+        switch codec {
+        case .opus(let opus):
+            let chans = opus.channels > 1 ? String(localized: "Stereo", comment: "create channel") : String(localized: "Mono", comment: "create channel")
+            return "OPUS \(opus.sampleRate / 1000) KHz \(opus.bitrate / 1000) KB/s " + chans
+        case .speex(let speex):
+            return "Speex " + bandmodeString(speex.bandmode)
+        case .speexVBR(let speexvbr):
+            return "Speex VBR " + bandmodeString(speexvbr.bandmode)
+        case .none:
             return String(localized: "No Audio", comment: "create channel")
         }
     }
 
-    private static func bandmodeString(_ bandmode: INT32) -> String {
+    private static func bandmodeString(_ bandmode: Int32) -> String {
         switch bandmode {
         case 2:
             return String(localized: "32 KHz", comment: "create channel")

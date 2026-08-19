@@ -925,6 +925,63 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(playbackConfiguration.audioPreprocessorConfiguration, .speexDSP(speexConfiguration))
     }
 
+    func testAudioCodecConfigurationsRoundTrip() {
+        var opusConfiguration = TeamTalkOpusCodecConfiguration()
+        opusConfiguration.sampleRate = 48_000
+        opusConfiguration.channels = 2
+        opusConfiguration.application = TeamTalkOpusCodecConfiguration.applicationAudio
+        opusConfiguration.bitrate = 32_000
+        opusConfiguration.variableBitrateEnabled = true
+        opusConfiguration.discontinuousTransmissionEnabled = true
+        opusConfiguration.frameSizeMilliseconds = 40
+        opusConfiguration.transmitIntervalMilliseconds = 40
+
+        XCTAssertEqual(opusConfiguration.cValue.nSampleRate, 48_000)
+        XCTAssertEqual(opusConfiguration.cValue.nChannels, 2)
+        XCTAssertEqual(opusConfiguration.cValue.bVBR, 1)
+
+        let restoredOpus = TeamTalkOpusCodecConfiguration(opusConfiguration.cValue)
+        XCTAssertEqual(restoredOpus, opusConfiguration)
+
+        var speexConfiguration = TeamTalkSpeexCodecConfiguration()
+        speexConfiguration.bandmode = 1
+        speexConfiguration.quality = 7
+        speexConfiguration.transmitIntervalMilliseconds = 40
+        speexConfiguration.stereoPlaybackEnabled = true
+
+        let restoredSpeex = TeamTalkSpeexCodecConfiguration(speexConfiguration.cValue)
+        XCTAssertEqual(restoredSpeex, speexConfiguration)
+
+        var speexVBRConfiguration = TeamTalkSpeexVBRCodecConfiguration()
+        speexVBRConfiguration.bandmode = 2
+        speexVBRConfiguration.quality = 9
+        speexVBRConfiguration.bitrate = 28_000
+        speexVBRConfiguration.maxBitrate = 42_200
+        speexVBRConfiguration.discontinuousTransmissionEnabled = true
+        speexVBRConfiguration.transmitIntervalMilliseconds = 40
+
+        let restoredSpeexVBR = TeamTalkSpeexVBRCodecConfiguration(speexVBRConfiguration.cValue)
+        XCTAssertEqual(restoredSpeexVBR, speexVBRConfiguration)
+
+        let opusCodec = TeamTalkAudioCodecConfiguration.opus(opusConfiguration)
+        XCTAssertEqual(opusCodec.codec, .opus)
+        XCTAssertEqual(opusCodec.cValue.nCodec, TeamTalkC.OPUS_CODEC)
+
+        let restoredOpusCodec = TeamTalkAudioCodecConfiguration(opusCodec.cValue)
+        guard case .opus(let restoredOpusConfiguration) = restoredOpusCodec else {
+            XCTFail("Expected OPUS audio codec configuration")
+            return
+        }
+        XCTAssertEqual(restoredOpusConfiguration, opusConfiguration)
+
+        let speexVBRCodec = TeamTalkAudioCodecConfiguration.speexVBR(speexVBRConfiguration)
+        XCTAssertEqual(speexVBRCodec.codec, .speexVBR)
+        XCTAssertEqual(speexVBRCodec.cValue.nCodec, TeamTalkC.SPEEX_VBR_CODEC)
+
+        XCTAssertEqual(TeamTalkAudioCodecConfiguration.none.codec, .none)
+        XCTAssertEqual(TeamTalkAudioCodecConfiguration.none.cValue.nCodec, TeamTalkC.NO_CODEC)
+    }
+
     func testUserMediaStorageConfigurationHelpers() {
         let defaults = TeamTalkUserMediaStorageConfiguration()
         XCTAssertNil(defaults.directoryURL)

@@ -407,8 +407,7 @@ final class ChannelListModel {
         rejoinchannel = TeamTalkChannelConfiguration(
             parentChannelID: parentID,
             name: channelName,
-            password: password,
-            audioCodec: newAudioCodec(DEFAULT_AUDIOCODEC)
+            password: password
         )
     }
 

@@ -132,7 +132,7 @@ public struct TeamTalkChannelConfiguration {
     public var userData: Int32
     public var diskQuota: Int64
     public var maxUsers: Int32
-    public var audioCodec: AudioCodec
+    public var audioCodec: TeamTalkAudioCodecConfiguration
     public var transmitUsers: [TeamTalkChannelTransmitUser]
     public var transmitUsersQueue: [TeamTalkUserID]
     public var transmitUsersQueueDelayMilliseconds: Int32
@@ -150,7 +150,7 @@ public struct TeamTalkChannelConfiguration {
         userData: Int32 = 0,
         diskQuota: Int64 = 0,
         maxUsers: Int32 = 0,
-        audioCodec: AudioCodec = TeamTalkAudioCodec.makeAudioCodec(.opus),
+        audioCodec: TeamTalkAudioCodecConfiguration = .opus(TeamTalkOpusCodecConfiguration()),
         transmitUsers: [TeamTalkChannelTransmitUser] = [],
         transmitUsersQueue: [TeamTalkUserID] = [],
         transmitUsersQueueDelayMilliseconds: Int32 = 500,
@@ -186,7 +186,7 @@ public struct TeamTalkChannelConfiguration {
         userData: Int32 = 0,
         diskQuota: Int64 = 0,
         maxUsers: Int32 = 0,
-        audioCodec: AudioCodec = TeamTalkAudioCodec.makeAudioCodec(.opus),
+        audioCodec: TeamTalkAudioCodecConfiguration = .opus(TeamTalkOpusCodecConfiguration()),
         transmitUsers: [TeamTalkChannelTransmitUser] = [],
         transmitUsersQueue: [TeamTalkUserID] = [],
         transmitUsersQueueDelayMilliseconds: Int32 = 500,
@@ -225,7 +225,7 @@ public struct TeamTalkChannelConfiguration {
             userData: channel.userData,
             diskQuota: channel.diskQuota,
             maxUsers: channel.maxUsers,
-            audioCodec: channel.rawValue.audiocodec,
+            audioCodec: TeamTalkAudioCodecConfiguration(channel.rawValue.audiocodec),
             transmitUsers: channel.transmitUsers,
             transmitUsersQueue: channel.transmitUsersQueue,
             transmitUsersQueueDelayMilliseconds: channel.transmitUsersQueueDelayMilliseconds,
@@ -247,7 +247,7 @@ public struct TeamTalkChannelConfiguration {
         channel.nUserData = userData
         channel.nDiskQuota = diskQuota
         channel.nMaxUsers = maxUsers
-        channel.audiocodec = audioCodec
+        channel.audiocodec = audioCodec.cValue
         channel.transmitUserList = transmitUsers
         channel.transmitQueueUsers = transmitUsersQueue
         channel.transmitQueueDelayMilliseconds = transmitUsersQueueDelayMilliseconds
