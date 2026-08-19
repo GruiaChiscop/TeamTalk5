@@ -1,6 +1,18 @@
 import Foundation
 import TeamTalkC
 
+/// Default sound levels shared by input gain and playback volume APIs. See
+/// `SoundLevel` in the C SDK.
+public enum TeamTalkSoundLevel {
+    /// The gain level `TeamTalkSession.setSoundInputGainLevel(_:)` treats as
+    /// no gain.
+    public static let gainDefault = Int32(SOUND_GAIN_DEFAULT.rawValue)
+
+    /// The volume `TeamTalkSession.setSoundOutputVolume(_:)`/
+    /// `setUserVolume(_:stream:volume:)` treat as unchanged.
+    public static let volumeDefault = Int32(SOUND_VOLUME_DEFAULT.rawValue)
+}
+
 /// One audio input/output device visible to the OS, as reported by
 /// `TeamTalkSession.soundDevices()`.
 public struct TeamTalkSoundDevice: Identifiable {

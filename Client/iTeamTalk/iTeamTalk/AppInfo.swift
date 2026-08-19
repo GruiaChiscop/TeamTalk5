@@ -80,7 +80,7 @@ class AppInfo {
     }
 
     static func getDefaultUrlArgs() -> String {
-        return "client=" + getAppName() + "&version=" + getAppVersion() + "&dllversion=" + TEAMTALK_VERSION + "&os=" + OSTYPE
+        return "client=" + getAppName() + "&version=" + getAppVersion() + "&dllversion=" + TeamTalkSession.sdkVersion + "&os=" + OSTYPE
     }
     
     static func getServersURL(officialservers: Bool, unofficialservers: Bool) -> String {

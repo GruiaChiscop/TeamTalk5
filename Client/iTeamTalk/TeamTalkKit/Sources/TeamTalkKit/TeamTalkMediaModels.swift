@@ -370,6 +370,8 @@ public struct TeamTalkWebRTCAudioPreprocessorConfiguration: Hashable, Sendable {
         preprocessor.adaptiveMaxOutputNoiseLevelDecibelsFS = adaptiveMaxOutputNoiseLevelDecibelsFS
         return preprocessor
     }
+
+    public static let fixedDigitalGainMaxDecibels = Float(WEBRTC_GAINCONTROLLER2_FIXEDGAIN_MAX)
 }
 
 /// Which audio preprocessor backend to use for sound input, and its

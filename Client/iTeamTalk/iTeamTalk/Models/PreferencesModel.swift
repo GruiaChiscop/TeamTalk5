@@ -391,7 +391,7 @@ final class PreferencesModel {
 
     var preferences: Preferences
 
-    var users = Set<INT32>()
+    var users = Set<Int32>()
 
     let subscriptionRows: [SubscriptionRow]
     let versionRows: [VersionRow]
@@ -529,7 +529,7 @@ final class PreferencesModel {
             let roundedPercent = Double(Int(newValue / 10.0) * 10)
             preferences.sound.masterVolumePercent = roundedPercent
             let vol = refVolume(roundedPercent)
-            session.setSoundOutputVolume(INT32(vol))
+            session.setSoundOutputVolume(Int32(vol))
             UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MASTER_VOLUME)
         }
     }
@@ -544,7 +544,7 @@ final class PreferencesModel {
             let vol = refVolume(newValue)
             for userID in users {
                 if let user = session.user(id: TeamTalkUserID(userID)) {
-                    session.setUserVolume(user, stream: .mediaFileAudio, volume: INT32(vol))
+                    session.setUserVolume(user, stream: .mediaFileAudio, volume: Int32(vol))
                 }
             }
         }
@@ -556,7 +556,7 @@ final class PreferencesModel {
             let roundedPercent = Double(Int(newValue / 10.0) * 10)
             preferences.sound.microphoneGainPercent = roundedPercent
             let vol = refVolume(roundedPercent)
-            session.setSoundInputGainLevel(INT32(vol))
+            session.setSoundInputGainLevel(Int32(vol))
             UserDefaults.standard.set(Int(roundedPercent), forKey: PREF_MICROPHONE_GAIN)
         }
     }
@@ -571,7 +571,7 @@ final class PreferencesModel {
                 session.enableVoiceActivation(false)
             } else {
                 session.enableVoiceActivation(true)
-                session.setVoiceActivationLevel(INT32(level))
+                session.setVoiceActivationLevel(Int32(level))
             }
             UserDefaults.standard.set(level, forKey: PREF_VOICEACTIVATION)
         }
@@ -614,7 +614,7 @@ final class PreferencesModel {
     func percentText(_ value: Double) -> String {
         let percent = Int(value.rounded())
         let vol = refVolume(Double(percent))
-        if UInt32(vol) == SOUND_VOLUME_DEFAULT.rawValue {
+        if vol == Int(TeamTalkSoundLevel.volumeDefault) {
             return String(format: String(localized: "%d %% - Default", comment: "preferences"), percent)
         }
         return "\(percent) %"

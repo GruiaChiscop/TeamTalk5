@@ -1,15 +1,13 @@
 # TeamTalkKit
 
 TeamTalkKit is the Swift package used by iTeamTalk to wrap the TeamTalk C SDK.
-The package is intentionally moving in two layers:
-
-- a compatibility layer which still exposes TeamTalk C types when they are needed;
-- a modern Swift layer with typed options, models, events and command APIs.
-
-The goal is that application code can mostly talk to Swift types like
-`TeamTalkUser`, `TeamTalkChannel`, `TeamTalkCommandID`,
-`TeamTalkSubscriptions` and `TeamTalkUserRights`, while keeping access to the
-underlying C values through `rawValue` and `cValue`.
+Application code talks to Swift model types only - `TeamTalkUser`,
+`TeamTalkChannel`, `TeamTalkAudioCodecConfiguration`, `TeamTalkCommandID`,
+`TeamTalkSubscriptions`, `TeamTalkUserRights`, and so on - with `rawValue`/
+`cValue` available on those types for the rare case a caller needs the
+underlying C value. No raw C type or SDK function is re-exported to
+`import TeamTalkKit` consumers; files inside this package that still need a
+raw `TeamTalkC` symbol import that module directly instead.
 
 ## Platform Status
 
@@ -51,9 +49,10 @@ TeamTalkKit currently contains:
   `AsyncStream<TeamTalkEvent>`;
 - Swift command APIs on `TeamTalkClient` for login, channels, files, bans,
   user accounts, server settings and server statistics;
-- named re-exports (`Sources/TeamTalkKit/Exports.swift`) of the raw C struct/enum
-  types and constants the wrapper's own API and `.rawValue`/`.cValue` interop
-  depend on — not a blanket re-export, so raw SDK functions (`TT_*`) are not
+- no raw C re-exports (`Sources/TeamTalkKit/Exports.swift` is empty) — every
+  raw C type the wrapper's own API used to hand back has a Swift-native
+  counterpart (e.g. `TeamTalkAudioCodecConfiguration` instead of the raw
+  `AudioCodec` union), so neither raw SDK types nor functions (`TT_*`) are
   reachable from `import TeamTalkKit` alone.
 
 The package is not complete yet. See [TODO](Documentation/TODO.md) for the

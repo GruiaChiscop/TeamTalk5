@@ -100,18 +100,18 @@ final class MainTabModel: TeamTalkEventObserver {
         let defaults = UserDefaults.standard
         if defaults.object(forKey: PREF_MASTER_VOLUME) != nil {
             let vol = defaults.integer(forKey: PREF_MASTER_VOLUME)
-            session.setSoundOutputVolume(INT32(refVolume(Double(vol))))
+            session.setSoundOutputVolume(Int32(refVolume(Double(vol))))
         }
         if defaults.object(forKey: PREF_VOICEACTIVATION) != nil {
             let voiceact = defaults.integer(forKey: PREF_VOICEACTIVATION)
             if voiceact != VOICEACT_DISABLED {
                 session.enableVoiceActivation(true)
-                session.setVoiceActivationLevel(INT32(voiceact))
+                session.setVoiceActivationLevel(Int32(voiceact))
             }
         }
         if defaults.object(forKey: PREF_MICROPHONE_GAIN) != nil {
             let vol = defaults.integer(forKey: PREF_MICROPHONE_GAIN)
-            session.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
+            session.setSoundInputGainLevel(Int32(refVolume(Double(vol))))
         }
 
         let center = NotificationCenter.default
@@ -214,8 +214,8 @@ final class MainTabModel: TeamTalkEventObserver {
             fatalAlertMessage = String(localized: "Failed to setup encryption", comment: "connect to a server")
         } else if !session.connect(
             toHost: server.ipaddr,
-            tcpPort: INT32(server.tcpport),
-            udpPort: INT32(server.udpport),
+            tcpPort: Int32(server.tcpport),
+            udpPort: Int32(server.udpport),
             encrypted: server.encrypted
         ) {
             session.disconnect()
@@ -348,7 +348,7 @@ final class MainTabModel: TeamTalkEventObserver {
             if let mfvol = defaults.object(forKey: PREF_MEDIAFILE_VOLUME) as? Double {
                 let vol = refVolume(100.0 * mfvol)
                 session.setUserVolume(
-                    user, stream: .mediaFileAudio, volume: INT32(vol)
+                    user, stream: .mediaFileAudio, volume: Int32(vol)
                 )
             }
             if !session.myRights.contains(.canViewAllUsers) {

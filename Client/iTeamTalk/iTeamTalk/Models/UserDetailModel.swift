@@ -47,12 +47,12 @@ final class UserDetailModel {
     var usernameText: String
     var voiceVolume: Double {
         didSet {
-            session.setUserVolume(currentUser, stream: .voice, volume: INT32(refVolume(voiceVolume)))
+            session.setUserVolume(currentUser, stream: .voice, volume: Int32(refVolume(voiceVolume)))
         }
     }
     var mediaVolume: Double {
         didSet {
-            session.setUserVolume(currentUser, stream: .mediaFileAudio, volume: INT32(refVolume(mediaVolume)))
+            session.setUserVolume(currentUser, stream: .mediaFileAudio, volume: Int32(refVolume(mediaVolume)))
         }
     }
     var isVoiceMuted: Bool {
@@ -94,7 +94,7 @@ final class UserDetailModel {
         ]
     }
 
-    var userid: INT32 {
+    var userid: Int32 {
         userID.cValue
     }
 

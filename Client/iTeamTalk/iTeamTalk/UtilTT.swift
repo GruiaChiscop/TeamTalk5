@@ -43,9 +43,6 @@ func setupEncryption(server: Server, session: TeamTalkSession) -> Bool {
     }
 }
 
-let TRUE : TTBOOL = 1
-let FALSE : TTBOOL = 0
-
 // MARK: - Per-user settings cache
 
 // Keyed by BearWare.dk web-login username, since that's the only identity

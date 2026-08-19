@@ -1,3 +1,4 @@
+import TeamTalkC
 import XCTest
 @testable import TeamTalkKit
 

@@ -245,6 +245,12 @@ public enum TeamTalkMessagePayload {
 /// (`Channel.name`, `User.nickname`, ...) and the `Configuration` types'
 /// `cValue` builders.
 public enum TeamTalkString {
+    /// The longest a single SDK string field (`TT_STRLEN`, minus the null
+    /// terminator) can hold - usernames, nicknames, one text message part,
+    /// etc. Longer text message content is split by
+    /// ``TeamTalkTextMessageFactory``.
+    public static let maxFieldLength = Int(TT_STRLEN) - 1
+
     public static func user(_ property: TeamTalkUserStringProperty, from user: User) -> String {
         var user = user
         return String(cString: TTKitGetUserString(property.cValue, &user))

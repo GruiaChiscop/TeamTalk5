@@ -441,19 +441,18 @@ final class ChannelListModel {
 
     func updateAudioConfig() {
         if mychannel.isAGCEnabled {
-            session.setSoundInputGainLevel(INT32(SOUND_GAIN_DEFAULT.rawValue))
-            var ap = TeamTalkAudioPreprocessor.makeWebRTCPreprocessor()
+            session.setSoundInputGainLevel(TeamTalkSoundLevel.gainDefault)
             let gain = Float(mychannel.gainLevel) / Float(TeamTalkAudioPreprocessor.channelAudioConfigMax)
-            ap.webrtc.gaincontroller2.fixeddigital.fGainDB = WEBRTC_GAINCONTROLLER2_FIXEDGAIN_MAX * gain
-            ap.webrtc.gaincontroller2.bEnable = TRUE
-            session.setSoundInputPreprocess(&ap)
+            var webRTCConfiguration = TeamTalkWebRTCAudioPreprocessorConfiguration()
+            webRTCConfiguration.gainController2Enabled = true
+            webRTCConfiguration.fixedDigitalGainDecibels = TeamTalkWebRTCAudioPreprocessorConfiguration.fixedDigitalGainMaxDecibels * gain
+            session.setSoundInputPreprocessor(.webRTC(webRTCConfiguration))
         } else {
-            var ap = TeamTalkAudioPreprocessor.makeTeamTalkPreprocessor()
-            session.setSoundInputPreprocess(&ap)
+            session.setSoundInputPreprocessor(.teamTalk(TeamTalkTTAudioPreprocessorConfiguration()))
             // Preferences.sound.microphoneGainPercent reflects the SDK's *live* volume
             // (for the Preferences screen), not the persisted value being re-applied here.
             let vol = UserDefaults.standard.integer(forKey: PREF_MICROPHONE_GAIN)
-            session.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
+            session.setSoundInputGainLevel(Int32(refVolume(Double(vol))))
         }
     }
 }

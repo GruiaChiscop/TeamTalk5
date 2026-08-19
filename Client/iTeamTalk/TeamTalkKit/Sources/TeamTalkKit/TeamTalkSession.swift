@@ -365,4 +365,9 @@ public final class TeamTalkSession {
         String(cString: TT_GetVersion())
     }
 
+    /// The vendored TeamTalk SDK version this package was built against, as
+    /// reported at compile time. See ``version`` for the linked library's
+    /// own runtime-reported version, which normally matches.
+    public static let sdkVersion = TeamTalkC.TEAMTALK_VERSION
+
 }

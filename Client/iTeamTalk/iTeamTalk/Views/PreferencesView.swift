@@ -127,7 +127,7 @@ struct PreferencesView: View {
                 }
             }
             VStack(alignment: .leading, spacing: 4) {
-                Stepper(value: $model.limitText, in: 1...Double(TT_STRLEN - 1), step: 1) {
+                Stepper(value: $model.limitText, in: 1...Double(TeamTalkString.maxFieldLength), step: 1) {
                     HStack(spacing: 12) {
                         Text("Maximum Text Length")
                         Spacer(minLength: 16)
