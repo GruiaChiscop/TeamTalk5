@@ -1,6 +1,5 @@
 import XCTest
 @testable import TeamTalkKit
-import TeamTalkC
 
 final class TeamTalkEventResolverTests: XCTestCase {
     func testResolvedUserPicksEmbeddedUserWithoutQueryingSession() {

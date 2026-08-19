@@ -51,7 +51,10 @@ TeamTalkKit currently contains:
   `AsyncStream<TeamTalkEvent>`;
 - Swift command APIs on `TeamTalkClient` for login, channels, files, bans,
   user accounts, server settings and server statistics;
-- raw C escape hatches via the exported `TeamTalkC` module.
+- named re-exports (`Sources/TeamTalkKit/Exports.swift`) of the raw C struct/enum
+  types and constants the wrapper's own API and `.rawValue`/`.cValue` interop
+  depend on — not a blanket re-export, so raw SDK functions (`TT_*`) are not
+  reachable from `import TeamTalkKit` alone.
 
 The package is not complete yet. See [TODO](Documentation/TODO.md) for the
 remaining wrapper work.

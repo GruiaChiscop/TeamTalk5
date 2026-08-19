@@ -1012,7 +1012,7 @@ final class TeamTalkModelsTests: XCTestCase {
 
     func testOutgoingTextMessageReplyDerivesScope() {
         var raw = TextMessage()
-        raw.nMsgType = MSGTYPE_USER
+        raw.nMsgType = TeamTalkC.MSGTYPE_USER
         raw.nFromUserID = 7
         raw.nChannelID = 0
         let userMessage = TeamTalkTextMessage(raw)
@@ -1020,7 +1020,7 @@ final class TeamTalkModelsTests: XCTestCase {
         XCTAssertEqual(userReply.type, .user)
         XCTAssertEqual(userReply.toUserID, 7)
 
-        raw.nMsgType = MSGTYPE_CHANNEL
+        raw.nMsgType = TeamTalkC.MSGTYPE_CHANNEL
         raw.nFromUserID = 7
         raw.nChannelID = 99
         let channelMessage = TeamTalkTextMessage(raw)
@@ -1036,7 +1036,7 @@ final class TeamTalkModelsTests: XCTestCase {
     }
 
     func testTextMessageFactorySplitsLongContent() {
-        let content = String(repeating: "a", count: Int(TT_STRLEN) + 10)
+        let content = String(repeating: "a", count: Int(TeamTalkC.TT_STRLEN) + 10)
         let messages = TeamTalkTextMessageFactory.messages(from: TeamTalkOutgoingTextMessage.broadcast(content: "").cValue, content: content)
 
         XCTAssertGreaterThan(messages.count, 1)

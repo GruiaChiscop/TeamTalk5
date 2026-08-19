@@ -16,8 +16,13 @@ Swift SDK.
   copied through `TeamTalkC`.
 - [x] Cover initial `TeamTalkEvent.Kind` decoding for common event payloads.
 - [x] Vendor TeamTalk native SDK artifacts inside the Swift package.
-- [ ] Decide which APIs should be public compatibility APIs and which should be
-  deprecated once the app migrates to the Swift model layer.
+- [x] Decide which APIs should be public compatibility APIs and which should be
+  deprecated once the app migrates to the Swift model layer. Resolved:
+  `Exports.swift` re-exports specific raw C types/constants by name (not the
+  whole `TeamTalkC` module), so `.rawValue`/`.cValue` interop keeps working
+  but raw SDK functions (`TT_*`) are no longer reachable from `import
+  TeamTalkKit` alone. Verified the app needs no source changes under this
+  scheme, and that a bare `TT_*` call from app code fails to compile.
 - [x] Add documentation comments to the public Swift API once the names settle.
 
 ## Wrapper Coverage Still Missing
@@ -49,7 +54,10 @@ register a hotkey to trigger them on the platforms this package targets.
   `BannedUser` once the configuration structs grow.
 - Decide whether Swift model snapshots should conform to `Sendable`, `Equatable`
   and `Hashable`.
-- Decide how much of `TeamTalkC` should remain re-exported long term.
+- ~~Decide how much of `TeamTalkC` should remain re-exported long term.~~
+  Resolved: only the specific types/constants named in `Exports.swift`, never
+  the whole module. If a future app-side raw C usage needs another symbol,
+  add it there by name rather than reverting to `@_exported import TeamTalkC`.
 
 ## macOS Follow-Ups
 

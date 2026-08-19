@@ -428,10 +428,10 @@ final class TeamTalkTypesTests: XCTestCase {
 
     func testRawWrappersPreserveCValues() {
         assertCodecMappings([
-            (.none, NO_CODEC),
-            (.speex, SPEEX_CODEC),
-            (.speexVBR, SPEEX_VBR_CODEC),
-            (.opus, OPUS_CODEC),
+            (.none, TeamTalkC.NO_CODEC),
+            (.speex, TeamTalkC.SPEEX_CODEC),
+            (.speexVBR, TeamTalkC.SPEEX_VBR_CODEC),
+            (.opus, TeamTalkC.OPUS_CODEC),
             (.webMVP8, WEBM_VP8_CODEC)
         ])
 
@@ -445,8 +445,8 @@ final class TeamTalkTypesTests: XCTestCase {
 
         assertTextMessageMappings([
             (.none, MSGTYPE_NONE),
-            (.user, MSGTYPE_USER),
-            (.channel, MSGTYPE_CHANNEL),
+            (.user, TeamTalkC.MSGTYPE_USER),
+            (.channel, TeamTalkC.MSGTYPE_CHANNEL),
             (.broadcast, MSGTYPE_BROADCAST),
             (.custom, MSGTYPE_CUSTOM)
         ])
