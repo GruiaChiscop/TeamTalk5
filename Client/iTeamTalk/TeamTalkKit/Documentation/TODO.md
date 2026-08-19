@@ -56,10 +56,12 @@ register a hotkey to trigger them on the platforms this package targets.
 - [x] Consider async command helpers which wait for matching success/error
   events: `try await client.joinChannel(...)`. Resolved:
   `TeamTalkSessionAsyncCommands.swift` covers login, channels, files, bans,
-  user accounts, server settings and server statistics. See
-  `Documentation/Advanced.md#command-tracking` for the sync/async overload
-  pair this introduced, and its one sharp edge (documented there and in
-  `APIAudit.md`).
+  user accounts, server settings and server statistics. Introduced a
+  sync/async overload pair per command; investigated whether this causes
+  ambiguity in real usage and confirmed it doesn't (see
+  `Documentation/APIAudit.md`'s "Investigated: Sync/Async Overload Pairs") -
+  it only bites top-level-code scripts, documented in
+  `Documentation/Advanced.md#top-level-code-overload-gotcha`.
 - Consider typed event streams filtered by command ID or event kind.
 - Consider model builders for `Channel`, `UserAccount`, `ServerProperties` and
   `BannedUser` once the configuration structs grow.

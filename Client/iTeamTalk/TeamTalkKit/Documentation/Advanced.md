@@ -135,37 +135,41 @@ awaiting `Task` forever.
 `TeamTalkCommandID.invalid` maps to `-1`, the TeamTalk SDK's error return
 value for a command that failed to even start.
 
-### Overload gotcha
+### Top-level-code overload gotcha
 
-Because the sync and async overloads of the same command share argument
-labels (`logIn`, `logOut`, `joinChannel`, ...), Swift's overload resolution
-doesn't always land on the async one just because you wrote `try await`. In
-practice:
-
-- as a **bare statement** with the result discarded, it can go either way
-  depending on the specific overload pair - don't rely on the sync
-  overload's `@discardableResult` alone to mean "the async one ran and
-  completed";
-- assigned to a **`let` without an explicit type**, it can likewise resolve
-  to the sync overload, which silently changes both the return type (you
-  get a `TeamTalkCommandID`, not the value you expected) and the effect
-  (nothing was actually awaited).
-
-The reliable fix is to annotate the expected type at the call site:
+The sync and async overloads of the same command share argument labels
+(`logIn`, `logOut`, `joinChannel`, ...). Inside a normal function body,
+Swift's overload resolution reliably picks the async one when the call is
+written with `try await` - this is the common case, and it just works:
 
 ```swift
-// Unreliable - may silently pick the sync overload:
-let me = try await session.logIn(nickname: "Alice", username: "alice", password: "secret")
-
-// Reliable:
-let me: TeamTalkUser = try await session.logIn(nickname: "Alice", username: "alice", password: "secret")
-
-// For an async command that returns Void, same idea:
-let _: Void = try await session.joinChannel(channel)
+func logIn(session: TeamTalkSession) async throws -> TeamTalkUser {
+    let me = try await session.logIn(nickname: "Alice", username: "alice", password: "secret")
+    return me   // `me` is TeamTalkUser, as expected - no extra annotation needed
+}
 ```
 
-`Examples/TeamTalkKitExample/main.swift` follows this pattern throughout -
-see it for a complete example.
+The one place this *doesn't* hold is **top-level code** - statements
+written directly in a `main.swift`, outside any function. There, Swift's
+statement-by-statement type-checking doesn't reliably prefer the async
+overload, and `let me = try await session.logIn(...)` can silently resolve
+to the sync, `@discardableResult` overload instead: `me` ends up a
+`TeamTalkCommandID`, not the `TeamTalkUser` you were expecting, and nothing
+was actually awaited. It's a Swift top-level-code limitation, not something
+specific to this API - but this package's own command pairs are exactly the
+shape that triggers it.
+
+If you do write top-level code (a quick script, a one-off tool), either
+annotate the expected type explicitly:
+
+```swift
+let me: TeamTalkUser = try await session.logIn(nickname: "Alice", username: "alice", password: "secret")
+```
+
+or - the more robust fix, and what `Examples/TeamTalkKitExample/main.swift`
+does - keep top-level code to a couple of lines that just call into a
+regular `async` function holding the real logic. Inside that function, the
+ambiguity doesn't arise at all.
 
 ## Event Dispatch
 

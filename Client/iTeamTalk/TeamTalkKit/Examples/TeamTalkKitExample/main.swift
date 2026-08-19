@@ -54,6 +54,81 @@ func displayName(_ user: TeamTalkUser) -> String {
     user.nickname.isEmpty ? user.username : user.nickname
 }
 
+func shutDown(_ session: TeamTalkSession) async {
+    print("\nLogging out and disconnecting...")
+    try? await session.logOut()
+    session.disconnect()
+    session.stopEventDispatching()
+    session.close()
+}
+
+// The actual walkthrough lives in a real function rather than directly in
+// top-level code: Swift's top-level statement type-checking (as opposed to
+// a function body's) doesn't always resolve `try await session.command(...)`
+// to the async overload when a sync, @discardableResult twin with the same
+// argument labels also exists - inside a normal function, like here, it
+// resolves correctly with no extra annotation needed. See
+// ../../Documentation/Advanced.md#command-tracking for the full story.
+func run(host: String, tcpPort: Int32, udpPort: Int32, nickname: String) async {
+    let session = TeamTalkSession()
+    // An empty license name/key runs the SDK unregistered, the same default
+    // iTeamTalk itself ships with (see iTeamTalk/License.swift). BearWare.dk
+    // issues a real license key for production use.
+    session.start(licenseName: "", licenseKey: "")
+    session.startEventDispatching()
+
+    do {
+        print("Connecting to \(host):\(tcpPort) (UDP \(udpPort))...")
+        guard session.connect(toHost: host, tcpPort: tcpPort, udpPort: udpPort, encrypted: false) else {
+            print("Failed to start the connection.")
+            await shutDown(session)
+            return
+        }
+
+        try await waitForConnection(session, timeoutSeconds: 10)
+        print("Connected. Logging in as \"\(nickname)\"...")
+
+        let me = try await session.logIn(nickname: nickname, username: "", password: "", clientName: "TeamTalkKitExample")
+        print("Logged in as user #\(me.id) (\(displayName(me))).")
+
+        let channels = session.channels().sorted { $0.name < $1.name }
+        print("\n\(channels.count) channel(s):")
+        for channel in channels {
+            let suffix = channel.isPasswordProtected ? " (password protected)" : ""
+            print("  #\(channel.id) \(channel.name)\(suffix)")
+        }
+
+        if let root = session.channel(id: TeamTalkChannelID(session.rootChannelID)) {
+            print("\nJoining \"\(root.name)\"...")
+            try await session.joinChannel(root)
+            print("Joined.")
+        }
+
+        print("\nListening for 15 seconds (Ctrl+C to stop earlier)...")
+        let deadline = Date().addingTimeInterval(15)
+        for await event in session.events {
+            switch event.kind {
+            case .textMessage(let message):
+                print("Message: \(message.content)")
+            case .userJoined(let user) where user.userID != me.userID:
+                print("\(displayName(user)) joined.")
+            case .userLeft(_, let user) where user.userID != me.userID:
+                print("\(displayName(user)) left.")
+            default:
+                break
+            }
+            if Date() >= deadline {
+                break
+            }
+        }
+    } catch {
+        print("Error: \(error)")
+    }
+
+    await shutDown(session)
+    print("Done.")
+}
+
 let arguments = CommandLine.arguments
 guard arguments.count > 1 else {
     print("""
@@ -73,77 +148,4 @@ let tcpPort = arguments.count > 2 ? Int32(arguments[2]) ?? 10333 : 10333
 let udpPort = arguments.count > 3 ? Int32(arguments[3]) ?? tcpPort : tcpPort
 let nickname = arguments.count > 4 ? arguments[4] : "TeamTalkKitExample"
 
-// An empty license name/key runs the SDK unregistered, the same default
-// iTeamTalk itself ships with (see iTeamTalk/License.swift). BearWare.dk
-// issues a real license key for production use.
-let session = TeamTalkSession()
-session.start(licenseName: "", licenseKey: "")
-session.startEventDispatching()
-
-func shutDown(_ session: TeamTalkSession) async {
-    print("\nLogging out and disconnecting...")
-    do {
-        // Same overload-disambiguation reason as the logIn() call below.
-        let _: Void = try await session.logOut()
-    } catch {
-        // Ignore — we're tearing down either way.
-    }
-    session.disconnect()
-    session.stopEventDispatching()
-    session.close()
-}
-
-do {
-    print("Connecting to \(host):\(tcpPort) (UDP \(udpPort))...")
-    guard session.connect(toHost: host, tcpPort: tcpPort, udpPort: udpPort, encrypted: false) else {
-        print("Failed to start the connection.")
-        exit(1)
-    }
-
-    try await waitForConnection(session, timeoutSeconds: 10)
-    print("Connected. Logging in as \"\(nickname)\"...")
-
-    // Annotating the expected type matters here: TeamTalkSession has both a
-    // sync logIn(...) -> TeamTalkCommandID and this async logIn(...) async
-    // throws -> TeamTalkUser overload with the same argument labels, and
-    // `try await` alone doesn't reliably disambiguate a `let`-bound call
-    // between them.
-    let me: TeamTalkUser = try await session.logIn(nickname: nickname, username: "", password: "", clientName: "TeamTalkKitExample")
-    print("Logged in as user #\(me.id) (\(displayName(me))).")
-
-    let channels = session.channels().sorted { $0.name < $1.name }
-    print("\n\(channels.count) channel(s):")
-    for channel in channels {
-        let suffix = channel.isPasswordProtected ? " (password protected)" : ""
-        print("  #\(channel.id) \(channel.name)\(suffix)")
-    }
-
-    if let root = session.channel(id: TeamTalkChannelID(session.rootChannelID)) {
-        print("\nJoining \"\(root.name)\"...")
-        let _: Void = try await session.joinChannel(root)
-        print("Joined.")
-    }
-
-    print("\nListening for 15 seconds (Ctrl+C to stop earlier)...")
-    let deadline = Date().addingTimeInterval(15)
-    for await event in session.events {
-        switch event.kind {
-        case .textMessage(let message):
-            print("Message: \(message.content)")
-        case .userJoined(let user) where user.userID != me.userID:
-            print("\(displayName(user)) joined.")
-        case .userLeft(_, let user) where user.userID != me.userID:
-            print("\(displayName(user)) left.")
-        default:
-            break
-        }
-        if Date() >= deadline {
-            break
-        }
-    }
-} catch {
-    print("Error: \(error)")
-}
-
-await shutDown(session)
-print("Done.")
+await run(host: host, tcpPort: tcpPort, udpPort: udpPort, nickname: nickname)

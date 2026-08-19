@@ -63,19 +63,26 @@ Because these are already `internal` (or explicitly deprecated, in the
 message-observer case), there's no further deprecation wave needed for
 them - the compiler already keeps them out of a consumer's autocomplete.
 
-## Known Sharp Edge: Sync/Async Overload Pairs
+## Investigated: Sync/Async Overload Pairs
 
 Every mutating `TeamTalkSession` command exists as both a synchronous,
 `@discardableResult` overload and an `async throws` overload with the same
-argument labels (e.g. `logIn`, `joinChannel`, `logOut`). Swift's overload
-resolution doesn't reliably prefer the async one just because the call site
-has `try await` - see
-[Advanced Usage](Advanced.md#overload-gotcha) for the failure mode and the
-fix (annotate the expected type). This is a real ergonomic gap in the
-current design; a future revision could close it by, for example, giving
-the sync overloads a distinct base name (`startLogIn`, `startJoinChannel`,
-...) instead of overloading on effect alone. Not changed yet because it
-would be a breaking rename across every call site in `iTeamTalk`.
+argument labels (e.g. `logIn`, `joinChannel`, `logOut`). This looked like it
+might be a design flaw - `try await session.logIn(...)` bound to a `let`
+appeared to silently resolve to the sync overload in
+`Examples/TeamTalkKitExample`. Investigated by reproducing the same call
+inside a plain `async` function instead of top-level code: it resolved
+correctly there with no annotation needed, and stayed correct across every
+command pair in `TeamTalkSessionCommands.swift`/`TeamTalkSessionAsyncCommands.swift`.
+
+So this isn't an API design problem - it's a Swift **top-level-code**
+type-checking limitation (statements directly in a `main.swift`, outside
+any function, don't get the same overload resolution as a function body).
+`iTeamTalk` itself is unaffected, since none of its code is top-level.
+See [Advanced Usage](Advanced.md#top-level-code-overload-gotcha) for the
+mechanism and the fix for anyone writing a top-level script against this
+package. No API change needed; closing this out rather than carrying it as
+an open design question.
 
 ## Event Naming
 
@@ -91,10 +98,8 @@ types, so a typed ID wrapper wouldn't add anything.
 
 ## Recommended Next Steps
 
-1. Decide on the sync/async naming split described above, since it's the
-   main remaining ergonomic rough edge in the public API.
-2. Continue expanding `Examples/` as new API surface areas (files, admin,
+1. Continue expanding `Examples/` as new API surface areas (files, admin,
    audio) get their own worked examples, rather than only documenting them
    in prose.
-3. Validate macOS runtime behavior in a real (non-console) app target - see
+2. Validate macOS runtime behavior in a real (non-console) app target - see
    [Advanced Usage](Advanced.md#macos-notes).

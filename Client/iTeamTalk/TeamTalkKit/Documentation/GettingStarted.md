@@ -103,11 +103,12 @@ let me = try await session.logIn(
 print("Logged in as \(me.nickname), user #\(me.id)")
 ```
 
-> **Overload gotcha:** because both the sync and async `logIn` overloads
-> accept the same argument labels, `try await session.logIn(...)` bound to a
-> `let` doesn't always resolve to the async one on its own - annotate the
-> expected type (`let me: TeamTalkUser = try await ...`) to be sure. See
-> [Advanced Usage](Advanced.md#command-tracking) for the full explanation.
+> **Top-level-code gotcha:** inside a normal function, as above, this always
+> resolves correctly. Only if you write this directly as top-level code in a
+> `main.swift` (a quick script, not a regular function) can `try await
+> session.logIn(...)` bound to a `let` silently resolve to the sync overload
+> instead - see [Advanced Usage](Advanced.md#top-level-code-overload-gotcha)
+> for why, and the fix.
 
 Or track the command ID yourself with the sync overload:
 
