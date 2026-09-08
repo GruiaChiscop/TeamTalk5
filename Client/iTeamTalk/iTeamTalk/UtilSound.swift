@@ -59,86 +59,50 @@ enum Sounds : Int {
          transmit_ON = 11,
          transmit_OFF = 12,
          logged_IN = 13,
-         logged_OUT = 14
+         logged_OUT = 14,
+    file_UPDATE=15,
+    file_COMPLETE=16
 }
 
 var player : AVAudioPlayer?
 
 func getSoundFile(_ s: Sounds) -> String? {
-    
-    let settings = UserDefaults.standard
-    
+
+    let events = Preferences.current.soundEvents
+
     switch s {
     case .tx_ON:
-        if settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil ||
-           settings.bool(forKey: PREF_SNDEVENT_VOICETX) {
-            return "on"
-        }
+        if events.voiceTransmission { return "on.mp3" }
     case .tx_OFF:
-        if settings.object(forKey: PREF_SNDEVENT_VOICETX) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_VOICETX) {
-                return "off"
-        }
+        if events.voiceTransmission { return "off.mp3" }
     case .chan_MSG:
-        if settings.object(forKey: PREF_SNDEVENT_CHANMSG) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_CHANMSG) {
-                return "channel_message"
-        }
+        if events.channelMessage { return "channel_message.mp3" }
     case .user_MSG:
-        if settings.object(forKey: PREF_SNDEVENT_USERMSG) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_USERMSG) {
-                return "user_message"
-        }
+        if events.userMessage { return "user_message.mp3" }
     case .broadcast_MSG:
-        if settings.object(forKey: PREF_SNDEVENT_BCASTMSG) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_BCASTMSG) {
-            return "broadcast_message"
-        }
+        if events.broadcastMessage { return "broadcast_message.mp3" }
     case .srv_LOST:
-        if settings.object(forKey: PREF_SNDEVENT_SERVERLOST) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_SERVERLOST) {
-                return "serverlost"
-        }
+        if events.serverConnectionLost { return "serverlost.mp3" }
     case .joined_CHAN:
-        if settings.object(forKey: PREF_SNDEVENT_JOINEDCHAN) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_JOINEDCHAN) {
-                return "newuser"
-        }
+        if events.userJoinedChannel { return "newuser.mp3" }
     case .left_CHAN:
-        if settings.object(forKey: PREF_SNDEVENT_LEFTCHAN) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_LEFTCHAN) {
-                return "removeuser"
-        }
-    case .voxtriggered_ON :
-        if settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER) {
-            return "voiceact_on"
-        }
-    case .voxtriggered_OFF :
-        if settings.object(forKey: PREF_SNDEVENT_VOXTRIGGER) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_VOXTRIGGER) {
-            return "voiceact_off"
-        }
-    case .transmit_ON :
-        if settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY) {
-            return "txqueue_start"
-        }
-    case .transmit_OFF :
-        if settings.object(forKey: PREF_SNDEVENT_TRANSMITREADY) == nil ||
-            settings.bool(forKey: PREF_SNDEVENT_TRANSMITREADY) {
-            return "txqueue_stop"
-        }
-    case .logged_IN :
-        if settings.object(forKey: PREF_SNDEVENT_LOGGEDIN) != nil &&
-            settings.bool(forKey: PREF_SNDEVENT_LOGGEDIN) {
-            return "logged_on"
-        }
-    case .logged_OUT :
-        if settings.object(forKey: PREF_SNDEVENT_LOGGEDOUT) != nil &&
-            settings.bool(forKey: PREF_SNDEVENT_LOGGEDOUT) {
-            return "logged_off"
-        }
+        if events.userLeftChannel { return "removeuser.mp3" }
+    case .voxtriggered_ON:
+        if events.voiceActivationTriggered { return "voiceact_on.mp3" }
+    case .voxtriggered_OFF:
+        if events.voiceActivationTriggered { return "voiceact_off.mp3" }
+    case .transmit_ON:
+        if events.transmitReady { return "txqueue_start.mp3" }
+    case .transmit_OFF:
+        if events.transmitReady { return "txqueue_stop.mp3" }
+    case .logged_IN:
+        if events.userLoggedIn { return "logged_on.mp3" }
+    case .logged_OUT:
+        if events.userLoggedOut { return "logged_off.mp3" }
+    case .file_COMPLETE:
+        if events.fileTransferComplete { return "filetx_complete.wav" }
+    case .file_UPDATE:
+        if events.fileAddedOrRemoved { return "fileupdate.wav" }
     }
 
     return nil
@@ -173,6 +137,7 @@ func getCategory(_ opt: AVAudioSession.CategoryOptions) -> String {
     return str
 }
 
+// Keyed per hardware device UID, so this can't be a fixed field on Preferences.
 func getAudioPortDataSource(descr: AVAudioSessionPortDescription) -> NSNumber? {
     let defaults = UserDefaults.standard
     let prefname = PREF_SNDINPUT_PORT + "_" + descr.uid
@@ -194,27 +159,55 @@ func removeAudioPortDataSource(descr: AVAudioSessionPortDescription) {
     defaults.removeObject(forKey: prefname)
 }
 
-func closeSoundDevices() {
-    TeamTalkClient.shared.closeSoundDevices()
+// Which input port to prefer even when it has no specific data source chosen
+// (i.e. "Default" was picked for it) - a per-port data source preference alone
+// doesn't say which of several available *ports* should be active.
+func getPreferredInputUID() -> String? {
+    UserDefaults.standard.string(forKey: PREF_SNDINPUT_UID)
 }
 
-func setupSoundDevices() {
-    
-    do {
-        closeSoundDevices()
-        
-        let session = AVAudioSession.sharedInstance()
+func setPreferredInputUID(_ uid: String) {
+    UserDefaults.standard.set(uid, forKey: PREF_SNDINPUT_UID)
+}
 
-        print("preset: " + session.mode.rawValue)
-        
-        let defaults = UserDefaults.standard
-        let speaker = defaults.object(forKey: PREF_SPEAKER_OUTPUT) != nil && defaults.bool(forKey: PREF_SPEAKER_OUTPUT)
-        let preprocess = defaults.object(forKey: PREF_VOICEPROCESSINGIO) != nil && defaults.bool(forKey: PREF_VOICEPROCESSINGIO)
-        let a2dp = defaults.object(forKey: PREF_BLUETOOTH_A2DP) != nil && defaults.bool(forKey: PREF_BLUETOOTH_A2DP)
-        let headsettoggle = defaults.object(forKey: PREF_HEADSET_TXTOGGLE) != nil && defaults.bool(forKey: PREF_HEADSET_TXTOGGLE)
-                
+func closeSoundDevices(session: TeamTalkSession) {
+    session.closeSoundDevices()
+}
+
+func setupSoundDevices(session: TeamTalkSession) {
+    // The native SDK's own mic-permission request is broken (wrong ObjC selector,
+    // so it never fires), and initializing the sound input device while the OS
+    // permission prompt is still unresolved leaves the input Audio Unit capturing
+    // silence even after the user grants access. Resolve permission here first.
+    switch AVAudioApplication.shared.recordPermission {
+    case .undetermined:
+        AVAudioApplication.requestRecordPermission { _ in
+            DispatchQueue.main.async {
+                performSoundDeviceSetup(session: session)
+            }
+        }
+    default:
+        performSoundDeviceSetup(session: session)
+    }
+}
+
+private func performSoundDeviceSetup(session: TeamTalkSession) {
+
+    do {
+        closeSoundDevices(session: session)
+
+        let audioSession = AVAudioSession.sharedInstance()
+
+        print("preset: " + audioSession.mode.rawValue)
+
+        let preferences = Preferences.current
+        let speaker = preferences.soundDevice.speakerOutput
+        let preprocess = preferences.soundDevice.voicePreprocessing
+        let a2dp = preferences.soundDevice.bluetoothA2DP
+        let headsettoggle = preferences.general.headsetTXToggle
+
         // In 'voiceChat' mode stereo cannot be enabled on input devices.
-        try session.setMode(preprocess ? .voiceChat : .default)
+        try audioSession.setMode(preprocess ? .voiceChat : .default)
 
         var catoptions : AVAudioSession.CategoryOptions
         
@@ -239,41 +232,60 @@ func setupSoundDevices() {
             catoptions.update(with: .mixWithOthers)
         }
         
-        try session.setCategory(.playAndRecord, options: catoptions)
+        try audioSession.setCategory(.playAndRecord, options: catoptions)
 
         // Note that Voice Preprocessing IO will disable ability to select
         // stereo microphone sources
         let sndid = preprocess ? TeamTalkSoundDeviceID.voiceProcessingIO : TeamTalkSoundDeviceID.remoteIO
-        if !TeamTalkClient.shared.initSoundInputDevice(id: sndid) {
+        if !session.initSoundInputDevice(id: sndid) {
             print("Failed to initialize sound input device: \(sndid)")
         }
         else {
             print("Using sound input device: \(sndid)")
         }
-        if !TeamTalkClient.shared.initSoundOutputDevice(id: sndid) {
+        if !session.initSoundOutputDevice(id: sndid) {
             print("Failed to initialize sound output device: \(sndid)")
         }
         else {
             print("Using sound output device: \(sndid)")
         }
-        print("postset. Mode \(session.mode.rawValue), category \(session.category.rawValue), options \(getCategory(session.categoryOptions))")
-        
-        // enable stereo on all data sources that support it
-        for input in session.availableInputs ?? [] {
-            guard let dataSourceID = getAudioPortDataSource(descr: input) else { continue }
-            for datasrc in input.dataSources ?? [] {
-                if datasrc.dataSourceID == dataSourceID {
-                    if datasrc.supportedPolarPatterns?.contains(.stereo) == true {
-                        try datasrc.setPreferredPolarPattern(.stereo)
-                        print("Setting \(datasrc.dataSourceName) to stereo")
-                    } else {
-                        print("No stereo on \(datasrc.dataSourceName)")
-                    }
+
+        // The native SDK resets the audio session's category (without
+        // .defaultToSpeaker) the first time it opens an input/output device,
+        // clobbering the options set above regardless of the speaker preference.
+        // Re-assert the category, then force the physical route directly -
+        // overrideOutputAudioPort is independent of category options and wins
+        // even if something downstream fights the category again.
+        try audioSession.setCategory(.playAndRecord, options: catoptions)
+        try audioSession.overrideOutputAudioPort(speaker ? .speaker : .none)
+
+        print("postset. Mode \(audioSession.mode.rawValue), category \(audioSession.category.rawValue), options \(getCategory(audioSession.categoryOptions))")
+
+        // Restore the previously chosen input port + data source. Only the one
+        // data source matching what was saved should be applied - not whichever
+        // one happened to be last in the list - and the port itself needs to be
+        // made preferred too, or iOS falls back to its own default input. A port
+        // chosen with no specific data source (i.e. "Default") has nothing in
+        // getAudioPortDataSource, so it's matched separately, by uid.
+        let preferredInputUID = getPreferredInputUID()
+        for input in audioSession.availableInputs ?? [] {
+            guard let dataSourceID = getAudioPortDataSource(descr: input),
+                  let dataSource = input.dataSources?.first(where: { $0.dataSourceID == dataSourceID }) else {
+                if input.uid == preferredInputUID {
+                    try audioSession.setPreferredInput(input)
                 }
-                if session.inputDataSource?.dataSourceID != dataSourceID {
-                    try input.setPreferredDataSource(datasrc)
-                }
+                continue
             }
+
+            if dataSource.supportedPolarPatterns?.contains(.stereo) == true {
+                try dataSource.setPreferredPolarPattern(.stereo)
+                print("Setting \(dataSource.dataSourceName) to stereo")
+            } else {
+                print("No stereo on \(dataSource.dataSourceName)")
+            }
+            try input.setPreferredDataSource(dataSource)
+            try audioSession.setPreferredInput(input)
+            try audioSession.setInputDataSource(dataSource)
         }
     }
     catch {
@@ -289,7 +301,7 @@ func playSound(_ s: Sounds) {
         return
     }
     
-    if let resPath = Bundle.main.path(forResource: filename, ofType: "mp3") {
+    if let resPath = Bundle.main.path(forResource: filename, ofType: "") {
         
         let url = URL(fileURLWithPath: resPath)
         

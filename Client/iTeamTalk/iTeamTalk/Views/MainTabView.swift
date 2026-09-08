@@ -22,19 +22,15 @@
  */
 
 import SwiftUI
-import UIKit
 
 struct MainTabView: View {
-    @ObservedObject var model: MainTabModel
+    @Bindable var model: MainTabModel
     let close: () -> Void
     @State private var saveAlertName = String(localized: "New Server", comment: "Dialog message")
 
     var body: some View {
         TabView {
             ChannelsTabView(mainModel: model, model: model.channelListModel, close: close)
-                /*.accessibilityAction(.magicTap) {
-                    model.channelListModel.txBtnAccessibilityAction()
-                }*/
             .tabItem {
                 Label("Channels", image: "channels")
             }
@@ -43,29 +39,29 @@ struct MainTabView: View {
             // Messages tab
             NavigationStack {
                 TextMessageView(model: model.channelChatModel)
-                    /*.accessibilityAction(.magicTap) {
-                        model.channelListModel.txBtnAccessibilityAction()
-                    }*/
             }
             .tabItem {
                 Label("Messages", image: "messages")
             }
             .tag(1)
 
+            // Files tab
+            NavigationStack {
+                ChannelFilesView(model: model.channelFilesModel)
+            }
+            .tabItem {
+                Label("Files", systemImage: "folder")
+            }
+            .tag(2)
+
             // Preferences tab
             NavigationStack {
                 PreferencesView(model: model.preferencesModel)
-                    /*.accessibilityAction(.magicTap) {
-                        model.channelListModel.txBtnAccessibilityAction()
-                    }*/
             }
             .tabItem {
                 Label("Preferences", image: "setup")
             }
-            .tag(2)
-        }
-        .accessibilityAction(.magicTap) {
-            model.channelListModel.txBtnAccessibilityAction()
+            .tag(3)
         }
         .onAppear {
             model.setup()
@@ -77,21 +73,15 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkRemoteControl)) { notification in
             model.remoteControl(notification.object as? UIEvent)
         }
-        .alert("Error",
-               isPresented: Binding(
-                get: { model.alertMessage != nil },
-                set: { if !$0 { model.alertMessage = nil } }
-               )) {
+        .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkMagicTap)) { _ in
+            model.magicTapToggleTX()
+        }
+        .alert("Error", isPresented: $model.isPresentingAlert) {
             Button("OK", role: .cancel) {}
         } message: {
             Text(model.alertMessage ?? "")
         }
-        .alert("Connect to Server",
-            isPresented: Binding(
-                get: { model.fatalAlertMessage != nil },
-                set: { if !$0 { model.fatalAlertMessage = nil } }
-            )
-        ) {
+        .alert("Connect to Server", isPresented: $model.isPresentingFatalAlert) {
             Button("OK", role: .cancel) {
                 close()
             }
@@ -119,8 +109,8 @@ struct MainTabView: View {
 // MARK: - Channels tab
 
 private struct ChannelsTabView: View {
-    @ObservedObject var mainModel: MainTabModel
-    @ObservedObject var model: ChannelListModel
+    let mainModel: MainTabModel
+    @Bindable var model: ChannelListModel
     let close: () -> Void
 
     var body: some View {
@@ -166,17 +156,14 @@ private struct ChannelsTabView: View {
 // MARK: - Channel detail sheet
 
 private struct ChannelDetailSheetView: View {
-    @ObservedObject var model: ChannelDetailModel
+    @Bindable var model: ChannelDetailModel
 
     var body: some View {
         NavigationStack {
             ChannelDetailView(model: model, setupCodec: {
                 model.audioCodecModel = model.makeAudioCodecModel()
             })
-            .navigationDestination(isPresented: Binding(
-                get: { model.audioCodecModel != nil },
-                set: { if !$0 { model.audioCodecModel = nil } }
-            )) {
+            .navigationDestination(isPresented: $model.isShowingAudioCodec) {
                 if let codecModel = model.audioCodecModel {
                     AudioCodecView(model: codecModel, performAction: { action in
                         model.applyCodecAction(action, codecModel: codecModel)

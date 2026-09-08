@@ -21,46 +21,61 @@
  *
  */
 
+import Observation
 import SwiftUI
 import TeamTalkKit
 
-final class ChannelDetailModel: ObservableObject {
-    var channel: Channel
+@Observable
+final class ChannelDetailModel {
+    let session: TeamTalkSession
+    private var configuration: TeamTalkChannelConfiguration
+    private let isPasswordProtected: Bool
     let isExistingChannel: Bool
 
-    private var cmdid: INT32 = 0
+    var nameText: String
+    var passwordText: String
+    var topicText: String
+    var isPermanent: Bool
+    var hasNoInterruptions: Bool
+    var hasNoVoiceActivation: Bool
+    var hasNoAudioRecording: Bool
+    var isHidden: Bool
+    var codecDescription: String
+    var errorMessage: String?
+    var shouldDismiss = false
+    var showingJoinAlert = false
+    var joinPassword = ""
+    var audioCodecModel: AudioCodecModel?
 
-    @Published var nameText: String
-    @Published var passwordText: String
-    @Published var topicText: String
-    @Published var isPermanent: Bool
-    @Published var hasNoInterruptions: Bool
-    @Published var hasNoVoiceActivation: Bool
-    @Published var hasNoAudioRecording: Bool
-    @Published var isHidden: Bool
-    @Published var codecDescription: String
-    @Published var errorMessage: String?
-    @Published var shouldDismiss = false
-    @Published var showingJoinAlert = false
-    @Published var joinPassword = ""
-    @Published var audioCodecModel: AudioCodecModel?
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
 
-    init(channel: Channel) {
-        var channel = channel
-        if channel.nChannelID == 0 {
-            channel.audiocodec = newAudioCodec(DEFAULT_AUDIOCODEC)
+    var isShowingAudioCodec: Bool {
+        get { audioCodecModel != nil }
+        set { if !newValue { audioCodecModel = nil } }
+    }
+
+    init(channel: TeamTalkChannel, session: TeamTalkSession) {
+        self.session = session
+        var configuration = TeamTalkChannelConfiguration(channel)
+
+        if !channel.channelID.isValid {
+            configuration.audioCodec = .opus(TeamTalkOpusCodecConfiguration())
         }
-        self.channel = channel
-        isExistingChannel = channel.nChannelID != 0
-        nameText = TeamTalkString.channel(.name, from: channel)
-        passwordText = TeamTalkString.channel(.password, from: channel)
-        topicText = TeamTalkString.channel(.topic, from: channel)
-        isPermanent = (channel.uChannelType & CHANNEL_PERMANENT.rawValue) != 0
-        hasNoInterruptions = (channel.uChannelType & CHANNEL_SOLO_TRANSMIT.rawValue) != 0
-        hasNoVoiceActivation = (channel.uChannelType & CHANNEL_NO_VOICEACTIVATION.rawValue) != 0
-        hasNoAudioRecording = (channel.uChannelType & CHANNEL_NO_RECORDING.rawValue) != 0
-        isHidden = (channel.uChannelType & CHANNEL_HIDDEN.rawValue) != 0
-        codecDescription = Self.codecDescription(for: channel.audiocodec)
+        self.configuration = configuration
+        isPasswordProtected = channel.isPasswordProtected
+        isExistingChannel = channel.channelID.isValid
+        nameText = channel.name
+        passwordText = channel.password
+        topicText = channel.topic
+        isPermanent = channel.types.contains(.permanent)
+        hasNoInterruptions = channel.types.contains(.soloTransmit)
+        hasNoVoiceActivation = channel.types.contains(.noVoiceActivation)
+        hasNoAudioRecording = channel.types.contains(.noRecording)
+        isHidden = channel.types.contains(.hidden)
+        codecDescription = Self.codecDescription(for: configuration.audioCodec)
     }
 
     var navigationTitle: String {
@@ -73,59 +88,127 @@ final class ChannelDetailModel: ObservableObject {
         return String(localized: "Create Channel", comment: "View Title")
     }
 
-    func refreshCodecDescription(_ codec: AudioCodec) {
+    func refreshCodecDescription(_ codec: TeamTalkAudioCodecConfiguration) {
         codecDescription = Self.codecDescription(for: codec)
     }
 
     func createOrUpdate() {
-        apply()
-        if channel.nChannelID == 0 {
-            cmdid = TeamTalkClient.shared.join(channel: &channel)
-        } else {
-            cmdid = TeamTalkClient.shared.update(channel: &channel)
+        applyToConfiguration()
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                if configuration.id == 0 {
+                    try await self.session.joinChannel(configuration)
+                } else {
+                    try await self.session.updateChannel(configuration)
+                }
+
+                await MainActor.run {
+                    self.shouldDismiss = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
         }
     }
 
     func joinChannelPressed() {
-        if channel.bPassword == TRUE {
+        if isPasswordProtected || !configuration.password.isEmpty {
             //joinPassword = passwordText
             showingJoinAlert = true
         } else {
-            cmdid = TeamTalkClient.shared.joinChannel(id: channel.nChannelID)
+            guard let channel = session.channel(id: TeamTalkChannelID(configuration.id)) else {
+                self.errorMessage = "Channel not found"
+                return
+            }
+
+            Task { [weak self] in
+                guard let self else { return }
+
+                do {
+                    try await self.session.joinChannel(channel)
+                    await MainActor.run {
+                        self.shouldDismiss = true
+                    }
+                } catch {
+                    await MainActor.run {
+                        self.errorMessage = error.localizedDescription
+                    }
+                }
+            }
         }
     }
 
     func joinWithPassword() {
-        cmdid = TeamTalkClient.shared.joinChannel(id: channel.nChannelID, password: joinPassword)
+        guard let channel = session.channel(id: TeamTalkChannelID(configuration.id)) else {
+            self.errorMessage = "Channel not found"
+            return
+        }
+        let password = joinPassword
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await self.session.joinChannel(channel, password: password)
+                await MainActor.run {
+                    self.shouldDismiss = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     func deleteChannel() {
-        cmdid = TeamTalkClient.shared.removeChannel(id: channel.nChannelID)
+        guard let channel = session.channel(id: TeamTalkChannelID(configuration.id)) else {
+            self.errorMessage = "Channel not found"
+            return
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await self.session.removeChannel(channel)
+                await MainActor.run {
+                    self.shouldDismiss = true
+                }
+            } catch {
+                await MainActor.run {
+                    self.errorMessage = error.localizedDescription
+                }
+            }
+        }
     }
 
     func makeAudioCodecModel() -> AudioCodecModel {
-        var opuscodec = newOpusCodec()
-        var speexcodec = newSpeexCodec()
-        var speexvbrcodec = newSpeexVBRCodec()
-        var activeCodec = channel.audiocodec
+        var opuscodec = TeamTalkOpusCodecConfiguration()
+        var speexcodec = TeamTalkSpeexCodecConfiguration()
+        var speexvbrcodec = TeamTalkSpeexVBRCodecConfiguration()
+        var activeCodec = configuration.audioCodec.codec
 
-        switch channel.audiocodec.nCodec {
-        case SPEEX_CODEC:
-            speexcodec = TeamTalkAudioCodec.speexCodec(from: channel.audiocodec)
-        case SPEEX_VBR_CODEC:
-            speexvbrcodec = TeamTalkAudioCodec.speexVBRCodec(from: channel.audiocodec)
-        case OPUS_CODEC:
-            opuscodec = TeamTalkAudioCodec.opusCodec(from: channel.audiocodec)
-        case NO_CODEC:
-            if channel.nChannelID == 0 {
-                activeCodec.nCodec = OPUS_CODEC
+        switch configuration.audioCodec {
+        case .speex(let speexConfiguration):
+            speexcodec = speexConfiguration
+        case .speexVBR(let speexVBRConfiguration):
+            speexvbrcodec = speexVBRConfiguration
+        case .opus(let opusConfiguration):
+            opuscodec = opusConfiguration
+        case .none:
+            if configuration.id == 0 {
+                activeCodec = .opus
             }
-        default:
-            activeCodec.nCodec = NO_CODEC
         }
 
         return AudioCodecModel(
-            activeCodec: activeCodec.nCodec,
+            activeCodec: activeCodec,
             opuscodec: opuscodec,
             speexcodec: speexcodec,
             speexvbrcodec: speexvbrcodec
@@ -135,64 +218,57 @@ final class ChannelDetailModel: ObservableObject {
     func applyCodecAction(_ action: AudioCodecAction, codecModel: AudioCodecModel) {
         switch action {
         case .useNoAudio:
-            channel.audiocodec.nCodec = NO_CODEC
+            configuration.audioCodec = .none
         case .useOPUS:
-            var opuscodec = newOpusCodec()
-            codecModel.saveOPUSCodec(to: &opuscodec)
-            TeamTalkAudioCodec.setOpusCodec(opuscodec, on: &channel.audiocodec)
+            configuration.audioCodec = .opus(codecModel.saveOPUSCodec())
         case .useSpeex:
-            var speexcodec = newSpeexCodec()
-            codecModel.saveSpeexCodec(to: &speexcodec)
-            TeamTalkAudioCodec.setSpeexCodec(speexcodec, on: &channel.audiocodec)
+            configuration.audioCodec = .speex(codecModel.saveSpeexCodec())
         case .useSpeexVBR:
-            var speexvbrcodec = newSpeexVBRCodec()
-            codecModel.saveSpeexVBRCodec(to: &speexvbrcodec)
-            TeamTalkAudioCodec.setSpeexVBRCodec(speexvbrcodec, on: &channel.audiocodec)
+            configuration.audioCodec = .speexVBR(codecModel.saveSpeexVBRCodec())
         }
-        refreshCodecDescription(channel.audiocodec)
+        refreshCodecDescription(configuration.audioCodec)
     }
 
-    private func apply() {
-        let channame = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        TeamTalkString.setChannel(.name, on: &channel, to: channame)
-        TeamTalkString.setChannel(.password, on: &channel, to: passwordText)
-        TeamTalkString.setChannel(.topic, on: &channel, to: topicText)
-
-        updateChannelType(&channel, flag: CHANNEL_PERMANENT.rawValue, enabled: isPermanent)
-        updateChannelType(&channel, flag: CHANNEL_SOLO_TRANSMIT.rawValue, enabled: hasNoInterruptions)
-        updateChannelType(&channel, flag: CHANNEL_NO_VOICEACTIVATION.rawValue, enabled: hasNoVoiceActivation)
-        updateChannelType(&channel, flag: CHANNEL_NO_RECORDING.rawValue, enabled: hasNoAudioRecording)
-        updateChannelType(&channel, flag: CHANNEL_HIDDEN.rawValue, enabled: isHidden)
+    private func applyToConfiguration() {
+        configuration.name = nameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        configuration.password = passwordText
+        configuration.topic = topicText
+        configuration.types = makeChannelTypes()
     }
 
-    private func updateChannelType(_ channel: inout Channel, flag: UInt32, enabled: Bool) {
+    private func updateChannelType(_ types: inout TeamTalkChannelTypes, flag: TeamTalkChannelTypes, enabled: Bool) {
         if enabled {
-            channel.uChannelType |= flag
+            types.insert(flag)
         } else {
-            channel.uChannelType &= ~flag
+            types.remove(flag)
         }
     }
 
-    private static func codecDescription(for codec: AudioCodec) -> String {
-        switch codec.nCodec {
-        case OPUS_CODEC:
-            let opus = TeamTalkAudioCodec.opusCodec(from: codec)
-            let chans = opus.nChannels > 1 ? String(localized: "Stereo", comment: "create channel") : String(localized: "Mono", comment: "create channel")
-            return "OPUS \(opus.nSampleRate / 1000) KHz \(opus.nBitRate / 1000) KB/s " + chans
-        case SPEEX_CODEC:
-            let speex = TeamTalkAudioCodec.speexCodec(from: codec)
-            return "Speex " + bandmodeString(speex.nBandmode)
-        case SPEEX_VBR_CODEC:
-            let speexvbr = TeamTalkAudioCodec.speexVBRCodec(from: codec)
-            return "Speex VBR " + bandmodeString(speexvbr.nBandmode)
-        case NO_CODEC:
-            fallthrough
-        default:
+    private func makeChannelTypes() -> TeamTalkChannelTypes {
+        var types: TeamTalkChannelTypes = .default
+        updateChannelType(&types, flag: .permanent, enabled: isPermanent)
+        updateChannelType(&types, flag: .soloTransmit, enabled: hasNoInterruptions)
+        updateChannelType(&types, flag: .noVoiceActivation, enabled: hasNoVoiceActivation)
+        updateChannelType(&types, flag: .noRecording, enabled: hasNoAudioRecording)
+        updateChannelType(&types, flag: .hidden, enabled: isHidden)
+        return types
+    }
+
+    private static func codecDescription(for codec: TeamTalkAudioCodecConfiguration) -> String {
+        switch codec {
+        case .opus(let opus):
+            let chans = opus.channels > 1 ? String(localized: "Stereo", comment: "create channel") : String(localized: "Mono", comment: "create channel")
+            return "OPUS \(opus.sampleRate / 1000) KHz \(opus.bitrate / 1000) KB/s " + chans
+        case .speex(let speex):
+            return "Speex " + bandmodeString(speex.bandmode)
+        case .speexVBR(let speexvbr):
+            return "Speex VBR " + bandmodeString(speexvbr.bandmode)
+        case .none:
             return String(localized: "No Audio", comment: "create channel")
         }
     }
 
-    private static func bandmodeString(_ bandmode: INT32) -> String {
+    private static func bandmodeString(_ bandmode: Int32) -> String {
         switch bandmode {
         case 2:
             return String(localized: "32 KHz", comment: "create channel")
@@ -206,25 +282,4 @@ final class ChannelDetailModel: ObservableObject {
 
 extension ChannelDetailModel: Identifiable {
     var id: ObjectIdentifier { ObjectIdentifier(self) }
-}
-
-extension ChannelDetailModel: TeamTalkEvent {
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
-        case CLIENTEVENT_CMD_SUCCESS:
-            if m.nSource == cmdid {
-                shouldDismiss = true
-            }
-        case CLIENTEVENT_CMD_ERROR:
-            if m.nSource == cmdid {
-                errorMessage = TeamTalkString.clientError(TeamTalkMessagePayload.clientError(from: m))
-            }
-        case CLIENTEVENT_CMD_PROCESSING:
-            if !TeamTalkMessagePayload.isActive(m) && cmdid == m.nSource {
-                cmdid = 0
-            }
-        default:
-            break
-        }
-    }
 }
