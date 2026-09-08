@@ -73,6 +73,9 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkRemoteControl)) { notification in
             model.remoteControl(notification.object as? UIEvent)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkMagicTap)) { _ in
+            model.magicTapToggleTX()
+        }
         .alert("Error", isPresented: $model.isPresentingAlert) {
             Button("OK", role: .cancel) {}
         } message: {

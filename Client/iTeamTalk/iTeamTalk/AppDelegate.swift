@@ -129,6 +129,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         NotificationCenter.default.post(name: .iTeamTalkRemoteControl, object: event)
     }
 
+    // VoiceOver "magic tap" (two-finger double tap) bubbles up the responder
+    // chain to here when no focused element handled it. Forward it like remote
+    // control events so a VoiceOver user can toggle voice transmission from
+    // anywhere in the app without first finding and focusing the Talk button.
+    // Only claim the gesture while connected, so its default system behavior
+    // still works on the server list.
+    override func accessibilityPerformMagicTap() -> Bool {
+        guard session.isConnected else { return false }
+        NotificationCenter.default.post(name: .iTeamTalkMagicTap, object: nil)
+        return true
+    }
+
     func testBackgroundTask() {
         if (backgroundRunning) {
             endBackgroundTask()

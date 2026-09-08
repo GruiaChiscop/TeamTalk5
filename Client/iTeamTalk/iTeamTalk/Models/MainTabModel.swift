@@ -159,13 +159,27 @@ final class MainTabModel: TeamTalkEventObserver {
     func remoteControl(_ event: UIEvent?) {
         guard let rc = event?.subtype else { return }
         switch rc {
-        case .remoteControlPause, .remoteControlTogglePlayPause:
+        case .remoteControlPlay:
+            channelListModel.pushToTalk.enableVoiceTx(true)
+        case .remoteControlPause:
             channelListModel.pushToTalk.enableVoiceTx(false)
+        case .remoteControlTogglePlayPause:
+            // Single-button headsets (wired EarPods, a single AirPod press) only
+            // ever send toggle-play-pause, so this has to flip the current state
+            // rather than just stop TX - otherwise the headset could turn
+            // transmission off but never back on.
+            channelListModel.pushToTalk.txBtnAccessibilityAction()
         case .remoteControlPreviousTrack, .remoteControlNextTrack:
             channelListModel.pushToTalk.enableVoiceTx(true)
         default:
             break
         }
+    }
+
+    // Two-finger double tap (VoiceOver "magic tap") from anywhere in the app
+    // toggles voice transmission, forwarded from AppDelegate.
+    func magicTapToggleTX() {
+        channelListModel.pushToTalk.txBtnAccessibilityAction()
     }
 
     func disconnectTapped(dismiss: @escaping () -> Void) {
