@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct ChannelDetailView: View {
-    @ObservedObject var model: ChannelDetailModel
+    @Bindable var model: ChannelDetailModel
     @Environment(\.dismiss) private var dismiss
 
     let setupCodec: () -> Void
@@ -80,10 +80,7 @@ struct ChannelDetailView: View {
         } message: {
             Text("Password")
         }
-        .alert("Error", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) {
+        .alert("Error", isPresented: $model.isPresentingError) {
             Button("OK", role: .cancel) { }
         } message: {
             Text(model.errorMessage ?? "")

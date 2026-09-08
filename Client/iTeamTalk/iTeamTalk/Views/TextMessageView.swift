@@ -24,7 +24,7 @@
 import SwiftUI
 
 struct TextMessageView: View {
-    @ObservedObject var model: TextMessageModel
+    @Bindable var model: TextMessageModel
     @FocusState private var isComposing: Bool
 
     var body: some View {
@@ -59,7 +59,7 @@ struct TextMessageView: View {
                         .focused($isComposing)
                         .frame(minHeight: 40, maxHeight: 96)
                         .textInputAutocapitalization(.sentences)
-                        .accessibilityLabel("Message")
+                        .accessibilityLabel("Message)")
                         .onChange(of: model.composedText) { text in
                             sendOnReturnIfNeeded(text)
                         }
@@ -70,9 +70,10 @@ struct TextMessageView: View {
                             .padding(.horizontal, 5)
                             .padding(.vertical, 8)
                             .allowsHitTesting(false)
-                            .accessibilityHidden(true)
                     }
                 }
+                .accessibilityElement(children: .combine)
+
                 Button("Send") {
                     if model.composedText.isEmpty {
                         isComposing = false
@@ -93,9 +94,7 @@ struct TextMessageView: View {
     }
 
     private func sendOnReturnIfNeeded(_ text: String) {
-        let defaults = UserDefaults.standard
-        let sendOnReturn = defaults.object(forKey: PREF_GENERAL_SENDONRETURN) == nil || defaults.bool(forKey: PREF_GENERAL_SENDONRETURN)
-        guard sendOnReturn, text.contains("\n") else { return }
+        guard Preferences.current.general.sendOnReturn, text.contains("\n") else { return }
         model.composedText = text.replacingOccurrences(of: "\n", with: "")
         model.sendMessage()
     }

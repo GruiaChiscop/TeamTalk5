@@ -22,44 +22,64 @@
  */
 
 import AVFoundation
+import Observation
 import OSLog
 import SwiftUI
 import TeamTalkKit
 import UIKit
 
-final class MainTabModel: ObservableObject, TeamTalkEvent {
+@Observable
+final class MainTabModel: TeamTalkEventObserver {
+
+    let session: TeamTalkSession
 
     let channelListModel: ChannelListModel
     let channelChatModel: TextMessageModel
+    let channelFilesModel: ChannelFilesModel
     let preferencesModel: PreferencesModel
 
     var server: Server
-    var cmdid: INT32 = 0
 
-    @Published var alertMessage: String?
-    @Published var fatalAlertMessage: String?   // dismisses the view when OK tapped
-    @Published var showSaveAlert = false
+    var alertMessage: String?
+    var fatalAlertMessage: String?   // dismisses the view when OK tapped
+    var showSaveAlert = false
+
+    var isPresentingAlert: Bool {
+        get { alertMessage != nil }
+        set { if !newValue { alertMessage = nil } }
+    }
+
+    var isPresentingFatalAlert: Bool {
+        get { fatalAlertMessage != nil }
+        set { if !newValue { fatalAlertMessage = nil } }
+    }
 
     private var pendingDismiss: (() -> Void)?
-    private var polltimer: Timer?
     private var reconnecttimer: Timer?
     private var didSetup = false
 
-    init(server: Server) {
+    init(server: Server, session: TeamTalkSession) {
         self.server = server
-        channelListModel = ChannelListModel()
+        self.session = session
+        channelListModel = ChannelListModel(session: session)
         channelChatModel = TextMessageModel(
-            userid: 0,
-            title: String(localized: "Messages", comment: "tab")
+            target: .channelFeed,
+            title: String(localized: "Messages", comment: "tab"),
+            session: session
         )
-        preferencesModel = PreferencesModel()
+        channelFilesModel = ChannelFilesModel(session: session)
+        preferencesModel = PreferencesModel(session: session)
         channelListModel.openTextMessages(channelChatModel)
     }
 
     deinit {
-        TeamTalkClient.shared.disconnect()
-        closeSoundDevices()
-        runTeamTalkEventHandler()
+        session.disconnect()
+        closeSoundDevices(session: session)
+        // closeSoundDevices() only closes the individual input/output devices;
+        // the native SDK only deactivates the OS audio session when its audio
+        // subsystem singleton is destructed, which doesn't happen until process
+        // exit. Deactivate it here so leaving a server actually releases it.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         print("Destroyed main view controller")
     }
 
@@ -67,37 +87,32 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         guard !didSetup else { return }
         didSetup = true
 
-        addToTTMessages(self)
-        addToTTMessages(channelListModel)
-        addToTTMessages(channelChatModel)
-        addToTTMessages(preferencesModel)
+        addToTeamTalkEvents(self, on: session)
+        addToTeamTalkEvents(channelListModel, on: session)
+        addToTeamTalkEvents(channelChatModel, on: session)
+        addToTeamTalkEvents(channelFilesModel, on: session)
+        addToTeamTalkEvents(preferencesModel, on: session)
 
-        setupSoundDevices()
+        setupSoundDevices(session: session)
 
+        // Reads the persisted values directly: Preferences.sound.* mirrors the SDK's
+        // *live* volume for the Preferences screen, not what should be re-applied here.
         let defaults = UserDefaults.standard
         if defaults.object(forKey: PREF_MASTER_VOLUME) != nil {
             let vol = defaults.integer(forKey: PREF_MASTER_VOLUME)
-            TeamTalkClient.shared.setSoundOutputVolume(INT32(refVolume(Double(vol))))
+            session.setSoundOutputVolume(Int32(refVolume(Double(vol))))
         }
         if defaults.object(forKey: PREF_VOICEACTIVATION) != nil {
             let voiceact = defaults.integer(forKey: PREF_VOICEACTIVATION)
             if voiceact != VOICEACT_DISABLED {
-                TeamTalkClient.shared.enableVoiceActivation(true)
-                TeamTalkClient.shared.setVoiceActivationLevel(INT32(voiceact))
+                session.enableVoiceActivation(true)
+                session.setVoiceActivationLevel(Int32(voiceact))
             }
         }
         if defaults.object(forKey: PREF_MICROPHONE_GAIN) != nil {
             let vol = defaults.integer(forKey: PREF_MICROPHONE_GAIN)
-            TeamTalkClient.shared.setSoundInputGainLevel(INT32(refVolume(Double(vol))))
+            session.setSoundInputGainLevel(Int32(refVolume(Double(vol))))
         }
-
-        polltimer = Timer.scheduledTimer(
-            timeInterval: 0.1,
-            target: self,
-            selector: #selector(timerEvent),
-            userInfo: nil,
-            repeats: true
-        )
 
         let center = NotificationCenter.default
         center.addObserver(
@@ -120,22 +135,23 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     }
 
     func teardown() {
-        polltimer?.invalidate()
         reconnecttimer?.invalidate()
-        removeAllTTMessageHandlers()
+        removeFromTeamTalkEvents(self, from: session)
+        removeFromTeamTalkEvents(channelListModel, from: session)
+        removeFromTeamTalkEvents(channelChatModel, from: session)
+        removeFromTeamTalkEvents(channelFilesModel, from: session)
+        removeFromTeamTalkEvents(preferencesModel, from: session)
         unreadmessages.removeAll()
         UIDevice.current.isProximityMonitoringEnabled = false
         UIApplication.shared.endReceivingRemoteControlEvents()
     }
 
     func onVisibleAppear() {
-        let defaults = UserDefaults.standard
-        if defaults.object(forKey: PREF_DISPLAY_PROXIMITY) != nil &&
-            defaults.bool(forKey: PREF_DISPLAY_PROXIMITY) {
+        let preferences = Preferences.current
+        if preferences.display.proximitySensor {
             UIDevice.current.isProximityMonitoringEnabled = true
         }
-        if defaults.object(forKey: PREF_HEADSET_TXTOGGLE) != nil &&
-            defaults.bool(forKey: PREF_HEADSET_TXTOGGLE) {
+        if preferences.general.headsetTXToggle {
             UIApplication.shared.beginReceivingRemoteControlEvents()
         }
     }
@@ -143,13 +159,27 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     func remoteControl(_ event: UIEvent?) {
         guard let rc = event?.subtype else { return }
         switch rc {
-        case .remoteControlPause, .remoteControlTogglePlayPause:
-            channelListModel.enableVoiceTx(false)
+        case .remoteControlPlay:
+            channelListModel.pushToTalk.enableVoiceTx(true)
+        case .remoteControlPause:
+            channelListModel.pushToTalk.enableVoiceTx(false)
+        case .remoteControlTogglePlayPause:
+            // Single-button headsets (wired EarPods, a single AirPod press) only
+            // ever send toggle-play-pause, so this has to flip the current state
+            // rather than just stop TX - otherwise the headset could turn
+            // transmission off but never back on.
+            channelListModel.pushToTalk.txBtnAccessibilityAction()
         case .remoteControlPreviousTrack, .remoteControlNextTrack:
-            channelListModel.enableVoiceTx(true)
+            channelListModel.pushToTalk.enableVoiceTx(true)
         default:
             break
         }
+    }
+
+    // Two-finger double tap (VoiceOver "magic tap") from anywhere in the app
+    // toggles voice transmission, forwarded from AppDelegate.
+    func magicTapToggleTX() {
+        channelListModel.pushToTalk.txBtnAccessibilityAction()
     }
 
     func disconnectTapped(dismiss: @escaping () -> Void) {
@@ -194,31 +224,34 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     }
 
     @objc func connectToServer() {
-        if !setupEncryption(server: server) {
+        if !setupEncryption(server: server, session: session) {
             fatalAlertMessage = String(localized: "Failed to setup encryption", comment: "connect to a server")
-        } else if !TeamTalkClient.shared.connect(
+        } else if !session.connect(
             toHost: server.ipaddr,
-            tcpPort: INT32(server.tcpport),
-            udpPort: INT32(server.udpport),
+            tcpPort: Int32(server.tcpport),
+            udpPort: Int32(server.udpport),
             encrypted: server.encrypted
         ) {
-            TeamTalkClient.shared.disconnect()
+            session.disconnect()
             startReconnectTimer()
         }
     }
 
-    @objc private func timerEvent() {
-        runTeamTalkEventHandler()
+    @objc private func proximityChanged(_ notification: Notification) {
+        // Route to the earpiece while the phone is held to the ear, like a
+        // regular phone call; restore the user's actual preference once moved away.
+        let soundDevice = Preferences.current.soundDevice
+        guard soundDevice.proximitySwitching else { return }
+        let nearEar = UIDevice.current.proximityState
+        try? AVAudioSession.sharedInstance().overrideOutputAudioPort(nearEar ? .none : (soundDevice.speakerOutput ? .speaker : .none))
     }
-
-    @objc private func proximityChanged(_ notification: Notification) {}
 
     @objc private func audioRouteChange(_ notification: Notification) {
         guard let reasonValue = notification.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
               let reason = AVAudioSession.RouteChangeReason(rawValue: reasonValue) else { return }
         switch reason {
         case .oldDeviceUnavailable:
-            setupSoundDevices()
+            setupSoundDevices(session: session)
         default:
             break
         }
@@ -226,26 +259,35 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
     }
 
     @objc private func audioInterruption(_ notification: Notification) {
-        guard let optionValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
-        let options = AVAudioSession.InterruptionOptions(rawValue: optionValue)
-        if options.contains(.shouldResume) {
-            setupSoundDevices()
+        guard let typeValue = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+              let type = AVAudioSession.InterruptionType(rawValue: typeValue) else { return }
+        switch type {
+        case .began:
+            // Something else (a phone call, Siri, ...) just took the audio
+            // session away - stop transmitting so the UI doesn't keep showing
+            // "transmitting" while the mic isn't actually being captured.
+            channelListModel.pushToTalk.enableVoiceTx(false)
+        case .ended:
+            guard let optionValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt else { return }
+            if AVAudioSession.InterruptionOptions(rawValue: optionValue).contains(.shouldResume) {
+                setupSoundDevices(session: session)
+            }
+        @unknown default:
+            break
         }
     }
 
-    func handleTTMessage(_ m: TTMessage) {
-        switch m.nClientEvent {
+    func handleTeamTalkEvent(_ event: TeamTalkEvent) {
+        switch event.kind {
 
-        case CLIENTEVENT_CON_SUCCESS:
+        case .connectionSucceeded:
             os_log("Connected to \(self.server.ipaddr)")
 
             if AppInfo.isBearWareWebLogin(self.server.username) {
-                let settings = UserDefaults.standard
-                let username = settings.string(forKey: PREF_GENERAL_BEARWARE_ID) ?? ""
-                let token = settings.string(forKey: PREF_GENERAL_BEARWARE_TOKEN) ?? ""
-                let accesstoken = TeamTalkClient.shared.withServerProperties {
-                    TeamTalkString.serverProperties(.accessToken, from: $0)
-                }
+                let webLogin = Preferences.current.webLogin
+                let username = webLogin.bearwareID ?? ""
+                let token = webLogin.bearwareToken ?? ""
+                let accesstoken = session.serverProperties()?.accessToken ?? ""
                 let url = AppInfo.getBearWareServerTokenURL(
                     username: username, token: token, accesstoken: accesstoken
                 )
@@ -263,93 +305,80 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
             }
             login()
 
-        case CLIENTEVENT_CON_FAILED:
-            TeamTalkClient.shared.disconnect()
+        case .connectionFailed:
+            session.disconnect()
             startReconnectTimer()
             os_log("Connect to \(self.server.ipaddr) failed")
 
-        case CLIENTEVENT_CON_LOST:
+        case .connectionLost:
             os_log("Connection to \(self.server.ipaddr) lost")
-            TeamTalkClient.shared.disconnect()
+            session.disconnect()
             playSound(.srv_LOST)
-            if UserDefaults.standard.object(forKey: PREF_TTSEVENT_CONLOST) == nil ||
-                UserDefaults.standard.bool(forKey: PREF_TTSEVENT_CONLOST) {
+            if Preferences.current.textToSpeechEvents.connectionLost {
                 newUtterance(String(localized: "Connection lost", comment: "tts event"))
             }
             startReconnectTimer()
 
-        case CLIENTEVENT_VOICE_ACTIVATION:
-            playSound(TeamTalkMessagePayload.isActive(m) ? .voxtriggered_ON : .voxtriggered_OFF)
+        case .voiceActivation(let isActive):
+            playSound(isActive ? .voxtriggered_ON : .voxtriggered_OFF)
 
-        case CLIENTEVENT_CMD_PROCESSING:
-            if !TeamTalkMessagePayload.isActive(m) {
-                commandComplete(m.nSource)
-            }
-
-        case CLIENTEVENT_CMD_MYSELF_LOGGEDIN:
-            let account = TeamTalkMessagePayload.userAccount(from: m)
-            let initchan = TeamTalkString.userAccount(.initialChannel, from: account)
+        case .myselfLoggedIn(_, let account):
+            let initchan = account.initialChannel
             if !initchan.isEmpty {
                 server.channel = initchan
             }
 
-        case CLIENTEVENT_CMD_MYSELF_KICKED:
+        case .myselfKicked(let channelID, let kickedBy):
             let msg: String
-            if TeamTalkMessagePayload.hasUserPayload(m) {
-                let kicker = getDisplayName(TeamTalkMessagePayload.user(from: m))
-                msg = m.nSource == 0
+            if let kickedBy {
+                let kicker = getDisplayName(kickedBy)
+                msg = !channelID.isValid
                     ? String(format: String(localized: "You have been kicked from server by %@", comment: "Dialog"), kicker)
                     : String(format: String(localized: "You have been kicked from channel by %@", comment: "Dialog"), kicker)
             } else {
-                msg = m.nSource == 0
+                msg = !channelID.isValid
                     ? String(localized: "You have been kicked from server", comment: "Dialog")
                     : String(localized: "You have been kicked from channel", comment: "Dialog")
             }
-            if m.nSource == 0 { playSound(.srv_LOST) }
+            if !channelID.isValid { playSound(.srv_LOST) }
             alertMessage = msg
 
-        case CLIENTEVENT_CMD_ERROR:
-            if m.nSource == cmdid {
-                fatalAlertMessage = TeamTalkString.clientError(TeamTalkMessagePayload.clientError(from: m))
-                reconnecttimer?.invalidate()
-                TeamTalkClient.shared.disconnect()
+        case .userLoggedIn(let user):
+            let subscriptions = getDefaultSubscriptions()
+            if session.myUserIdentifier != user.userID && user.localSubscriptions != subscriptions {
+                let difference = TeamTalkSubscriptions(rawValue: user.localSubscriptions.rawValue ^ subscriptions.rawValue)
+                session.unsubscribe(difference, from: user)
             }
+            syncFromUserCache(user: user, session: session)
 
-        case CLIENTEVENT_CMD_USER_LOGGEDIN:
-            let subs = getDefaultSubscriptions()
-            let user = TeamTalkMessagePayload.user(from: m)
-            if TeamTalkClient.shared.myUserID != user.nUserID && user.uLocalSubscriptions != subs {
-                TeamTalkClient.shared.unsubscribe(userID: user.nUserID, subscriptions: user.uLocalSubscriptions ^ subs)
-            }
-            syncFromUserCache(user: user)
+        case .userLoggedOut(let user):
+            syncToUserCache(user: user)
 
-        case CLIENTEVENT_CMD_USER_LOGGEDOUT:
-            syncToUserCache(user: TeamTalkMessagePayload.user(from: m))
-
-        case CLIENTEVENT_CMD_USER_JOINED:
-            let user = TeamTalkMessagePayload.user(from: m)
+        case .userJoined(let user):
+            // Raw read, not Preferences.sound.mediaFileVolumePercent: this must stay
+            // unset (skip applying a volume) when the user never touched the slider,
+            // whereas Preferences always resolves a display default for that field.
             let defaults = UserDefaults.standard
             if let mfvol = defaults.object(forKey: PREF_MEDIAFILE_VOLUME) as? Double {
                 let vol = refVolume(100.0 * mfvol)
-                TeamTalkClient.shared.setUserVolume(
-                    userID: user.nUserID, stream: STREAMTYPE_MEDIAFILE_AUDIO, volume: INT32(vol)
+                session.setUserVolume(
+                    user, stream: .mediaFileAudio, volume: Int32(vol)
                 )
-                TeamTalkClient.shared.pump(CLIENTEVENT_USER_STATECHANGE, source: user.nUserID)
             }
-            if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
-                syncFromUserCache(user: user)
-            }
-
-        case CLIENTEVENT_CMD_USER_LEFT:
-            if (TeamTalkClient.shared.myUserRights & USERRIGHT_VIEW_ALL_USERS.rawValue) != USERRIGHT_VIEW_ALL_USERS.rawValue {
-                syncToUserCache(user: TeamTalkMessagePayload.user(from: m))
+            if !session.myRights.contains(.canViewAllUsers) {
+                syncFromUserCache(user: user, session: session)
             }
 
-        case CLIENTEVENT_CMD_USER_TEXTMSG:
-            switch TeamTalkMessagePayload.textMessage(from: m).nMsgType {
-            case MSGTYPE_CHANNEL:   playSound(.chan_MSG)
-            case MSGTYPE_USER:      playSound(.user_MSG)
-            case MSGTYPE_BROADCAST: playSound(.broadcast_MSG)
+        case .userLeft(_, let user):
+            if !session.myRights.contains(.canViewAllUsers) {
+                syncToUserCache(user: user)
+            }
+
+        case .textMessage(let message):
+            switch message.type {
+            case .channel:   playSound(.chan_MSG)
+            case .user:      playSound(.user_MSG)
+            case .broadcast: playSound(.broadcast_MSG)
             default: break
             }
 
@@ -358,52 +387,42 @@ final class MainTabModel: ObservableObject, TeamTalkEvent {
         }
     }
 
-    private func commandComplete(_ active_cmdid: INT32) {
-        let cmd = channelListModel.activeCommands[active_cmdid]
-        guard let cmd else { return }
-
-        switch cmd {
-        case .loginCmd:
-            if !server.channel.isEmpty {
-                var tokens = server.channel.components(separatedBy: "/")
-                let chanid = TeamTalkClient.shared.channelID(fromPath: server.channel)
-                if chanid > 0 {
-                    channelListModel.rejoinchannel.nChannelID = chanid
-                    TeamTalkString.setChannel(.password, on: &channelListModel.rejoinchannel, to: server.chanpasswd)
-                } else if tokens.count > 0 {
-                    let channame = tokens.removeLast()
-                    let chanpath = tokens.map { "/" + $0 }.joined()
-                    let parentid = TeamTalkClient.shared.channelID(fromPath: chanpath)
-                    if parentid > 0 {
-                        channelListModel.rejoinchannel.nParentID = parentid
-                        TeamTalkString.setChannel(.name, on: &channelListModel.rejoinchannel, to: channame)
-                        TeamTalkString.setChannel(.password, on: &channelListModel.rejoinchannel, to: server.chanpasswd)
-                        channelListModel.rejoinchannel.audiocodec = newAudioCodec(DEFAULT_AUDIOCODEC)
-                    }
-                }
-                server.channel.removeAll()
-                server.chanpasswd.removeAll()
-            }
-            let settings = UserDefaults.standard
-            if settings.integer(forKey: PREF_GENERAL_GENDER) != 0 {
-                TeamTalkClient.shared.changeStatus(mode: INT32(StatusMode.STATUSMODE_FEMALE.rawValue))
-            }
-        default:
-            break
-        }
-    }
-
     private func login() {
         let nickname = server.nickname.isEmpty
-            ? (UserDefaults.standard.string(forKey: PREF_GENERAL_NICKNAME) ?? "")
+            ? Preferences.current.general.nickname
             : server.nickname
-        cmdid = TeamTalkClient.shared.login(
-            nickname: nickname,
-            username: server.username,
-            password: server.password,
-            clientName: AppInfo.getAppName()
-        )
-        channelListModel.activeCommands[cmdid] = .loginCmd
         reconnecttimer?.invalidate()
+
+        Task { [weak self] in
+            guard let self else { return }
+
+            do {
+                try await session.logIn(
+                    nickname: nickname,
+                    username: server.username,
+                    password: server.password,
+                    clientName: AppInfo.getAppName()
+                )
+
+                await MainActor.run {
+                    self.channelListModel.configureInitialJoin(
+                        channelPath: self.server.channel,
+                        password: self.server.chanpasswd
+                    )
+                    self.server.channel.removeAll()
+                    self.server.chanpasswd.removeAll()
+
+                    if Preferences.current.general.genderIndex != 0 {
+                        self.session.setStatus(mode: .female)
+                    }
+                }
+
+                try await self.channelListModel.joinInitialChannelIfNeeded()
+            } catch {
+                await MainActor.run {
+                    self.alertMessage = error.localizedDescription
+                }
+            }
+        }
     }
 }

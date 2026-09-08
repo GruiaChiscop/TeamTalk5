@@ -28,7 +28,8 @@ struct WebLoginView: View {
     @State private var usernameText = ""
     @State private var passwordText = ""
     @State private var hasStoredUsername = false
-    @State private var alertMessage: String?
+    @State private var isAlertPresented = false
+    @State private var alertMessage = ""
 
     var body: some View {
         Form {
@@ -61,23 +62,15 @@ struct WebLoginView: View {
         }
         .navigationTitle("BearWare.dk Web Login")
         .onAppear(perform: loadWebLogin)
-        .alert("Authenticate",
-               isPresented: Binding(get: { alertMessage != nil }, set: { isPresented in
-                   if !isPresented {
-                       alertMessage = nil
-                   }
-               })) {
-            Button("OK", role: .cancel) {
-                alertMessage = nil
-            }
+        .alert("Authenticate", isPresented: $isAlertPresented) {
+            Button("OK", role: .cancel) { }
         } message: {
-            Text(alertMessage ?? "")
+            Text(alertMessage)
         }
     }
 
     private func loadWebLogin() {
-        let settings = UserDefaults.standard
-        let username = settings.string(forKey: PREF_GENERAL_BEARWARE_ID)
+        let username = Preferences.current.webLogin.bearwareID
         usernameText = username ?? ""
         passwordText = ""
         hasStoredUsername = username != nil
@@ -90,7 +83,7 @@ struct WebLoginView: View {
         let tokenURL = AppInfo.getBearWareTokenURL(username: username, passwd: passwordText)
 
         guard let url = URL(string: tokenURL), let parser = XMLParser(contentsOf: url) else {
-            alertMessage = String(localized: "Username or password incorrect", comment: "Web Login Controller")
+            showAlert(String(localized: "Username or password incorrect", comment: "Web Login Controller"))
             return
         }
 
@@ -98,7 +91,7 @@ struct WebLoginView: View {
         parser.delegate = authParser
         if parser.parse() && authParser.username.count > 0 {
             let fmtmsg = String(localized: "%@, your username \"%@\" has been validated", comment: "Web Login Controller")
-            alertMessage = String(format: fmtmsg, authParser.nickname, authParser.username)
+            showAlert(String(format: fmtmsg, authParser.nickname, authParser.username))
 
             let settings = UserDefaults.standard
             settings.set(authParser.username, forKey: PREF_GENERAL_BEARWARE_ID)
@@ -106,8 +99,13 @@ struct WebLoginView: View {
 
             loadWebLogin()
         } else {
-            alertMessage = String(localized: "Username or password incorrect", comment: "Web Login Controller")
+            showAlert(String(localized: "Username or password incorrect", comment: "Web Login Controller"))
         }
+    }
+
+    private func showAlert(_ message: String) {
+        alertMessage = message
+        isAlertPresented = true
     }
 
     private func openWebLoginSignup() {

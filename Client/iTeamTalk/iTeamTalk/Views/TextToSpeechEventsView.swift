@@ -25,13 +25,13 @@ import SwiftUI
 
 struct TextToSpeechEventsView: View {
     private let rows = [
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_USERLOGIN, defaultValue: false, title: "User logged in", subtitle: "Announce user logged onto server"),
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_USERLOGOUT, defaultValue: false, title: "User logged out", subtitle: "Announce user logged out of server"),
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_JOINEDCHAN, defaultValue: true, title: "User joins channel", subtitle: "Announce user joining channel"),
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_LEFTCHAN, defaultValue: true, title: "User leaves channel", subtitle: "Announce user leaving channel"),
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_CONLOST, defaultValue: true, title: "Connection lost", subtitle: "Announce lost server connection"),
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_TEXTMSG, defaultValue: false, title: "Private Text Message", subtitle: "Announce content of text message"),
-        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_CHANTEXTMSG, defaultValue: false, title: "Channel Text Message", subtitle: "Announce content of text message")
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_USERLOGIN, keyPath: \.userLoggedIn, title: "User logged in", subtitle: "Announce user logged onto server"),
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_USERLOGOUT, keyPath: \.userLoggedOut, title: "User logged out", subtitle: "Announce user logged out of server"),
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_JOINEDCHAN, keyPath: \.userJoinedChannel, title: "User joins channel", subtitle: "Announce user joining channel"),
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_LEFTCHAN, keyPath: \.userLeftChannel, title: "User leaves channel", subtitle: "Announce user leaving channel"),
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_CONLOST, keyPath: \.connectionLost, title: "Connection lost", subtitle: "Announce lost server connection"),
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_TEXTMSG, keyPath: \.privateTextMessage, title: "Private Text Message", subtitle: "Announce content of text message"),
+        TextToSpeechEventRow(preferenceKey: PREF_TTSEVENT_CHANTEXTMSG, keyPath: \.channelTextMessage, title: "Channel Text Message", subtitle: "Announce content of text message")
     ]
 
     var body: some View {
@@ -52,7 +52,7 @@ private struct TextToSpeechEventToggle: View {
 
     init(row: TextToSpeechEventRow) {
         self.row = row
-        _isOn = AppStorage(wrappedValue: row.defaultValue, row.preferenceKey)
+        _isOn = AppStorage(wrappedValue: Preferences.TextToSpeechEvents()[keyPath: row.keyPath], row.preferenceKey)
     }
 
     var body: some View {
@@ -69,7 +69,7 @@ private struct TextToSpeechEventToggle: View {
 
 private struct TextToSpeechEventRow: Identifiable {
     let preferenceKey: String
-    let defaultValue: Bool
+    let keyPath: KeyPath<Preferences.TextToSpeechEvents, Bool>
     let title: LocalizedStringKey
     let subtitle: LocalizedStringKey
 

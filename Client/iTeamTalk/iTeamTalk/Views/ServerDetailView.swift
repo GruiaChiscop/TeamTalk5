@@ -25,7 +25,7 @@ import SwiftUI
 
 struct ServerDetailView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject var model: ServerDetailModel
+    @Bindable var model: ServerDetailModel
     @State private var showServerPassword = false
     @State private var showChannelPassword = false
 

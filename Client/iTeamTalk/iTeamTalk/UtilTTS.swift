@@ -33,33 +33,34 @@ var myUtterance = AVSpeechUtterance(string: "")
 let DEFAULT_TTS_VOL : Float = 0.5
 
 func newUtterance(_ utterance: String) {
-    let settings = UserDefaults.standard
+    let preferences = Preferences.current
     myUtterance = AVSpeechUtterance(string: utterance)
     if UIAccessibility.isVoiceOverRunning && UIApplication.shared.applicationState == .active{
         UIAccessibility.post(notification: UIAccessibility.Notification.announcement, argument: utterance)
         return
     }
-    if let rate = settings.value(forKey: PREF_TTSEVENT_RATE) {
-        myUtterance.rate = (rate as AnyObject).floatValue!
+    myUtterance.rate = Float(preferences.textToSpeech.rate)
+    // Only override AVSpeechUtterance's own default volume (1.0) once the user has
+    // touched the slider — Preferences.textToSpeech.volume defaults to 0.5 for
+    // *display* purposes on the Preferences screen, which isn't the same thing.
+    if UserDefaults.standard.value(forKey: PREF_TTSEVENT_VOL) != nil {
+        myUtterance.volume = Float(preferences.textToSpeech.volume)
     }
-    if let vol = settings.value(forKey: PREF_TTSEVENT_VOL) {
-        myUtterance.volume = (vol as AnyObject).floatValue!
-    }
-    if let voice = settings.string(forKey: PREF_TTSEVENT_VOICEID) {
+    if let voice = preferences.textToSpeechEvents.voiceIdentifier {
         myUtterance.voice = AVSpeechSynthesisVoice(identifier: voice)
     }
-    else if let lang = settings.string(forKey: PREF_TTSEVENT_VOICELANG) {
+    else if let lang = preferences.textToSpeechEvents.voiceLanguage {
         myUtterance.voice = AVSpeechSynthesisVoice(language: lang)
     }
-    
+
     synth.speak(myUtterance)
 }
 
-func speakTextMessage(_ msgtype: TextMsgType, mymsg: MyTextMessage) {
-    
-    let settings = UserDefaults.standard
-    let tts_priv = settings.object(forKey: PREF_TTSEVENT_TEXTMSG) != nil && settings.bool(forKey: PREF_TTSEVENT_TEXTMSG) && msgtype == MSGTYPE_USER
-    let tts_chan = settings.object(forKey: PREF_TTSEVENT_CHANTEXTMSG) != nil && settings.bool(forKey: PREF_TTSEVENT_CHANTEXTMSG) && msgtype == MSGTYPE_CHANNEL
+func speakTextMessage(_ msgtype: TeamTalkTextMessageType, mymsg: MyTextMessage) {
+
+    let events = Preferences.current.textToSpeechEvents
+    let tts_priv = events.privateTextMessage && msgtype == .user
+    let tts_chan = events.channelTextMessage && msgtype == .channel
     
     if tts_priv {
         let ttsmsg = String(format: String(localized: "Private text message from %@. %@", comment: "TTS EVENT"),

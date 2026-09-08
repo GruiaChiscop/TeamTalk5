@@ -22,10 +22,12 @@
  */
 
 import AVFoundation
+import Observation
 import SwiftUI
 import TeamTalkKit
 
-final class SoundDevicesModel: ObservableObject {
+@Observable
+final class SoundDevicesModel {
     struct ToggleRow: Identifiable {
         let id: String
         let title: String
@@ -40,7 +42,9 @@ final class SoundDevicesModel: ObservableObject {
         let dataSources: [AVAudioSessionDataSourceDescription?]
     }
 
-    @Published private var revision = 0
+    let session: TeamTalkSession
+
+    private var revision = 0
 
     let toggleRows = [
         ToggleRow(
@@ -60,14 +64,20 @@ final class SoundDevicesModel: ObservableObject {
             title: String(localized: "Bluetooth A2DP Playback", comment: "Sound Devices"),
             subtitle: String(localized: "Bluetooth playback should use Advanced Audio Distribution Profile", comment: "Sound Devices"),
             preferenceKey: PREF_BLUETOOTH_A2DP
+        ),
+        ToggleRow(
+            id: PREF_PROXIMITY_AUDIOSWITCH,
+            title: String(localized: "Proximity Switching", comment: "Sound Devices"),
+            subtitle: String(localized: "Route to earpiece automatically when phone is held to ear", comment: "Sound Devices"),
+            preferenceKey: PREF_PROXIMITY_AUDIOSWITCH
         )
     ]
 
     var audioInputSections: [AudioInputSection] {
         _ = revision
 
-        let session = AVAudioSession.sharedInstance()
-        return (session.availableInputs ?? []).map { input in
+        let audioSession = AVAudioSession.sharedInstance()
+        return (audioSession.availableInputs ?? []).map { input in
             let dataSources = input.dataSources ?? []
             return AudioInputSection(
                 id: input.uid,
@@ -80,9 +90,10 @@ final class SoundDevicesModel: ObservableObject {
 
     private var routeObserver: NSObjectProtocol?
 
-    init() {
-        if !TeamTalkClient.shared.isSoundInputReady {
-            setupSoundDevices()
+    init(session: TeamTalkSession) {
+        self.session = session
+        if !session.isSoundInputReady {
+            setupSoundDevices(session: session)
         }
 
         routeObserver = NotificationCenter.default.addObserver(
@@ -102,13 +113,27 @@ final class SoundDevicesModel: ObservableObject {
     }
 
     func preferenceValue(forKey key: String) -> Bool {
-        UserDefaults.standard.object(forKey: key) != nil && UserDefaults.standard.bool(forKey: key)
+        let soundDevice = Preferences.current.soundDevice
+        switch key {
+        case PREF_SPEAKER_OUTPUT: return soundDevice.speakerOutput
+        case PREF_VOICEPROCESSINGIO: return soundDevice.voicePreprocessing
+        case PREF_BLUETOOTH_A2DP: return soundDevice.bluetoothA2DP
+        case PREF_PROXIMITY_AUDIOSWITCH: return soundDevice.proximitySwitching
+        default: return false
+        }
     }
 
     func setPreference(_ value: Bool, forKey key: String) {
         UserDefaults.standard.set(value, forKey: key)
-        setupSoundDevices()
+        setupSoundDevices(session: session)
         reload()
+    }
+
+    func binding(forKey key: String) -> Binding<Bool> {
+        Binding(
+            get: { self.preferenceValue(forKey: key) },
+            set: { self.setPreference($0, forKey: key) }
+        )
     }
 
     func title(for dataSources: [AVAudioSessionDataSourceDescription?],
@@ -137,22 +162,23 @@ final class SoundDevicesModel: ObservableObject {
 
     func selectDataSource(at index: Int, for input: AVAudioSessionPortDescription) {
         do {
-            let session = AVAudioSession.sharedInstance()
+            let audioSession = AVAudioSession.sharedInstance()
             print("UID of \(input.portName): \(input.uid)")
 
             if let dataSources = input.dataSources, index < dataSources.count {
                 let dataSource = dataSources[index]
                 print("Data source ID: \(dataSource.dataSourceID)")
                 try input.setPreferredDataSource(dataSource)
-                try session.setPreferredInput(input)
-                try session.setInputDataSource(dataSource)
+                try audioSession.setPreferredInput(input)
+                try audioSession.setInputDataSource(dataSource)
                 setAudioPortDataSource(descr: input, dsrc: dataSource)
             } else {
-                try session.setPreferredInput(input)
+                try audioSession.setPreferredInput(input)
                 removeAudioPortDataSource(descr: input)
             }
+            setPreferredInputUID(input.uid)
 
-            print(session.currentRoute)
+            print(audioSession.currentRoute)
         } catch {
             print("Failed to select data source")
         }

@@ -26,7 +26,7 @@ import SwiftUI
 
 struct SpeechListView: View {
     private let sections: [String]
-    @State private var selectedVoiceIdentifier = UserDefaults.standard.string(forKey: PREF_TTSEVENT_VOICEID)
+    @State private var selectedVoiceIdentifier = Preferences.current.textToSpeechEvents.voiceIdentifier
 
     init() {
         var languages = [AVSpeechSynthesisVoice.currentLanguageCode()]

@@ -45,17 +45,17 @@ struct MyTextMessage {
     var message : String
     var date = Date()
     var msgtype : MsgType
-    var fromuserid : INT32 = 0
+    var fromUserID: TeamTalkUserID = .none
     
-    init(m: TextMessage, nickname: String, msgtype: MsgType) {
-        message = TeamTalkString.textMessage(m)
+    init(m: TeamTalkTextMessage, nickname: String, msgtype: MsgType) {
+        message = m.content
         self.nickname = nickname
         self.msgtype = msgtype
-        self.fromuserid = m.nFromUserID
+        self.fromUserID = m.fromUserIdentifier
     }
 
-    init(fromuserid: INT32, nickname: String, msgtype: MsgType, content: String) {
-        self.fromuserid = fromuserid
+    init(fromUserID: TeamTalkUserID, nickname: String, msgtype: MsgType, content: String) {
+        self.fromUserID = fromUserID
         self.message = content
         self.nickname = nickname
         self.msgtype = msgtype
@@ -68,7 +68,7 @@ struct MyTextMessage {
 }
 
 protocol MyTextMessageDelegate: AnyObject {
-    func appendTextMessage(_ userid: INT32, txtmsg: MyTextMessage)
+    func appendTextMessage(for userID: TeamTalkUserID, message: MyTextMessage)
 }
 
 class MyCustomAction : UIAccessibilityCustomAction {
@@ -82,15 +82,12 @@ class MyCustomAction : UIAccessibilityCustomAction {
 }
 
 func hasPTTLock() -> Bool {
-    let defaults = UserDefaults.standard
-    return defaults.object(forKey: PREF_GENERAL_PTTLOCK) != nil && defaults.bool(forKey: PREF_GENERAL_PTTLOCK)
+    Preferences.current.general.pushToTalkLock
 }
 
 func limitText(_ s: String) -> String {
-    
-    let settings = UserDefaults.standard
-    let length = settings.object(forKey: PREF_DISPLAY_LIMITTEXT) == nil ? DEFAULT_LIMIT_TEXT : settings.integer(forKey: PREF_DISPLAY_LIMITTEXT)
-    
+    let length = Int(Preferences.current.display.limitText)
+
     if s.count > length {
         return String(s.prefix(length))
     }
@@ -106,17 +103,16 @@ func announceForAccessibility(_ message: String) {
     UIAccessibility.post(notification: .announcement, argument: message)
 }
 
-func getDisplayName(_ user: User) -> String {
-    let settings = UserDefaults.standard
-    if settings.object(forKey: PREF_DISPLAY_SHOWUSERNAME) != nil && settings.bool(forKey: PREF_DISPLAY_SHOWUSERNAME) {
-        return limitText(TeamTalkString.user(.username, from: user))
+func getDisplayName(_ user: TeamTalkUser) -> String {
+    if Preferences.current.display.showUsername {
+        return limitText(user.username)
     }
 
-    let nickname = TeamTalkString.user(.nickname, from: user)
+    let nickname = user.nickname
     if nickname.isEmpty {
-        return DEFAULT_NICKNAME + " - #\(user.nUserID)"
+        return DEFAULT_NICKNAME + " - #\(user.id)"
     }
-    
+
     return limitText(nickname)
 }
 
@@ -164,4 +160,24 @@ func formPasswordField(
         Text(title)
             .accessibilityHidden(true)
     }
+}
+
+let DEFAULT_NICKNAME = String(localized: "Noname", comment: "default nickname")
+
+func within<T: Comparable>(_ min_v: T, max_v: T, value: T) -> T {
+    if value < min_v {
+        return min_v
+    }
+    if value > max_v {
+        return max_v
+    }
+    return value
+}
+
+func getXMLPath(elementStack: [String]) -> String {
+    var path = ""
+    for s in elementStack {
+        path += "/" + s
+    }
+    return path
 }

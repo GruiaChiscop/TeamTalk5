@@ -22,18 +22,20 @@
  */
 
 import SwiftUI
+import TeamTalkKit
 
 struct SoundDevicesView: View {
-    @StateObject private var model = SoundDevicesModel()
+    @State private var model: SoundDevicesModel
+
+    init(session: TeamTalkSession) {
+        _model = State(initialValue: SoundDevicesModel(session: session))
+    }
 
     var body: some View {
         Form {
             Section("General") {
                 ForEach(model.toggleRows) { row in
-                    Toggle(isOn: Binding(
-                        get: { model.preferenceValue(forKey: row.preferenceKey) },
-                        set: { model.setPreference($0, forKey: row.preferenceKey) }
-                    )) {
+                    Toggle(isOn: model.binding(forKey: row.preferenceKey)) {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(row.title)
                             Text(row.subtitle)
