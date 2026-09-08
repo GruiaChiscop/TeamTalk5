@@ -80,7 +80,7 @@ class AppInfo {
     }
 
     static func getDefaultUrlArgs() -> String {
-        return "client=" + getAppName() + "&version=" + getAppVersion() + "&dllversion=" + TEAMTALK_VERSION + "&os=" + OSTYPE
+        return "client=" + getAppName() + "&version=" + getAppVersion() + "&dllversion=" + TeamTalkSession.sdkVersion + "&os=" + OSTYPE
     }
     
     static func getServersURL(officialservers: Bool, unofficialservers: Bool) -> String {
@@ -125,4 +125,5 @@ class AppInfo {
 extension Notification.Name {
     static let iTeamTalkOpenURL = Notification.Name("iTeamTalkOpenURL")
     static let iTeamTalkRemoteControl = Notification.Name("iTeamTalkRemoteControl")
+    static let iTeamTalkMagicTap = Notification.Name("iTeamTalkMagicTap")
 }

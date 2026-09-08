@@ -21,7 +21,9 @@
  *
  */
 
+import Observation
 import SwiftUI
+import TeamTalkKit
 import UIKit
 
 enum ServerType {
@@ -152,32 +154,42 @@ enum ServerListDestination: Hashable {
 
 // MARK: - Server List Model
 
-final class ServerListModel: ObservableObject {
-    @Published var servers: [Server] = []
-    @Published var navigationPath: [ServerListDestination] = []
-    @Published var activeMainTabModel: MainTabModel?
-    @Published var serverDetailModel: ServerDetailModel?
+@Observable
+final class ServerListModel {
+    let session: TeamTalkSession
+
+    var servers: [Server] = []
+    var navigationPath: [ServerListDestination] = []
+    var activeMainTabModel: MainTabModel?
+    var serverDetailModel: ServerDetailModel?
 
     // Join code alert
-    @Published var showJoinCodeAlert = false
-    @Published var joinCodeInput = ""
+    var showJoinCodeAlert = false
+    var joinCodeInput = ""
 
     // Error alert
-    @Published var errorMessage: String?
+    var errorMessage: String?
+
+    var isPresentingError: Bool {
+        get { errorMessage != nil }
+        set { if !newValue { errorMessage = nil } }
+    }
 
     var nextappupdate = Date()
 
-    init() {}
+    init(session: TeamTalkSession) {
+        self.session = session
+    }
 
     // MARK: - On-appear lifecycle
 
     func onAppear() {
         servers = loadLocalServers()
 
-        let defaults = UserDefaults.standard
-        let downloadOfficial = defaults.object(forKey: PREF_DISPLAY_OFFICIALSERVERS) == nil || defaults.bool(forKey: PREF_DISPLAY_OFFICIALSERVERS)
-        let downloadPublic = defaults.object(forKey: PREF_DISPLAY_PUBLICSERVERS) == nil || defaults.bool(forKey: PREF_DISPLAY_PUBLICSERVERS)
-        let downloadUnofficial = defaults.object(forKey: PREF_DISPLAY_UNOFFICIALSERVERS) != nil && defaults.bool(forKey: PREF_DISPLAY_UNOFFICIALSERVERS)
+        let filters = Preferences.current.serverListFilters
+        let downloadOfficial = filters.showOfficialServers
+        let downloadPublic = filters.showPublicServers
+        let downloadUnofficial = filters.showUnofficialServers
 
         if downloadOfficial || downloadPublic || downloadUnofficial {
             Timer.scheduledTimer(withTimeInterval: 1.0, repeats: false) { [weak self] _ in
@@ -195,7 +207,7 @@ final class ServerListModel: ObservableObject {
     // MARK: - Navigation actions
 
     func openPreferences() {
-        navigationPath.append(.preferences(PreferencesModel()))
+        navigationPath.append(.preferences(PreferencesModel(session: session)))
     }
 
     func addServer() {
@@ -208,7 +220,7 @@ final class ServerListModel: ObservableObject {
 
     func connect(to server: Server) {
         navigationPath.removeAll()
-        activeMainTabModel = MainTabModel(server: server)
+        activeMainTabModel = MainTabModel(server: server, session: session)
     }
 
     func closeActiveServer() {
@@ -335,9 +347,9 @@ final class ServerListModel: ObservableObject {
     }
 
     func downloadServerList() {
-        let defaults = UserDefaults.standard
-        let official = defaults.object(forKey: PREF_DISPLAY_OFFICIALSERVERS) == nil || defaults.bool(forKey: PREF_DISPLAY_OFFICIALSERVERS)
-        let unofficial = defaults.object(forKey: PREF_DISPLAY_UNOFFICIALSERVERS) != nil && defaults.bool(forKey: PREF_DISPLAY_UNOFFICIALSERVERS)
+        let filters = Preferences.current.serverListFilters
+        let official = filters.showOfficialServers
+        let unofficial = filters.showUnofficialServers
 
         guard let url = URL(string: AppInfo.getServersURL(officialservers: official, unofficialservers: unofficial)) else { return }
         let task = URLSession.shared.dataTask(with: url) { [weak self] data, response, error in

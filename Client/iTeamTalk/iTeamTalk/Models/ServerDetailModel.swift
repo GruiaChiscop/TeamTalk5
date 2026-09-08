@@ -21,24 +21,26 @@
  *
  */
 
+import Observation
 import SwiftUI
 
-final class ServerDetailModel: ObservableObject {
+@Observable
+final class ServerDetailModel {
     let server: Server
     let joinCode: String
     let statusRows: [ServerStatusRow]
 
-    @Published var nameText: String
-    @Published var hostText: String
-    @Published var tcpPortText: String
-    @Published var udpPortText: String
-    @Published var isEncrypted: Bool
-    @Published var usernameText: String
-    @Published var passwordText: String
-    @Published var nicknameText: String
-    @Published var isWebLogin: Bool
-    @Published var channelText: String
-    @Published var channelPasswordText: String
+    var nameText: String
+    var hostText: String
+    var tcpPortText: String
+    var udpPortText: String
+    var isEncrypted: Bool
+    var usernameText: String
+    var passwordText: String
+    var nicknameText: String
+    var isWebLogin: Bool
+    var channelText: String
+    var channelPasswordText: String
 
     init(server: Server) {
         self.server = server
