@@ -405,11 +405,11 @@ final class ChannelListModel {
             return
         }
 
-        var tokens = channelPath.components(separatedBy: "/")
+        var tokens = channelPath.components(separatedBy: "/").filter { !$0.isEmpty }
         guard !tokens.isEmpty else { return }
 
         let channelName = tokens.removeLast()
-        let channelPath = tokens.map { "/" + $0 }.joined()
+        let channelPath = "/" + tokens.joined(separator: "/")
         let parentID = session.channelIdentifier(from: TeamTalkChannelPath(channelPath))
 
         guard parentID.isValid else { return }
