@@ -162,6 +162,7 @@ final class ServerListModel {
     var navigationPath: [ServerListDestination] = []
     var activeMainTabModel: MainTabModel?
     var serverDetailModel: ServerDetailModel?
+    var serverPendingDeletion: Server?
 
     // Join code alert
     var showJoinCodeAlert = false
