@@ -222,6 +222,15 @@ struct Preferences {
 
 let PREF_GENERAL_NICKNAME = "nickname_preference"
 let PREF_GENERAL_GENDER = "gender_preference"
+
+/// Status mode for PREF_GENERAL_GENDER: 0 is male, 1 is female and 2 is neutral
+func genderStatusMode(_ index: Int) -> TeamTalkStatusMode {
+    switch index {
+    case 1: return .female
+    case 2: return .neutral
+    default: return .available
+    }
+}
 let PREF_GENERAL_BEARWARE_ID = "general_bearwareid_preference"
 let PREF_GENERAL_BEARWARE_TOKEN = "general_bearwaretoken_preference"
 let PREF_GENERAL_PTTLOCK = "general_pttlock_preference"
@@ -442,8 +451,7 @@ final class PreferencesModel {
             preferences.general.genderIndex = newValue
             UserDefaults.standard.set(newValue, forKey: PREF_GENERAL_GENDER)
 
-            let mode: TeamTalkStatusMode = newValue != 0 ? .female : .available
-            session.setStatus(mode: mode)
+            session.setStatus(mode: genderStatusMode(newValue))
         }
     }
 

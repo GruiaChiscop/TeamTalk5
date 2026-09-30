@@ -501,5 +501,6 @@ public struct TeamTalkStatusMode: OptionSet, Hashable, Sendable {
     public static let videoTransmit = TeamTalkStatusMode(rawValue: 0x00000200)
     public static let desktop = TeamTalkStatusMode(rawValue: 0x00000400)
     public static let streamMediaFile = TeamTalkStatusMode(rawValue: 0x00000800)
+    public static let neutral = TeamTalkStatusMode(rawValue: 0x00001000)
 }
 

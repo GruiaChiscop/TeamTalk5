@@ -412,8 +412,9 @@ final class MainTabModel: TeamTalkEventObserver {
                     self.server.channel.removeAll()
                     self.server.chanpasswd.removeAll()
 
-                    if Preferences.current.general.genderIndex != 0 {
-                        self.session.setStatus(mode: .female)
+                    let gender = genderStatusMode(Preferences.current.general.genderIndex)
+                    if gender != .available {
+                        self.session.setStatus(mode: gender)
                     }
                 }
 

@@ -231,11 +231,11 @@ final class ChannelListModel {
 
     func userDetails(_ user: TeamTalkUser) -> ChannelUserDetails {
         let female = user.statusMode.contains(.female)
+        let neutral = user.statusMode.contains(.neutral)
         let isTalking = user.states.contains(.voice) ||
             (session.myUserIdentifier == user.userID && session.isVoiceTransmitting)
-        let iconName = isTalking
-            ? (female ? "woman_green" : "man_green")
-            : (female ? "woman_blue" : "man_blue")
+        let icon = female ? "woman" : neutral ? "neutral" : "man"
+        let iconName = icon + (isTalking ? "_green" : "_blue")
         let iconAccessibilityLabel = isTalking
             ? String(localized: "Talking", comment: "channel list")
             : String(localized: "Silent", comment: "channel list")
