@@ -97,15 +97,22 @@ struct ChannelListView: View {
     @ScaledMetric(relativeTo: .body) private var messageIconSize: CGFloat = 24
 
     var body: some View {
+        // Nested DisclosureGroups instead of an OutlineGroup, which has no way
+        // to open a group from code - needed to expand the channel the user is in.
         List {
-            OutlineGroup(model.rootNodes, children: \.children) { node in
-                switch node.kind {
-                case .channel(let channel):
-                    channelRow(channel)
-                case .user(let user):
-                    userRow(user)
-                }
+            ForEach(model.rootNodes) { node in
+                ChannelTreeNodeView(node: node, model: model, row: row)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func row(_ node: ChannelTreeNode) -> some View {
+        switch node.kind {
+        case .channel(let channel):
+            channelRow(channel)
+        case .user(let user):
+            userRow(user)
         }
     }
 
@@ -215,7 +222,7 @@ struct ChannelListView: View {
         }
 
         // Direct tap expands/collapses under VoiceOver (that's fine - it's the
-        // native OutlineGroup disclosure behavior), so Join is a named action
+        // native DisclosureGroup behavior), so Join is a named action
         // instead. Move only makes sense - and only appears - once users are
         // actually selected, in which case it comes before Join.
         return Group {
@@ -234,6 +241,41 @@ struct ChannelListView: View {
                     }
             }
         }
+    }
+}
+
+// MARK: - Tree node
+
+private struct ChannelTreeNodeView<Row: View>: View {
+    let node: ChannelTreeNode
+    let model: ChannelListModel
+    let row: (ChannelTreeNode) -> Row
+
+    var body: some View {
+        if let children = node.children, case .channel(let channel) = node.kind {
+            DisclosureGroup(isExpanded: isExpanded(channel.channelID)) {
+                ForEach(children) { child in
+                    ChannelTreeNodeView(node: child, model: model, row: row)
+                }
+            } label: {
+                row(node)
+            }
+        } else {
+            row(node)
+        }
+    }
+
+    private func isExpanded(_ channelID: TeamTalkChannelID) -> Binding<Bool> {
+        Binding(
+            get: { model.expandedChannelIDs.contains(channelID) },
+            set: { expanded in
+                if expanded {
+                    model.expandedChannelIDs.insert(channelID)
+                } else {
+                    model.expandedChannelIDs.remove(channelID)
+                }
+            }
+        )
     }
 }
 

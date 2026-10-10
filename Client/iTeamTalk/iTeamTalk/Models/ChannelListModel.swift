@@ -49,7 +49,7 @@ enum ChannelListDestination: Hashable {
 
 // MARK: - Row model
 
-// One node in the channel tree rendered by an OutlineGroup: a channel's
+// One node in the channel tree rendered as nested DisclosureGroups: a channel's
 // `children` are its subchannels followed by the users in it, or `nil` (not
 // an empty array) when there's nothing to show, so empty channels get no
 // disclosure indicator. Users are always leaves.
@@ -82,6 +82,10 @@ final class ChannelListModel {
     // MARK: Published state for the channel list view
     var rootNodes: [ChannelTreeNode] = []
     var navigationTitle: String = ""
+    // Channels whose disclosure group is open. Joining or being moved into a
+    // channel opens it and every channel above it (otherwise it would stay
+    // hidden), and leaving it collapses it again - matching the Qt client.
+    var expandedChannelIDs = Set<TeamTalkChannelID>()
 
     // MARK: Split-out sub-controllers
     let moderation: ChannelModerationActions
@@ -208,6 +212,14 @@ final class ChannelListModel {
             guard let self else { return }
             self.isRefreshScheduled = false
             self.refreshChannelList()
+        }
+    }
+
+    func expandPath(to channelID: TeamTalkChannelID) {
+        var current = channels[channelID]
+        while let channel = current {
+            expandedChannelIDs.insert(channel.channelID)
+            current = channel.parentChannelID.isValid ? channels[channel.parentChannelID] : nil
         }
     }
 
@@ -483,6 +495,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             users.removeAll()
             mychannel = TeamTalkChannel.empty
             rejoinchannel = nil
+            expandedChannelIDs.removeAll()
             refreshChannelList()
 
         case .commandProcessing(_, let isActive):
@@ -546,6 +559,7 @@ extension ChannelListModel: TeamTalkEventObserver {
             users[user.userID] = user
             if user.userID == session.myUserIdentifier, let joinedChannel = channels[user.channelIdentifier] {
                 mychannel = joinedChannel
+                expandPath(to: joinedChannel.channelID)
                 if rejoinchannel?.id == 0 && chanpasswds[user.channelIdentifier] == nil {
                     chanpasswds[user.channelIdentifier] = rejoinchannel?.password ?? ""
                 }
@@ -575,6 +589,8 @@ extension ChannelListModel: TeamTalkEventObserver {
             if user.userID == session.myUserIdentifier {
                 mychannel = TeamTalkChannel.empty
                 rejoinchannel = nil
+                // Like the Qt client, collapse the channel we left.
+                expandedChannelIDs.remove(previousChannelID)
             }
             if previousChannelID == mychannel.channelID && mychannel.channelID.isValid {
                 playSound(.left_CHAN)
