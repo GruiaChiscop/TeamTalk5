@@ -779,3 +779,9 @@
 
 /* speech */
 "You have selected %@" = "Você selecionou %@";
+
+/* serverlist */
+"Import .tt File" = "Import .tt File";
+
+/* serverlist */
+"No servers found in the file" = "No servers found in the file";

@@ -168,6 +168,8 @@ final class ServerListModel {
     var showJoinCodeAlert = false
     var joinCodeInput = ""
 
+    var showTTFileImporter = false
+
     // Error alert
     var errorMessage: String?
 
@@ -252,6 +254,38 @@ final class ServerListModel {
         guard !joinCodeInput.isEmpty else { return }
         downloadServer(joincode: joinCodeInput)
         joinCodeInput = ""
+    }
+
+    // MARK: - .tt file import
+
+    /// Adds the servers in a .tt file to the server list instead of
+    /// connecting right away like opening the file from outside does.
+    func importServers(from url: URL) {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        let serverparser = ServerParser()
+        if let parser = XMLParser(contentsOf: url) {
+            parser.delegate = serverparser
+            parser.parse()
+        }
+
+        let imported = serverparser.servers.filter { !$0.ipaddr.isEmpty }
+        guard !imported.isEmpty else {
+            errorMessage = String(localized: "No servers found in the file", comment: "serverlist")
+            return
+        }
+        for server in imported {
+            server.servertype = .LOCAL
+            if server.name.isEmpty {
+                server.name = server.ipaddr
+            }
+            upsertServer(server)
+        }
     }
 
     // MARK: - URL handling

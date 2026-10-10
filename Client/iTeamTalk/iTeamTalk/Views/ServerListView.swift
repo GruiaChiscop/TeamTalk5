@@ -22,6 +22,7 @@
  */
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ServerListView: View {
     @Bindable var model: ServerListModel
@@ -48,13 +49,6 @@ struct ServerListView: View {
     private var serverList: some View {
         NavigationStack(path: $model.navigationPath) {
             List {
-                Button {
-                    model.showJoinCodeAlert = true
-                } label: {
-                    Text("Enter Join Code")
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-
                 ForEach(model.servers, id: \.self) { server in
                     HStack(spacing: 10) {
                         Image(iconName(for: server))
@@ -91,12 +85,6 @@ struct ServerListView: View {
                         }
                         .tint(.red)
                     }
-                    /*.accessibilityAction(named: "Connect to server") {
-                        model.connect(to: server)
-                    }
-                    .accessibilityAction(named: "Delete server from list") {
-                        model.deleteServer(server)
-                    }*/
                     .accessibilityAction(named: "Show server details") {
                         model.showServerDetail(for: server)
                     }
@@ -113,11 +101,31 @@ struct ServerListView: View {
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        model.addServer()
+                    Menu {
+                        Button {
+                            model.addServer()
+                        } label: {
+                            Label("Add new server entry", systemImage: "square.and.pencil")
+                        }
+                        Button {
+                            model.showJoinCodeAlert = true
+                        } label: {
+                            Label("Enter Join Code", systemImage: "number")
+                        }
+                        Button {
+                            model.showTTFileImporter = true
+                        } label: {
+                            Label("Import .tt File", systemImage: "square.and.arrow.down")
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
+                }
+            }
+            .fileImporter(isPresented: $model.showTTFileImporter,
+                          allowedContentTypes: [UTType("dk.bearware.teamtalkhost") ?? .data]) { result in
+                if case .success(let url) = result {
+                    model.importServers(from: url)
                 }
             }
             .navigationDestination(for: ServerListDestination.self) { destination in
