@@ -73,7 +73,11 @@ struct MainTabView: View {
         .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkRemoteControl)) { notification in
             model.remoteControl(notification.object as? UIEvent)
         }
-        .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkMagicTap)) { _ in
+        // Two-finger double tap from anywhere while connected. With the SwiftUI
+        // app lifecycle, AppDelegate isn't in the responder chain, so its
+        // accessibilityPerformMagicTap() override never ran and iOS fell back to
+        // play/pause of whatever media played last.
+        .accessibilityAction(.magicTap) {
             model.magicTapToggleTX()
         }
         .alert("Error", isPresented: $model.isPresentingAlert) {

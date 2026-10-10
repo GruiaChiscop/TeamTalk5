@@ -125,5 +125,4 @@ class AppInfo {
 extension Notification.Name {
     static let iTeamTalkOpenURL = Notification.Name("iTeamTalkOpenURL")
     static let iTeamTalkRemoteControl = Notification.Name("iTeamTalkRemoteControl")
-    static let iTeamTalkMagicTap = Notification.Name("iTeamTalkMagicTap")
 }
