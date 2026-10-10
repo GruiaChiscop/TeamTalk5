@@ -36,8 +36,11 @@ struct ServerListView: View {
                 serverList
             }
         }
-        .onReceive(NotificationCenter.default.publisher(for: .iTeamTalkOpenURL)) { notification in
-            guard let url = notification.object as? URL else { return }
+        // tt:// links and .tt files. With the SwiftUI app lifecycle these are
+        // delivered to the scene, never to AppDelegate's application(_:open:options:),
+        // on cold launch as well as while running.
+        .onOpenURL { url in
+            guard url.absoluteString.starts(with: AppInfo.TTLINK_PREFIX) || url.isFileURL else { return }
             model.openUrl(url)
         }
     }
