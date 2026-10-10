@@ -109,7 +109,6 @@ struct ServerListView: View {
                     } label: {
                         Image(systemName: "gearshape")
                             .accessibilityLabel("Preferences")
-                            .accessibilityHint("Access preferences")
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
@@ -117,7 +116,6 @@ struct ServerListView: View {
                         model.addServer()
                     } label: {
                         Image(systemName: "plus")
-                            .accessibilityLabel("Add new server entry")
                     }
                 }
             }

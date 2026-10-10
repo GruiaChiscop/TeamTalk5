@@ -2,10 +2,9 @@
 //  UtilTT.swift
 //  iTeamTalk
 //
-//  Created by Bjørn Damstedt Rasmussen on 10/01/2021.
+//  Created by Bjørn Damstedt Rasmussen on 10/01/2021 and modified by Gruia Chiscop in 2026.
 //  Copyright © 2021 BearWare.dk. All rights reserved.
-//
-
+//  Copyright © 2026 Gruia Chiscop, all rights reserved.
 import Foundation
 import TeamTalkKit
 
