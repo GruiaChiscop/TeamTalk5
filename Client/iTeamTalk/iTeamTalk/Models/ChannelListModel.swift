@@ -464,8 +464,15 @@ final class ChannelListModel {
             session.setSoundInputPreprocessor(.teamTalk(TeamTalkTTAudioPreprocessorConfiguration()))
             // Preferences.sound.microphoneGainPercent reflects the SDK's *live* volume
             // (for the Preferences screen), not the persisted value being re-applied here.
-            let vol = UserDefaults.standard.integer(forKey: PREF_MICROPHONE_GAIN)
-            session.setSoundInputGainLevel(Int32(refVolume(Double(vol))))
+            // Until the slider has been moved once nothing is persisted, and
+            // integer(forKey:) would return 0 - a fully muted microphone.
+            let defaults = UserDefaults.standard
+            if defaults.object(forKey: PREF_MICROPHONE_GAIN) != nil {
+                let vol = defaults.integer(forKey: PREF_MICROPHONE_GAIN)
+                session.setSoundInputGainLevel(Int32(refVolume(Double(vol))))
+            } else {
+                session.setSoundInputGainLevel(TeamTalkSoundLevel.gainDefault)
+            }
         }
     }
 }
