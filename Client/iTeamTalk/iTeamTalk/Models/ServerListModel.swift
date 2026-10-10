@@ -444,19 +444,25 @@ class ServerParser: NSObject, XMLParserDelegate {
     var currentServer = Server()
     var elementStack = [String]()
     var servers = [Server]()
+    // XMLParser hands over an element's text in several chunks (split
+    // around entities like &amp;), so collect it and apply it at the end.
+    var text = ""
 
     func parser(_ parser: XMLParser, didStartElement elementName: String,
         namespaceURI: String?, qualifiedName qName: String?,
         attributes attributeDict: [String: String]) {
         elementStack.append(elementName)
+        text = ""
         if elementName == "host" {
             currentServer = Server()
         }
     }
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
-        guard let currentElement = elementStack.last else { return }
+        text += string
+    }
 
+    private func apply(_ string: String, to currentElement: String) {
         switch currentElement {
         case "teamtalk": break
         case "host": break
@@ -505,18 +511,18 @@ class ServerParser: NSObject, XMLParserDelegate {
         case "country":
             currentServer.stats_country = string
         case "servername":
-            currentServer.stats_servername += string
+            currentServer.stats_servername = string
         case "motd":
-            currentServer.stats_motd += string
+            currentServer.stats_motd = string
         case "active":
             break
         case "trusted-certificate": break
         case "certificate-authority-pem":
-            currentServer.cacertdata += string
+            currentServer.cacertdata = string
         case "client-certificate-pem":
-            currentServer.certdata += string
+            currentServer.certdata = string
         case "client-private-key-pem":
-            currentServer.certprivkeydata += string
+            currentServer.certprivkeydata = string
         case "verify-peer":
             currentServer.certverifypeer = string == "true"
         default:
@@ -526,6 +532,8 @@ class ServerParser: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, didEndElement elementName: String,
         namespaceURI: String?, qualifiedName qName: String?) {
+        apply(text, to: elementName)
+        text = ""
         self.elementStack.removeLast()
         if elementName == "host" {
             servers.append(currentServer)
