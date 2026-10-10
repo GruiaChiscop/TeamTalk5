@@ -19,5 +19,6 @@ target_cpu="@WEBRTC_ARCH@"
 treat_warnings_as_errors=false
 use_aura=false
 use_custom_libcxx=false
+use_lld=false
 use_ozone=false
 use_rtti=true
