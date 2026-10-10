@@ -243,6 +243,9 @@
    user detail */
 "General" = "Generelt";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "er nu i kanalen";
 

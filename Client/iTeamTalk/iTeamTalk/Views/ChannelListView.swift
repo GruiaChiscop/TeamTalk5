@@ -29,17 +29,26 @@ import TeamTalkKit
 struct ChannelListContainerView: View {
     @State var model: ChannelListModel
     @State private var isPressingTalkButton = false
+    @ScaledMetric(relativeTo: .title3) private var talkButtonMinHeight: CGFloat = 50
 
     var body: some View {
         VStack(spacing: 0) {
             ChannelListView(model: model)
 
-            Text("Talk")
-                .frame(maxWidth: .infinity)
-                .frame(height: 50)
-                .background(model.pushToTalk.isTransmitting ? Color.red : Color.green)
-                .foregroundStyle(.white)
-                .fontWeight(.semibold)
+            // Black text on system green/red keeps well above 4.5:1 contrast in
+            // both light and dark mode, and the label and icon change along with
+            // the color so the state never depends on color alone.
+            Label(model.pushToTalk.isTransmitting ? "Transmitting" : "Talk",
+                  systemImage: model.pushToTalk.isTransmitting ? "mic.fill" : "mic")
+                .font(.title3.weight(.semibold))
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, minHeight: talkButtonMinHeight)
+                // A color background extends into the safe area by default, which
+                // painted the area behind the tab bar green as well.
+                .background(model.pushToTalk.isTransmitting ? Color.red : Color.green,
+                            ignoresSafeAreaEdges: [])
+                .foregroundStyle(.black)
+                .brightness(isPressingTalkButton ? -0.15 : 0)
                 .contentShape(Rectangle())
             .simultaneousGesture(
                 DragGesture(minimumDistance: 0)
@@ -84,6 +93,8 @@ struct ChannelListContainerView: View {
 
 struct ChannelListView: View {
     let model: ChannelListModel
+    @ScaledMetric(relativeTo: .body) private var rowIconSize: CGFloat = 36
+    @ScaledMetric(relativeTo: .body) private var messageIconSize: CGFloat = 24
 
     var body: some View {
         List {
@@ -104,7 +115,7 @@ struct ChannelListView: View {
         return HStack(spacing: 10) {
             Image(details.iconName)
                 .resizable()
-                .frame(width: 36, height: 36)
+                .frame(width: rowIconSize, height: rowIconSize)
                 .accessibilityLabel(details.iconAccessibilityLabel)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -131,7 +142,9 @@ struct ChannelListView: View {
             } label: {
                 Image(details.messageIconName)
                     .resizable()
-                    .frame(width: 24, height: 24)
+                    .frame(width: messageIconSize, height: messageIconSize)
+                    .frame(minWidth: 44, minHeight: 44)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.borderless)
             .accessibilityLabel("Text Messaging")
@@ -168,11 +181,11 @@ struct ChannelListView: View {
         let content = HStack(spacing: 10) {
             Image(details.iconName)
                 .resizable()
-                .frame(width: 36, height: 36)
+                .frame(width: rowIconSize, height: rowIconSize)
                 .accessibilityLabel(details.iconAccessibilityLabel)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(limitText(details.title))
+                Text(details.title)
                     .font(.body)
                     .lineLimit(1)
                 if let subtitle = details.subtitle {

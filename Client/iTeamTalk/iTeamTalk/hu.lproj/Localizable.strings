@@ -243,6 +243,9 @@
    user detail */
 "General" = "Általános";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "kapcsolódott a csatornához";
 

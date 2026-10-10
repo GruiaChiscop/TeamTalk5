@@ -244,6 +244,9 @@
    user detail */
 "General" = "常规";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "加入频道";
 

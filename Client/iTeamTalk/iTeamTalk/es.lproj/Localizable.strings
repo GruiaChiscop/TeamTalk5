@@ -243,6 +243,9 @@
    user detail */
 "General" = "General";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "se ha unido al canal";
 

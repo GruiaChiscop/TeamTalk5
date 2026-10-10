@@ -244,6 +244,9 @@
    user detail */
 "General" = "일반";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "채널에 입장함";
 

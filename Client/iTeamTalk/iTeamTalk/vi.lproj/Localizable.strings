@@ -246,6 +246,9 @@
    user detail */
 "General" = "Chung";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "đã tham gia kênh";
 

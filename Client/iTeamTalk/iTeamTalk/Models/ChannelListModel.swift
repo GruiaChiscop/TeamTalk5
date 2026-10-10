@@ -222,8 +222,8 @@ final class ChannelListModel {
         let isTalking = user.states.contains(.voice) ||
             (session.myUserIdentifier == user.userID && session.isVoiceTransmitting)
         let iconName = isTalking
-            ? (female ? "woman_green.png" : "man_green.png")
-            : (female ? "woman_blue.png" : "man_blue.png")
+            ? (female ? "woman_green" : "man_green")
+            : (female ? "woman_blue" : "man_blue")
         let iconAccessibilityLabel = isTalking
             ? String(localized: "Talking", comment: "channel list")
             : String(localized: "Silent", comment: "channel list")
@@ -232,7 +232,7 @@ final class ChannelListModel {
             : "message_blue"
         return ChannelUserDetails(
             title: getDisplayName(user),
-            subtitle: user.statusMessage,
+            subtitle: user.statusMessage.isEmpty ? nil : user.statusMessage,
             iconName: iconName,
             iconAccessibilityLabel: iconAccessibilityLabel,
             messageIconName: messageIcon
@@ -246,14 +246,15 @@ final class ChannelListModel {
             ? String(localized: "Edit", comment: "channel list")
             : String(localized: "View", comment: "channel list")
 
-        let iconName = channel.isPasswordProtected ? "channel_pink.png" : "channel_orange.png"
+        let iconName = channel.isPasswordProtected ? "channel_pink" : "channel_orange"
         let iconLabel = channel.isPasswordProtected
             ? String(localized: "Password protected", comment: "channel list")
             : String(localized: "No password", comment: "channel list")
 
         // The root channel's own name is typically empty - show the server's
         // display name there instead.
-        let displayName = channel.parentChannelID.isValid ? channel.name : srvprop.name
+        // Only the name is limited, so the user count after it is never cut off.
+        let displayName = limitText(channel.parentChannelID.isValid ? channel.name : srvprop.name)
         let hasChildren = !(childrenByParent[channel.channelID] ?? []).isEmpty
         let directCount = usersByChannel[channel.channelID]?.count ?? 0
         let totalCount = getUsersCount(channel.channelID)
@@ -265,7 +266,7 @@ final class ChannelListModel {
 
         return ChannelDisplayDetails(
             title: title,
-            subtitle: channel.topic,
+            subtitle: channel.topic.isEmpty ? nil : channel.topic,
             iconName: iconName,
             iconAccessibilityLabel: iconLabel,
             actionTitle: actionTitle

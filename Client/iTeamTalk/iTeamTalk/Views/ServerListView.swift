@@ -104,7 +104,7 @@ struct ServerListView: View {
                     Button {
                         model.openPreferences()
                     } label: {
-                        Image("setup")
+                        Image(systemName: "gearshape")
                             .accessibilityLabel("Preferences")
                             .accessibilityHint("Access preferences")
                     }

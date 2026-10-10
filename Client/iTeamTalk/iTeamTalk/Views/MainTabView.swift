@@ -59,7 +59,7 @@ struct MainTabView: View {
                 PreferencesView(model: model.preferencesModel)
             }
             .tabItem {
-                Label("Preferences", image: "setup")
+                Label("Preferences", systemImage: "gearshape")
             }
             .tag(3)
         }

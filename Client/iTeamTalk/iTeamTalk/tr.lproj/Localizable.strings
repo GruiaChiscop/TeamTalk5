@@ -244,6 +244,9 @@
    user detail */
 "General" = "Genel";
 
+/* channel list */
+"Talk" = "Talk";
+
 /* TTS EVENT */
 "has joined the channel" = "kanala katıldı";
 
