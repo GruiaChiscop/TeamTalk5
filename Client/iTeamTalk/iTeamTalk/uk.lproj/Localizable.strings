@@ -243,6 +243,9 @@
    user detail */
 "General" = "Загальне";
 
+/* preferences */
+"Set by the channel's volume leveling" = "Set by the channel's volume leveling";
+
 /* channel list */
 "Talk" = "Talk";
 

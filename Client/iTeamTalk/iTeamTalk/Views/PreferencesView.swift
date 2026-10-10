@@ -208,7 +208,13 @@ struct PreferencesView: View {
                 Slider(value: $model.microphoneGainPercent, in: 0...100, step: 10) {
                     Text("Microphone Gain")
                 }
+                if model.isMicrophoneGainManagedByChannel {
+                    Text("Set by the channel's volume leveling")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
             }
+            .disabled(model.isMicrophoneGainManagedByChannel)
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     Text("Voice Activation Level")

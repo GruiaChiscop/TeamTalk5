@@ -393,6 +393,11 @@ final class PreferencesModel {
 
     var users = Set<Int32>()
 
+    // True while the current channel has volume leveling (AGC) on: the channel
+    // then decides the microphone gain, like in the other clients, so the
+    // slider is disabled and never overrides it.
+    var isMicrophoneGainManagedByChannel = false
+
     let subscriptionRows: [SubscriptionRow]
     let versionRows: [VersionRow]
 
@@ -553,6 +558,7 @@ final class PreferencesModel {
     var microphoneGainPercent: Double {
         get { preferences.sound.microphoneGainPercent }
         set {
+            guard !isMicrophoneGainManagedByChannel else { return }
             let roundedPercent = Double(Int(newValue / 10.0) * 10)
             preferences.sound.microphoneGainPercent = roundedPercent
             let vol = refVolume(roundedPercent)
@@ -634,10 +640,21 @@ extension PreferencesModel: TeamTalkEventObserver {
         switch event.kind {
         case .userJoined(let user):
             users.insert(user.userID.cValue)
+            if user.userID == session.myUserIdentifier { updateMicrophoneGainState() }
         case .userLeft(_, let user):
             users.remove(user.userID.cValue)
+            if user.userID == session.myUserIdentifier { updateMicrophoneGainState() }
+        case .channelUpdated(let channel):
+            if channel.channelID == session.myChannelIdentifier { updateMicrophoneGainState() }
         default:
             break
         }
+    }
+
+    // ChannelListModel observes the same events first and applies the gain
+    // (channel default or the saved value), so the live level is current here.
+    private func updateMicrophoneGainState() {
+        isMicrophoneGainManagedByChannel = session.currentChannel()?.isAGCEnabled ?? false
+        preferences.sound.microphoneGainPercent = Double(refVolumeToPercent(Int(session.soundInputGainLevel)))
     }
 }
